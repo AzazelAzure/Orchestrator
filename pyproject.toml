@@ -30,7 +30,7 @@ flowctl = "flow_engine.cli.app:main"
 flowctl-mcp = "flow_engine.mcp.server:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.9"]
+dev = ["pytest>=8.0", "ruff>=0.15.21"]
 mcp = ["mcp>=1.27"]
 
 [tool.hatch.build.targets.wheel]
