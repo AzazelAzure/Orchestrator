@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Audit Procedure"
+  short_description: "Audit security risk before release claims"
+  default_prompt: "Use $security-audit-procedure for auth, secrets, or pre-release hardening."

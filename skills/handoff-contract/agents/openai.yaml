@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff Contract"
+  short_description: "Standardize transferable work outputs"
+  default_prompt: "Use $handoff-contract to package results for a receiver."

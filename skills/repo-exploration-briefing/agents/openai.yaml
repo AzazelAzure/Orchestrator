@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Exploration Briefing"
+  short_description: "Map unfamiliar code quickly"
+  default_prompt: "Use $repo-exploration-briefing to map structure before planning."

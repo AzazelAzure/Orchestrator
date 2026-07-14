@@ -1,0 +1,153 @@
+"""Publication-candidate neutrality and skill package validation."""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _p(*parts: str, flags: int = 0) -> re.Pattern[str]:
+    """Build a pattern from parts to avoid self-matching this test module."""
+    return re.compile("".join(parts), flags)
+
+
+FORBIDDEN_PATTERNS = [
+    _p(r"\b", "HFM", r"\b"),
+    _p(r"\b", "HiveSolutions", r"\b"),
+    _p(r"\b", "Hive", r"_", "Orchestrator", r"\b"),
+    _p(r"\b", "hive", r"-", "orchestrator", r"\b", flags=re.I),
+    _p(r"\b", "Directorate", r"\b"),
+    _p(r"\b", "Finance", r" Manager", r"\b", flags=re.I),
+    _p("portfolio", r"_", flags=re.I),
+    _p("flow-engine", r"-", "portfolio", flags=re.I),
+    _p("/", "home", "/", "pproctor"),
+    _p(r"/Users/", r"[A-Za-z_][A-Za-z0-9._-]*/"),
+    _p(r"\b", "Portfolio", r"\b"),
+]
+
+TRACKED_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".json", ".sql", ".txt"}
+SKIP_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+SKIP_FILES = {Path(__file__).resolve()}
+
+SEED_SKILLS = {
+    "session-orientation": "skill.session-orientation",
+    "repo-exploration-briefing": "skill.repo-exploration-briefing",
+    "trust-but-verify": "skill.trust-but-verify",
+    "design-first-gate": "skill.design-first-gate",
+    "handoff-contract": "skill.handoff-contract",
+    "ci-test-triage": "skill.ci-test-triage",
+    "code-review-risk-triage": "skill.code-review-risk-triage",
+    "security-audit-procedure": "skill.security-audit-procedure",
+    "skill-gap-detection": "skill.skill-gap-detection",
+}
+
+
+def _candidate_files() -> list[Path]:
+    files: list[Path] = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.resolve() in SKIP_FILES:
+            continue
+        if any(part in SKIP_DIRS for part in path.parts):
+            continue
+        if path.suffix.lower() not in TRACKED_SUFFIXES and path.name not in {
+            "LICENSE",
+            "AGENTS.md",
+            "README.md",
+            "CONTRIBUTING.md",
+            "SECURITY.md",
+            "CODE_OF_CONDUCT.md",
+            ".gitignore",
+            ".gitleaks.toml",
+        }:
+            continue
+        files.append(path)
+    return files
+
+
+def test_no_product_branding_or_private_paths() -> None:
+    hits: list[str] = []
+    for path in _candidate_files():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        rel = path.relative_to(ROOT).as_posix()
+        for pattern in FORBIDDEN_PATTERNS:
+            if pattern.search(text):
+                hits.append(f"{rel}: matched {pattern.pattern}")
+    assert hits == [], "forbidden branding/path references:\n" + "\n".join(hits)
+
+
+def test_mcp_tools_are_product_agnostic() -> None:
+    from flow_engine.capabilities.transport import APPROVED_MCP_TOOL_NAMES, MCP_TOOL_TO_CAPABILITY
+    from flow_engine.mcp.server import SERVER_NAME
+
+    assert SERVER_NAME == "orchestrator"
+    assert all(not name.startswith("port" + "folio_") for name in APPROVED_MCP_TOOL_NAMES)
+    assert set(APPROVED_MCP_TOOL_NAMES) == {
+        "repo_health",
+        "open_prs",
+        "ci_status",
+        "work_lookup",
+        "session_brief",
+    }
+    assert set(MCP_TOOL_TO_CAPABILITY) == set(APPROVED_MCP_TOOL_NAMES)
+
+
+def test_default_projects_config_path_is_neutral() -> None:
+    from flow_engine.capabilities.project_resolver import ProjectResolver
+
+    path = ProjectResolver._resolve_config_path(None)
+    assert path.as_posix().endswith("/.config/orchestrator/projects.json")
+    assert "hive" not in path.as_posix().lower()
+    assert ("port" + "folio") not in path.as_posix().lower()
+
+
+def test_no_product_adapter_module() -> None:
+    src = ROOT / "src" / "flow_engine"
+    stems = {p.stem.lower() for p in src.rglob("*.py")}
+    assert "hfm" not in stems
+    assert not any("hfm" in p.as_posix().lower() for p in src.rglob("*"))
+
+
+def test_seed_skill_packages_valid() -> None:
+    skills_root = ROOT / "skills"
+    assert skills_root.is_dir()
+    for dirname, skill_id in SEED_SKILLS.items():
+        skill_dir = skills_root / dirname
+        assert (skill_dir / "SKILL.md").is_file(), dirname
+        assert (skill_dir / "agents" / "openai.yaml").is_file(), dirname
+        manifest = json.loads((skill_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["skill_id"] == skill_id
+        assert manifest["activation_state"] == "active"
+        assert manifest["product_coupling"] == "none"
+        assert manifest["scheduling_ref"] is None
+        assert manifest["triggers"]
+        assert all(t.get("kind") == "on_demand" for t in manifest["triggers"])
+        assert isinstance(manifest["content_sha256"], str) and len(manifest["content_sha256"]) == 64
+
+
+def test_skill_gap_is_ondemand_local_only() -> None:
+    skill = (ROOT / "skills" / "skill-gap-detection" / "SKILL.md").read_text(encoding="utf-8")
+    manifest = json.loads(
+        (ROOT / "skills" / "skill-gap-detection" / "manifest.json").read_text(encoding="utf-8")
+    )
+    lowered = skill.lower()
+    assert "on-demand" in lowered
+    assert "scheduler" in lowered
+    assert manifest["scheduling_ref"] is None
+    assert manifest["write_set"] == ["candidate.create", "evidence.create"]
+
+
+def test_no_tracked_db_or_cache_artifacts() -> None:
+    bad: list[str] = []
+    for path in ROOT.rglob("*"):
+        if any(part in SKIP_DIRS for part in path.parts):
+            continue
+        if path.suffix.lower() in {".db", ".sqlite", ".sqlite3"}:
+            bad.append(str(path.relative_to(ROOT)))
+        if path.name == ".env":
+            bad.append(str(path.relative_to(ROOT)))
+    assert bad == []

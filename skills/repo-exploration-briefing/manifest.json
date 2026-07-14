@@ -1,0 +1,23 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.repo.read"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "b1b24320c6b66446723ddf3e4df7bf8141b479c30d23fa6adfd25e0534c3aecd",
+  "degraded_behavior": "If repositories are unavailable, report partial map with explicit unknowns.",
+  "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.repo-exploration-briefing",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": []
+}

@@ -1,0 +1,26 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.repo.read",
+    "cap.finding.create"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "542140d11581f6b36a0bd6ce2155831aec5be1930ae37da520975fac0117e9c8",
+  "degraded_behavior": "Do not claim a clean audit if tooling did not execute; never log secrets.",
+  "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.security-audit-procedure",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": [
+    "finding.create"
+  ]
+}

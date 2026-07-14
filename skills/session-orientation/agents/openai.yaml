@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Orientation"
+  short_description: "Orient at session start before work"
+  default_prompt: "Use $session-orientation to confirm session context before starting work."

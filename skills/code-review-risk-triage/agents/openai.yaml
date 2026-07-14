@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review Risk Triage"
+  short_description: "Pre-publication diff risk review"
+  default_prompt: "Use $code-review-risk-triage before publishing a change."

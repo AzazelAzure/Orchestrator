@@ -1,0 +1,4 @@
+# Gitleaks configuration for Orchestrator candidate scans.
+title = "gitleaks config"
+[extend]
+useDefault = true

@@ -1,0 +1,26 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.repo.read",
+    "cap.finding.create"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "c41fec993982b9c08c63c66691d27d9c88f7dd816fde215eecee8736ebdac9f0",
+  "degraded_behavior": "If CI logs are unavailable, reproduce locally first and document missing evidence.",
+  "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.ci-test-triage",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": [
+    "finding.create"
+  ]
+}

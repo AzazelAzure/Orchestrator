@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Gap Detection"
+  short_description: "On-demand skill-gap wishlist only"
+  default_prompt: "Use $skill-gap-detection to propose on-demand wishlist candidates from session friction."

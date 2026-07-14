@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trust But Verify"
+  short_description: "Re-check consequential status claims"
+  default_prompt: "Use $trust-but-verify before acting on a clean/ready claim."

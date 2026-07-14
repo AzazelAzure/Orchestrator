@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design First Gate"
+  short_description: "Close design before dispatch"
+  default_prompt: "Use $design-first-gate when a plan claims design readiness."

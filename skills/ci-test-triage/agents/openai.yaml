@@ -1,0 +1,4 @@
+interface:
+  display_name: "CI Test Triage"
+  short_description: "Triage CI and test failures"
+  default_prompt: "Use $ci-test-triage to classify and fix failing checks."

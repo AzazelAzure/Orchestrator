@@ -1,0 +1,24 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.session.read",
+    "cap.evidence.read"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "dd99448fcd362e5d7fd32e32a4306fd1800a0b730b1d67ceedfa60de4006f2f0",
+  "degraded_behavior": "If the authoritative source is unreachable, do not treat the cached claim as verified; report degraded and block the gated decision.",
+  "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.trust-but-verify",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": []
+}
