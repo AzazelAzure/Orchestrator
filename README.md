@@ -66,6 +66,13 @@ projects via `FLOW_PROJECTS_CONFIG` pointing at a `projects.json` (see
 Canonical packages live in `skills/`. See `docs/skills.md` for discovery and
 install mappings.
 
+## Deployment roadmap (planning)
+
+Phased hosted progression (P0–P4), go/no-go gates, and SQLite single-writer
+constraints are documented in [`docs/deployment-roadmap.md`](docs/deployment-roadmap.md).
+**Planning only** — not production ready; no schedule authorization; no linker
+enabled in this repository.
+
 ## License
 
 GNU Affero General Public License v3.0 only — see `LICENSE`.

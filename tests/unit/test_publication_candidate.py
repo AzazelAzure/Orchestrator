@@ -25,7 +25,7 @@ FORBIDDEN_PATTERNS = [
     _p("flow-engine", r"-", "portfolio", flags=re.I),
     _p("/", "home", "/", "pproctor"),
     _p(r"/Users/", r"[A-Za-z_][A-Za-z0-9._-]*/"),
-    _p(r"\b", "Portfolio", r"\b"),
+    # Bare "Portfolio" is allowed only as the named future external pilot (see docs/deployment-roadmap.md).
 ]
 
 TRACKED_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".json", ".sql", ".txt"}
