@@ -2,6 +2,12 @@
 
 Canonical skill packages live in this repository under `skills/`.
 
+The default `core` bundle contains five workflow-floor skills. The `extended`
+bundle ships with the repository but is opt-in and contains investigation,
+exploration, security, publication documentation, CI triage, and code-review
+risk triage. Bundle declarations live under `skills/bundles/` and reference
+package IDs rather than copying package bodies.
+
 ## Layout
 
 ```
@@ -35,5 +41,5 @@ Do not hard-code machine-specific absolute paths in tracked docs or configs.
 ## Validation
 
 ```bash
-pytest tests/unit/test_skill_packages.py
+pytest tests/unit/test_publication_candidate.py
 ```

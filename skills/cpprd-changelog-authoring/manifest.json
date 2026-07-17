@@ -1,0 +1,16 @@
+{
+  "activation_state": "active",
+  "capabilities_required": ["cap.repository.read", "cap.documentation.write"],
+  "conflicts_with": [],
+  "content_sha256": "63e069b4edc6912567fe89da99920e129d63c7da9a0f6c2f6c974d00836785e4",
+  "degraded_behavior": "Keep a local draft and report the unresolved authority or publication surface.",
+  "notes": "Public Orchestrator extended skill. CPPRD is compatibility vocabulary, not product coupling.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.cpprd-changelog-authoring",
+  "triggers": [{"condition": "A material change needs complete changelog or publication documentation.", "kind": "on_demand"}],
+  "version": "0.2.0",
+  "write_set": ["documentation.update"]
+}

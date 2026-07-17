@@ -5,7 +5,7 @@
     "cap.candidate.propose"
   ],
   "conflicts_with": [],
-  "content_sha256": "cc3656002ff5dabc9c67e56e698679593a86a94a5f2cf7f6cca1e7c4a505f6bf",
+  "content_sha256": "19c0d60a390c3cab83764060bdf8747bee1b83f5b38be31f1067f036d7d6e74a",
   "degraded_behavior": "Emit a local human-readable wishlist only; do not claim durable recording; no scheduler.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -19,7 +19,7 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": [
     "candidate.create",
     "evidence.create"

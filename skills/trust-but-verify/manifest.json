@@ -5,7 +5,7 @@
     "cap.evidence.read"
   ],
   "conflicts_with": [],
-  "content_sha256": "dd99448fcd362e5d7fd32e32a4306fd1800a0b730b1d67ceedfa60de4006f2f0",
+  "content_sha256": "ad578d8d527415c8ea3182308d88448c3421eb7283ca78d52ea12c660e17e034",
   "degraded_behavior": "If the authoritative source is unreachable, do not treat the cached claim as verified; report degraded and block the gated decision.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -19,6 +19,6 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": []
 }

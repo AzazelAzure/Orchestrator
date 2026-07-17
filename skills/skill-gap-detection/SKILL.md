@@ -7,7 +7,8 @@ description: "Interpret a session evidence window for repeated manual friction p
 
 On-demand interpretation procedure. This package teaches how to read friction
 patterns and draft a candidate record. It does not own schedulers, durable
-stores, or package mutation.
+stores, or package mutation. Apply an operator-supplied domain profile when one
+is present; do not invent missing domain policy.
 
 ## Guardrails
 
@@ -17,14 +18,17 @@ stores, or package mutation.
 - Do not consume prior candidates or wishlist rows as friction input (no self-signal loop).
 - Proposer, reviewer, and approver identities must be distinct; do not self-approve.
 - Prefer derived pattern summaries over raw command/tool bodies on portable surfaces.
+- A domain profile may narrow evidence sources, sensitivity, vocabulary, output,
+  and review roles. It may not expand this skill's write or scheduling authority.
 
 ## Procedure
 
-1. Obtain the current session evidence window (tool/command pattern summary).
-2. Identify repeated manual sequences that a future procedure could absorb.
-3. For each pattern, record description, recurrence signal, and logical capability needs.
-4. Emit a local wishlist / candidate draft only.
-5. Do not claim durable engine recording unless an operator-provided store is explicitly configured and used outside this package.
+1. Load the assigned domain profile, if present, and validate its skill ID and compatible version.
+2. Obtain the current session evidence window from profile-allowed sources.
+3. Identify repeated manual sequences that a future procedure could absorb.
+4. For each pattern, record domain, description, recurrence signal, and logical capability needs.
+5. Emit a local wishlist or candidate draft only at the profile-approved output.
+6. Do not claim durable engine recording unless an operator-provided store is explicitly configured and used outside this package.
 
 ## Degraded mode
 

@@ -4,7 +4,7 @@
     "cap.session.read"
   ],
   "conflicts_with": [],
-  "content_sha256": "0db3298cc31ab64934d508c4f9956121a8f3848498c498365e0da8e1d0975e3b",
+  "content_sha256": "874ad606b03485c2de00ab240fe64df3d727a6ad7910cd571fec4c2bec8cf2f2",
   "degraded_behavior": "If discovery is incomplete, enter degraded mode and do not invent project facts.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -18,6 +18,6 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": []
 }

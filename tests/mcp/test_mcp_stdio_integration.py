@@ -50,6 +50,9 @@ def _server_env(tmp_path: Path, config: Path) -> dict[str, str]:
     env = get_default_environment()
     env["FLOW_DB_PATH"] = str(tmp_path / "state.db")
     env["FLOW_PROJECTS_CONFIG"] = str(config)
+    source_root = str(Path(__file__).resolve().parents[2] / "src")
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = source_root if not existing else f"{source_root}:{existing}"
     return env
 
 

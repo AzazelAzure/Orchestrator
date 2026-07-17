@@ -1,0 +1,16 @@
+{
+  "activation_state": "active",
+  "capabilities_required": ["cap.repository.read"],
+  "conflicts_with": [],
+  "content_sha256": "bd09a950d963e84fa677c7658e1a06091e17e48a32ec2c31b8c8289daafa5ae3",
+  "degraded_behavior": "Report the unavailable authoritative source and preserve the question as unresolved.",
+  "notes": "Public Orchestrator extended skill. On-demand and product-neutral.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.investigation-report",
+  "triggers": [{"condition": "A design gate needs a scoped factual codebase investigation.", "kind": "on_demand"}],
+  "version": "0.2.0",
+  "write_set": ["finding.candidate"]
+}

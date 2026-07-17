@@ -63,8 +63,9 @@ projects via `FLOW_PROJECTS_CONFIG` pointing at a `projects.json` (see
 
 ## Skills
 
-Canonical packages live in `skills/`. See `docs/skills.md` for discovery and
-install mappings.
+Eleven canonical packages live in `skills/`, split into a five-skill default
+core bundle and a six-skill opt-in extended bundle. See `docs/skills.md` for
+discovery and install mappings.
 
 ## License
 

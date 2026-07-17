@@ -139,7 +139,7 @@ async def _run_stdio_server() -> None:
 def main() -> int:
     if MCP_IMPORT_ERROR is not None:
         print(
-            "flowctl-mcp requires the optional mcp dependency; install with: pip install 'flow-engine[mcp]'",
+            "flowctl-mcp requires the optional mcp dependency; install with: pip install 'orchestrator[mcp]'",
             file=sys.stderr,
         )
         return 2

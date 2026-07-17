@@ -5,7 +5,7 @@
     "cap.finding.create"
   ],
   "conflicts_with": [],
-  "content_sha256": "c41fec993982b9c08c63c66691d27d9c88f7dd816fde215eecee8736ebdac9f0",
+  "content_sha256": "de404b4747414745c4c8d60ce6f373cccc8f8e52a0cd1e434ffdaad7dc20dee5",
   "degraded_behavior": "If CI logs are unavailable, reproduce locally first and document missing evidence.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -19,7 +19,7 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": [
     "finding.create"
   ]

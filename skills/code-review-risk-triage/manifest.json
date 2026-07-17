@@ -5,7 +5,7 @@
     "cap.finding.create"
   ],
   "conflicts_with": [],
-  "content_sha256": "4fb50e210865e0e502b7163b8bc9e76b00259f0bdb003fc0e89cd84406ac4e8e",
+  "content_sha256": "839f16ed549a25f9a8e9ce2eacc510c018c635fe5804933b080e0e98a6254e69",
   "degraded_behavior": "If the full diff is unavailable, state omitted chunks and do not claim completeness.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -19,7 +19,7 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": [
     "finding.create"
   ]

@@ -1,0 +1,780 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "id": "orchestrator",
+    "domain": "orchestrator",
+    "manifest_path": "agentic/manifest.json",
+    "revision": null
+  },
+  "captured_at": "2026-07-17T03:52:14+00:00",
+  "entities": [
+    {
+      "id": "bundle.orchestrator.core",
+      "kind": "skill_bundle",
+      "name": "core",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/bundles/core.json",
+      "version": "1",
+      "content_sha256": "fdbe8ae0ab6dc74a5573927db4931d2494e9c95fc61ed6cb6172b9f11017657c",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation": "default"
+      },
+      "notes": "References packages by stable skill ID; contains no copied skill body.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "bundle.orchestrator.extended",
+      "kind": "skill_bundle",
+      "name": "extended",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/bundles/extended.json",
+      "version": "1",
+      "content_sha256": "d0388ffed59e7ceec4f8ec02b771412f67b2c02af95591d1c792c90cbd6a2008",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation": "opt_in"
+      },
+      "notes": "References packages by stable skill ID; contains no copied skill body.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "capability.orchestrator.ci-status",
+      "kind": "capability",
+      "name": "ci_status",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "logical_name": "ci_status"
+      },
+      "notes": "Shared application capability used by CLI and MCP transports.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "capability.orchestrator.open-prs",
+      "kind": "capability",
+      "name": "open_prs",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "logical_name": "open_prs"
+      },
+      "notes": "Shared application capability used by CLI and MCP transports.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "capability.orchestrator.repo-health",
+      "kind": "capability",
+      "name": "repo_health",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "logical_name": "repo_health"
+      },
+      "notes": "Shared application capability used by CLI and MCP transports.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "capability.orchestrator.session-brief",
+      "kind": "capability",
+      "name": "session_brief",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "logical_name": "session_brief"
+      },
+      "notes": "Shared application capability used by CLI and MCP transports.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "capability.orchestrator.work-lookup",
+      "kind": "capability",
+      "name": "work_lookup",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "logical_name": "work_lookup"
+      },
+      "notes": "Shared application capability used by CLI and MCP transports.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.server.orchestrator.read-only",
+      "kind": "mcp_server",
+      "name": "flowctl-mcp",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/mcp/server.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio",
+        "entrypoint": "flowctl-mcp",
+        "tool_count": 5
+      },
+      "notes": "Agent invocation is not exposed; Orchestrator workers retain agent authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.tool.orchestrator.ci-status",
+      "kind": "mcp_tool",
+      "name": "ci_status",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio"
+      },
+      "notes": "Typed MCP exposure of the corresponding logical capability.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.tool.orchestrator.open-prs",
+      "kind": "mcp_tool",
+      "name": "open_prs",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio"
+      },
+      "notes": "Typed MCP exposure of the corresponding logical capability.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.tool.orchestrator.repo-health",
+      "kind": "mcp_tool",
+      "name": "repo_health",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio"
+      },
+      "notes": "Typed MCP exposure of the corresponding logical capability.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.tool.orchestrator.session-brief",
+      "kind": "mcp_tool",
+      "name": "session_brief",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio"
+      },
+      "notes": "Typed MCP exposure of the corresponding logical capability.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.tool.orchestrator.work-lookup",
+      "kind": "mcp_tool",
+      "name": "work_lookup",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "available",
+      "source": "src/flow_engine/capabilities/transport.py",
+      "version": "0.1.0",
+      "content_sha256": null,
+      "authority": "read-only-default",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "transport": "stdio"
+      },
+      "notes": "Typed MCP exposure of the corresponding logical capability.",
+      "verification": {
+        "source_present": true,
+        "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.ci-test-triage",
+      "kind": "skill_package",
+      "name": "ci-test-triage",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/ci-test-triage",
+      "version": "0.2.0",
+      "content_sha256": "de404b4747414745c4c8d60ce6f373cccc8f8e52a0cd1e434ffdaad7dc20dee5",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.code-review-risk-triage",
+      "kind": "skill_package",
+      "name": "code-review-risk-triage",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/code-review-risk-triage",
+      "version": "0.2.0",
+      "content_sha256": "839f16ed549a25f9a8e9ce2eacc510c018c635fe5804933b080e0e98a6254e69",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.cpprd-changelog-authoring",
+      "kind": "skill_package",
+      "name": "cpprd-changelog-authoring",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/cpprd-changelog-authoring",
+      "version": "0.2.0",
+      "content_sha256": "63e069b4edc6912567fe89da99920e129d63c7da9a0f6c2f6c974d00836785e4",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator extended skill. CPPRD is compatibility vocabulary, not product coupling.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.design-first-gate",
+      "kind": "skill_package",
+      "name": "design-first-gate",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/design-first-gate",
+      "version": "0.2.0",
+      "content_sha256": "4a12b4016a077d964790421fce2aa8c125638902ef4cc6a579b255d99aa184c2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.handoff-contract",
+      "kind": "skill_package",
+      "name": "handoff-contract",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/handoff-contract",
+      "version": "0.2.0",
+      "content_sha256": "cdb17d58026b55a4de0282fced6dd88360544eebf2916a1e18b792787dffb171",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.investigation-report",
+      "kind": "skill_package",
+      "name": "investigation-report",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/investigation-report",
+      "version": "0.2.0",
+      "content_sha256": "bd09a950d963e84fa677c7658e1a06091e17e48a32ec2c31b8c8289daafa5ae3",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator extended skill. On-demand and product-neutral.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.repo-exploration-briefing",
+      "kind": "skill_package",
+      "name": "repo-exploration-briefing",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/repo-exploration-briefing",
+      "version": "0.2.0",
+      "content_sha256": "e50e716cd589ef51fd4322a490c79c49b2c35e328a97f3cd2a365fdf5228e125",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.security-audit-procedure",
+      "kind": "skill_package",
+      "name": "security-audit-procedure",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/security-audit-procedure",
+      "version": "0.2.0",
+      "content_sha256": "86b5bfadc1610212c8dfc395656bb2bbbaf5002a4580e7ccfd5b54b2c756187f",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.session-orientation",
+      "kind": "skill_package",
+      "name": "session-orientation",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/session-orientation",
+      "version": "0.2.0",
+      "content_sha256": "874ad606b03485c2de00ab240fe64df3d727a6ad7910cd571fec4c2bec8cf2f2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.skill-gap-detection",
+      "kind": "skill_package",
+      "name": "skill-gap-detection",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/skill-gap-detection",
+      "version": "0.2.0",
+      "content_sha256": "19c0d60a390c3cab83764060bdf8747bee1b83f5b38be31f1067f036d7d6e74a",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "local",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.trust-but-verify",
+      "kind": "skill_package",
+      "name": "trust-but-verify",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/trust-but-verify",
+      "version": "0.2.0",
+      "content_sha256": "ad578d8d527415c8ea3182308d88448c3421eb7283ca78d52ea12c660e17e034",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "from": "mcp.server.orchestrator.read-only",
+      "type": "exposes",
+      "to": "mcp.tool.orchestrator.ci-status"
+    },
+    {
+      "from": "mcp.server.orchestrator.read-only",
+      "type": "exposes",
+      "to": "mcp.tool.orchestrator.open-prs"
+    },
+    {
+      "from": "mcp.server.orchestrator.read-only",
+      "type": "exposes",
+      "to": "mcp.tool.orchestrator.repo-health"
+    },
+    {
+      "from": "mcp.server.orchestrator.read-only",
+      "type": "exposes",
+      "to": "mcp.tool.orchestrator.session-brief"
+    },
+    {
+      "from": "mcp.server.orchestrator.read-only",
+      "type": "exposes",
+      "to": "mcp.tool.orchestrator.work-lookup"
+    },
+    {
+      "from": "mcp.tool.orchestrator.ci-status",
+      "type": "wraps",
+      "to": "capability.orchestrator.ci-status"
+    },
+    {
+      "from": "mcp.tool.orchestrator.open-prs",
+      "type": "wraps",
+      "to": "capability.orchestrator.open-prs"
+    },
+    {
+      "from": "mcp.tool.orchestrator.repo-health",
+      "type": "wraps",
+      "to": "capability.orchestrator.repo-health"
+    },
+    {
+      "from": "mcp.tool.orchestrator.session-brief",
+      "type": "wraps",
+      "to": "capability.orchestrator.session-brief"
+    },
+    {
+      "from": "mcp.tool.orchestrator.work-lookup",
+      "type": "wraps",
+      "to": "capability.orchestrator.work-lookup"
+    },
+    {
+      "from": "skill.ci-test-triage",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.code-review-risk-triage",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.cpprd-changelog-authoring",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.design-first-gate",
+      "type": "member_of",
+      "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.handoff-contract",
+      "type": "member_of",
+      "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.investigation-report",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.repo-exploration-briefing",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.security-audit-procedure",
+      "type": "member_of",
+      "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.session-orientation",
+      "type": "member_of",
+      "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.skill-gap-detection",
+      "type": "member_of",
+      "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.trust-but-verify",
+      "type": "member_of",
+      "to": "bundle.orchestrator.core"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "bundle_id": "bundle.orchestrator.extended",
+  "activation": "opt_in",
+  "members": [
+    "skill.investigation-report",
+    "skill.repo-exploration-briefing",
+    "skill.security-audit-procedure",
+    "skill.cpprd-changelog-authoring",
+    "skill.ci-test-triage",
+    "skill.code-review-risk-triage"
+  ]
+}

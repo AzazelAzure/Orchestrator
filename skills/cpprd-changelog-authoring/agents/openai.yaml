@@ -1,0 +1,4 @@
+interface:
+  display_name: "Change Publication Docs"
+  short_description: "Author changelog and publication notes"
+  default_prompt: "Use $cpprd-changelog-authoring to author complete change-publication docs."

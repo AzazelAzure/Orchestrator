@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "bundle_id": "bundle.orchestrator.core",
+  "activation": "default",
+  "members": [
+    "skill.session-orientation",
+    "skill.trust-but-verify",
+    "skill.design-first-gate",
+    "skill.handoff-contract",
+    "skill.skill-gap-detection"
+  ]
+}

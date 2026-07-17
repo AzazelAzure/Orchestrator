@@ -2,11 +2,33 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _skill_content_hash(skill_dir: Path) -> str:
+    digest = hashlib.sha256()
+    files = sorted(
+        path
+        for path in skill_dir.rglob("*")
+        if path.is_file()
+        and path.relative_to(skill_dir).as_posix() not in {"manifest.json", ".hq-managed-skill.json"}
+        and "__pycache__" not in path.parts
+        and path.suffix != ".pyc"
+    )
+    for path in files:
+        relative = path.relative_to(skill_dir).as_posix()
+        data = path.read_bytes()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(len(data)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(data)
+    return digest.hexdigest()
 
 
 def _p(*parts: str, flags: int = 0) -> re.Pattern[str]:
@@ -42,6 +64,8 @@ SEED_SKILLS = {
     "code-review-risk-triage": "skill.code-review-risk-triage",
     "security-audit-procedure": "skill.security-audit-procedure",
     "skill-gap-detection": "skill.skill-gap-detection",
+    "investigation-report": "skill.investigation-report",
+    "cpprd-changelog-authoring": "skill.cpprd-changelog-authoring",
 }
 
 
@@ -127,6 +151,21 @@ def test_seed_skill_packages_valid() -> None:
         assert manifest["triggers"]
         assert all(t.get("kind") == "on_demand" for t in manifest["triggers"])
         assert isinstance(manifest["content_sha256"], str) and len(manifest["content_sha256"]) == 64
+        assert manifest["content_sha256"] == _skill_content_hash(skill_dir)
+
+
+def test_skill_bundles_partition_all_seed_packages() -> None:
+    bundles = ROOT / "skills" / "bundles"
+    core = json.loads((bundles / "core.json").read_text(encoding="utf-8"))
+    extended = json.loads((bundles / "extended.json").read_text(encoding="utf-8"))
+    core_members = set(core["members"])
+    extended_members = set(extended["members"])
+    assert core["activation"] == "default"
+    assert extended["activation"] == "opt_in"
+    assert core_members.isdisjoint(extended_members)
+    assert core_members | extended_members == set(SEED_SKILLS.values())
+    assert len(core_members) == 5
+    assert len(extended_members) == 6
 
 
 def test_skill_gap_is_ondemand_local_only() -> None:
@@ -139,6 +178,7 @@ def test_skill_gap_is_ondemand_local_only() -> None:
     assert "scheduler" in lowered
     assert manifest["scheduling_ref"] is None
     assert manifest["write_set"] == ["candidate.create", "evidence.create"]
+    assert "domain profile" in lowered
 
 
 def test_no_tracked_db_or_cache_artifacts() -> None:

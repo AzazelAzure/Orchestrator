@@ -5,7 +5,7 @@
     "cap.finding.create"
   ],
   "conflicts_with": [],
-  "content_sha256": "542140d11581f6b36a0bd6ce2155831aec5be1930ae37da520975fac0117e9c8",
+  "content_sha256": "86b5bfadc1610212c8dfc395656bb2bbbaf5002a4580e7ccfd5b54b2c756187f",
   "degraded_behavior": "Do not claim a clean audit if tooling did not execute; never log secrets.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -19,7 +19,7 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": [
     "finding.create"
   ]

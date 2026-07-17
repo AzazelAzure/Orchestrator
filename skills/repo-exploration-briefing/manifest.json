@@ -4,7 +4,7 @@
     "cap.repo.read"
   ],
   "conflicts_with": [],
-  "content_sha256": "b1b24320c6b66446723ddf3e4df7bf8141b479c30d23fa6adfd25e0534c3aecd",
+  "content_sha256": "e50e716cd589ef51fd4322a490c79c49b2c35e328a97f3cd2a365fdf5228e125",
   "degraded_behavior": "If repositories are unavailable, report partial map with explicit unknowns.",
   "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
   "portability": "portable",
@@ -18,6 +18,6 @@
       "kind": "on_demand"
     }
   ],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "write_set": []
 }

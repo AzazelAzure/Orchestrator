@@ -1,0 +1,4 @@
+interface:
+  display_name: "Investigation Report"
+  short_description: "Produce scoped factual investigation reports"
+  default_prompt: "Use $investigation-report to answer scoped factual codebase questions."
