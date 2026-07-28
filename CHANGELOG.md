@@ -29,8 +29,19 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - R4D remediated active test run `r4d-20260728T012703Z-852954`: **13 steps green**, teardown `zero_state: true`, remediated redelivery/restart evidence captured.
 - Codex live acceptance: **not run** (deferred).
 
+- **Verification ladder** — `scripts/verification_ladder.py` runs L1 (flowctl), L2 (DRF/delivery pytest subset), L3 (`r4d_verify`), L4 (provider runtime envelope); writes `.tmp/verification-ladder/<run_id>/summary.json`.
+- **Coordinator-path runtime acceptance** — `scripts/provider_runtime_acceptance.py` exercises AM-05/06 through coordinator/worker_delivery with credit reserve/settle (not host-runner-only).
+
+### Changed
+
+- **`runtime_service._row_to_invocation`** — exposes `invocation_packet_json` for worker preflight payload authorization.
+
+### Verified (2026-07-28, continued)
+
+- Verification ladder L1–L3 green; L4 runtime acceptance `runtime-20260728T033356Z` — AM-05/06 passed with credit ledger.
+- `tests/unit/test_verification_ladder.py`: 5 passed.
+
 ### Open / not claimed
 
-- **Gates remain open** — provider adapters, local control plane, script sandbox, scheduled maintenance (HitM disposition required).
-- **Independent review** — remediated R4D evidence and provider live acceptance support consideration; agents do not close gates.
-- **Codex** — pin and live call deferred pending credits.
+- **Gates (HitM 2026-07-28):** provider adapters **partial close** (Cursor+Claude; Codex waived NLT review 2026-08-05); script sandbox and scheduled maintenance **closed**; local control plane **open** (AM-10 security review).
+- **Codex** — pin and live call deferred; review NLT 2026-08-05.
