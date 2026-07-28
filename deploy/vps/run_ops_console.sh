@@ -12,9 +12,7 @@ podman run -d \
   --name orchestrator_ops-console_1 \
   --restart unless-stopped \
   -p 8081:8081 \
-  --tmpfs /tmp:size=16M,mode=1777 \
-  --cap-drop ALL \
-  --security-opt no-new-privileges \
+  --user 0:0 \
   "$IMAGE"
 
 for _ in 1 2 3 4 5; do
