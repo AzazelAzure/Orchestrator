@@ -79,6 +79,14 @@ COMMAND_KIND_MATRIX: dict[str, frozenset[str]] = {
     "schedule.tick": frozenset({"founder", "scheduler"}),
     "schedule.complete": frozenset({"founder", "scheduler"}),
     "schedule.run_on_demand": frozenset({"founder"}),
+    "ops.dashboard_read": frozenset({"founder", "system", "scheduler", "mcp_service"}),
+    "delegation.request": frozenset({"founder", "executive", "manager"}),
+    "delegation.accept": frozenset({"founder", "executive", "manager"}),
+    "delegation.decline": frozenset({"founder", "executive", "manager"}),
+    "delegation.reroute": frozenset({"founder", "executive", "manager"}),
+    "delegation.dispatch": frozenset({"founder", "executive", "manager"}),
+    "delegation.handoff": frozenset({"founder", "executive", "manager"}),
+    "delegation.accept_handoff": frozenset({"founder", "executive", "manager"}),
 }
 
 # Explicit capability keys that can widen recovery for non-founder kinds.
@@ -112,6 +120,9 @@ REST_ENDPOINT_COMMANDS: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/runtime/heartbeat"): "runtime.heartbeat",
     ("POST", "/api/v1/runtime/result"): "runtime.result",
     ("POST", "/api/v1/runtime/recover"): "runtime.recover_restart",
+    ("POST", "/api/v1/runtime/pause"): "runtime.pause",
+    ("POST", "/api/v1/runtime/resume"): "runtime.resume",
+    ("POST", "/api/v1/runtime/cancel"): "runtime.cancel",
     ("GET", "/api/v1/delivery/jobs"): "delivery.list_eligible",
     ("GET", "/api/v1/mcp/profiles"): "mcp.profiles.list",
     ("GET", "/api/v1/mcp/lanes"): "mcp.snapshot.get",

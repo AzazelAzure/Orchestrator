@@ -27,6 +27,12 @@ WORKFLOW_TOOL_TO_COMMAND: dict[str, str] = {
     "reconcile": "runtime.reconcile",
 }
 
+DELEGATION_TOOL_TO_COMMAND: dict[str, str] = {
+    "request": "delegation.request",
+    "dispatch": "delegation.dispatch",
+    "handoff": "delegation.handoff",
+}
+
 # Maintenance tools — status/run via coordinator; never remediation.
 MAINTENANCE_TOOLS = frozenset(
     {
@@ -124,12 +130,13 @@ def handle_read_tool(
         "policy_explanation",
         "ordinary_authorized_gate_actions",
         "assignment",
-        "request",
-        "disposition",
-        "dispatch",
-        "handoff",
     }:
         return _catalog_or_status_result(lane_id=lane_id, tool_name=tool_name, base=base, args=args)
+
+    if tool_name in DELEGATION_TOOL_TO_COMMAND:
+        raise ValidationFailedError(
+            f"tool {tool_name} requires delegation command dispatch, not read handler"
+        )
 
     if tool_name in WORKFLOW_TOOL_TO_COMMAND:
         raise ValidationFailedError(
@@ -304,6 +311,18 @@ def _catalog_or_status_result(
 
 def workflow_command_for_tool(tool_name: str) -> str | None:
     return WORKFLOW_TOOL_TO_COMMAND.get(tool_name)
+
+
+def delegation_command_for_tool(tool_name: str, arguments: dict[str, Any] | None = None) -> str | None:
+    if tool_name == "disposition":
+        args = arguments or {}
+        action = str(args.get("action") or args.get("disposition") or "accept").lower()
+        if action in {"decline", "reject", "deny"}:
+            return "delegation.decline"
+        if action in {"reroute", "route"}:
+            return "delegation.reroute"
+        return "delegation.accept"
+    return DELEGATION_TOOL_TO_COMMAND.get(tool_name)
 
 
 def _maintenance_tool_result(

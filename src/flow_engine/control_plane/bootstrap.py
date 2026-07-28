@@ -13,7 +13,7 @@ import os
 import secrets
 import sqlite3
 
-from flow_engine.control_plane.principal_registry import register_principal
+from flow_engine.control_plane.principal_registry import register_principal, token_digest
 from flow_engine.domain.states import PrincipalRole, Surface
 from flow_engine.mcp_lanes.catalog import LANE_IDS, principal_key_for_lane
 
@@ -152,11 +152,21 @@ def _register_from_tokens(conn: sqlite3.Connection, tokens: dict[str, str]) -> l
             "SELECT 1 FROM control_plane_principals WHERE principal_key = ?",
             (key,),
         ).fetchone()
-        if existing:
-            continue
         token = tokens.get(key)
         if not token:
             raise RuntimeError(f"missing token for principal key {key}")
+        if existing:
+            # Local stacks rotate ephemeral env tokens across restarts while
+            # retaining coordinator state; refresh digests on bootstrap.
+            conn.execute(
+                """
+                UPDATE control_plane_principals
+                SET token_digest = ?
+                WHERE principal_key = ? AND status = 'active'
+                """,
+                (token_digest(token), key),
+            )
+            continue
         register_principal(
             conn,
             principal_key=key,

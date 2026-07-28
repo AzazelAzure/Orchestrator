@@ -61,6 +61,23 @@ def authorize_command(
     if not ctx.principal_id:
         raise AuthRequiredError("principal_id is required")
 
+    grant = ctx.grant
+    hierarchy_bootstrap = command.command_type.startswith("org.") or command.command_type.startswith(
+        "delegation."
+    )
+    if (
+        hierarchy_bootstrap
+        and isinstance(grant, SystemTestGrant)
+        and ctx.role
+        in {
+            PrincipalRole.FOUNDER,
+            PrincipalRole.EXECUTIVE,
+            PrincipalRole.MANAGER,
+            PrincipalRole.SYSTEM,
+        }
+    ):
+        grant = None
+
     # Exact endpoint-by-kind matrix when kind is known (R4 registry / HTTP path).
     # Legacy R1–R3 in-process callers without a kind skip this layer.
     if principal_kind is not None and command.command_type != "control_plane.resolve_token":
@@ -70,7 +87,7 @@ def authorize_command(
             command_type=command.command_type,
             principal_kind=principal_kind,
             capabilities=capabilities
-            or (ctx.grant.capabilities if ctx.grant is not None else ()),
+            or (grant.capabilities if grant is not None else ()),
         )
 
     if command.command_type in MCP_FORBIDDEN_COMMANDS and ctx.surface == Surface.MCP:
@@ -87,7 +104,7 @@ def authorize_command(
             raise AuthzDeniedError("founder role required")
         validate_step_up(ctx.step_up)
 
-    if ctx.grant is None and command.command_type.startswith("runtime."):
+    if grant is None and command.command_type.startswith("runtime."):
         if command.command_type in {
             "runtime.recover_restart",
             "runtime.recover_worker_death",
@@ -112,15 +129,15 @@ def authorize_command(
         else:
             raise AuthzDeniedError("grant required for runtime commands")
 
-    if ctx.grant is None and command.command_type.startswith("delivery."):
+    if grant is None and command.command_type.startswith("delivery."):
         # Matrix already enforced for delivery verbs.
         pass
 
-    if ctx.grant is None and command.command_type.startswith("script."):
+    if grant is None and command.command_type.startswith("script."):
         # Script verbs rely on kind matrix + allowlist; grant optional.
         pass
 
-    if ctx.grant is None and command.command_type.startswith("schedule."):
+    if grant is None and command.command_type.startswith("schedule."):
         # Schedule verbs rely on kind matrix + template constraints; grant optional.
         if command.command_type in FOUNDER_ONLY_COMMANDS:
             pass
@@ -130,17 +147,14 @@ def authorize_command(
         ):
             raise AuthzDeniedError("schedule on-demand run requires founder")
 
-    if ctx.grant is None and command.command_type.startswith("control_plane."):
+    if grant is None and command.command_type.startswith("control_plane."):
         if command.command_type == "control_plane.resolve_token":
             pass  # token resolve is authenticated at the HTTP/service layer
         elif ctx.role not in {PrincipalRole.FOUNDER, PrincipalRole.SYSTEM}:
             raise AuthzDeniedError("control_plane admin commands require founder/system role")
     # Org/delegation bootstrap may proceed for authorized hierarchy roles without a
     # resolved grant (chicken-and-egg: profiles must exist before R3 grants).
-    if ctx.grant is None and (
-        command.command_type.startswith("org.")
-        or command.command_type.startswith("delegation.")
-    ):
+    if grant is None and hierarchy_bootstrap:
         if ctx.role not in {
             PrincipalRole.FOUNDER,
             PrincipalRole.EXECUTIVE,
@@ -151,16 +165,16 @@ def authorize_command(
                 "org/delegation commands require founder/executive/manager role or grant"
             )
 
-    if ctx.grant is not None:
-        if not ctx.grant.budget_scope_id.strip():
+    if grant is not None:
+        if not grant.budget_scope_id.strip():
             raise AuthzDeniedError("explicit acceptance budget_scope_id is required")
-        if ctx.principal_id != ctx.grant.principal_id:
+        if ctx.principal_id != grant.principal_id:
             raise AuthzDeniedError("principal does not match grant")
-        if ctx.surface not in ctx.grant.surfaces:
+        if ctx.surface not in grant.surfaces:
             raise AuthzDeniedError(f"surface {ctx.surface} not permitted by grant")
 
         # R2 compatibility path: SystemTestGrant refuses org/loadout semantics.
-        if isinstance(ctx.grant, SystemTestGrant):
+        if isinstance(grant, SystemTestGrant):
             if "loadout_id" in command.payload and command.payload.get("loadout_id"):
                 raise AuthzDeniedError(
                     "R2 compatibility grant refuses organization/loadout resolution"
@@ -182,12 +196,12 @@ def authorize_command(
                     "R2 compatibility grant cannot authorize org/delegation commands"
                 )
 
-        if isinstance(ctx.grant, ResolvedTaskGrant):
-            if not ctx.grant.snapshot_id or not ctx.grant.loadout_id:
+        if isinstance(grant, ResolvedTaskGrant):
+            if not grant.snapshot_id or not grant.loadout_id:
                 raise AuthzDeniedError("R3 grant requires pinned loadout snapshot")
-            if not ctx.grant.organization_profile_hash:
+            if not grant.organization_profile_hash:
                 raise AuthzDeniedError("R3 grant requires organization profile hash")
             # Provider identity never grants authority beyond explicit grant providers.
             provider = command.payload.get("provider")
-            if provider and provider not in ctx.grant.providers:
+            if provider and provider not in grant.providers:
                 raise AuthzDeniedError("provider not permitted by resolved grant")

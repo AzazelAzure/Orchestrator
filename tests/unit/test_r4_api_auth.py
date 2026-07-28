@@ -134,7 +134,24 @@ def test_mcp_denied_founder_preview(r4_api) -> None:
     assert resp.status_code == 403
 
 
-def test_worker_delivery_list(r4_api) -> None:
+def test_founder_runtime_control_not_denied(r4_api) -> None:
+    """Founder may call pause/resume/cancel; missing run fails after authz."""
+    api, _ = r4_api
+    _auth(api, "founder")
+    for path in ("/api/v1/runtime/pause", "/api/v1/runtime/resume", "/api/v1/runtime/cancel"):
+        resp = api.post(path, {"run_id": "nonexistent-run"}, format="json")
+        assert resp.status_code != 403
+
+
+def test_ops_summary_unauthenticated(r4_api) -> None:
+    api, _ = r4_api
+    resp = api.get("/ops/summary/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body.get("status") in {"ok", "degraded"}
+    assert "open_gates" in body
+    assert "hierarchy" in body
+    assert "delegations" in body
     api, _ = r4_api
     _auth(api, "worker")
     resp = api.get("/api/v1/delivery/jobs")

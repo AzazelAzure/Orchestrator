@@ -127,7 +127,10 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       ORCH_SCRIPT_ROLE: control
       ORCH_API_SERVICE_TOKEN: ${ORCH_API_SERVICE_TOKEN:?ORCH_API_SERVICE_TOKEN is required}
+      ORCH_TOKEN_FOUNDER: ${ORCH_TOKEN_FOUNDER:?ORCH_TOKEN_FOUNDER is required}
       ORCH_PROVIDER_MODE: ${ORCH_PROVIDER_MODE:-mock}
+      ORCH_LOCAL_BUDGET_SCOPE: ${ORCH_LOCAL_BUDGET_SCOPE:-acceptance-campaign-r4}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://www.thedirectorate.app,http://127.0.0.1:8081,http://localhost:8081}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
     depends_on:
@@ -361,6 +364,26 @@ services:
       ORCH_API_BASE_URL: http://api:8000
       ORCH_MCP_LANE_ID: maintenance
       ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_MAINTENANCE:?ORCH_TOKEN_MCP_MAINTENANCE is required}
+
+  ops-console:
+    build:
+      context: ./ops-console
+      dockerfile: Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    user: root
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - frontend
 
 volumes:
   orchestrator-data:

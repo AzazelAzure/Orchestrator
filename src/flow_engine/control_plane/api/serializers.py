@@ -108,6 +108,10 @@ class ScriptCancelSerializer(serializers.Serializer):
     execution_id = serializers.CharField()
 
 
+class RuntimeRunControlSerializer(serializers.Serializer):
+    run_id = serializers.CharField()
+
+
 class ScheduleTickSerializer(serializers.Serializer):
     schedule_id = serializers.CharField()
     planned_time = serializers.CharField()

@@ -4,55 +4,81 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Directorate Ops Console</title>
-  <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0f1117; color: #e6edf3; }
-    body { margin: 0; padding: 1.5rem; max-width: 960px; }
-    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
-    .muted { color: #8b949e; font-size: 0.875rem; }
-    section { margin-top: 1.25rem; padding: 1rem; border: 1px solid #30363d; border-radius: 8px; background: #161b22; }
-    .ok { color: #3fb950; } .warn { color: #d29922; } .bad { color: #f85149; }
-    pre { overflow: auto; font-size: 0.8rem; background: #0d1117; padding: 0.75rem; border-radius: 6px; }
-    ul { padding-left: 1.25rem; }
-  </style>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <h1>Directorate Ops Console</h1>
-  <p class="muted">Read-only stack summary — mutations via governed DRF founder paths only.</p>
-  <section>
-    <h2>Stack status <span id="status-badge" class="muted">loading…</span></h2>
-    <pre id="summary-json">Fetching…</pre>
-  </section>
-  <section>
-    <h2>Open gates</h2>
-    <ul id="gates"></ul>
-  </section>
-  <script>
-    const API_BASE = "__API_BASE_URL__";
-    async function load() {
-      const badge = document.getElementById("status-badge");
-      const pre = document.getElementById("summary-json");
-      const gates = document.getElementById("gates");
-      try {
-        const res = await fetch(`${API_BASE}/ops/summary/`);
-        const data = await res.json();
-        pre.textContent = JSON.stringify(data, null, 2);
-        const status = data.status || "unknown";
-        badge.textContent = status;
-        badge.className = status === "ok" ? "ok" : status === "degraded" ? "warn" : "bad";
-        gates.innerHTML = "";
-        for (const gate of data.open_gates || []) {
-          const li = document.createElement("li");
-          li.textContent = gate;
-          gates.appendChild(li);
-        }
-      } catch (err) {
-        badge.textContent = "error";
-        badge.className = "bad";
-        pre.textContent = String(err);
-      }
-    }
-    load();
-    setInterval(load, 30000);
-  </script>
+  <header>
+    <h1>Directorate Ops Console</h1>
+    <p class="muted">Read-mostly control plane — mutations via governed founder API paths.</p>
+    <div class="toolbar">
+      <label class="muted">Founder token
+        <input id="founder-token" type="password" placeholder="Bearer token (local)" autocomplete="off" />
+      </label>
+      <button id="save-token" type="button">Save</button>
+      <span id="status-badge" class="muted">loading…</span>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button type="button" data-tab="stack" class="active">Stack</button>
+    <button type="button" data-tab="hierarchy">Hierarchy</button>
+    <button type="button" data-tab="delegations">Delegations</button>
+    <button type="button" data-tab="queues">Queues</button>
+    <button type="button" data-tab="findings">Findings</button>
+    <button type="button" data-tab="gates">Gates</button>
+    <button type="button" data-tab="settings">Settings</button>
+    <button type="button" data-tab="actions">Actions</button>
+  </nav>
+
+  <main>
+    <section id="panel-stack" class="panel active">
+      <h2>Stack health</h2>
+      <pre id="stack-json">Loading…</pre>
+      <h3>Verification ladder</h3>
+      <pre id="ladder-json">—</pre>
+    </section>
+    <section id="panel-hierarchy" class="panel">
+      <h2>Organization</h2>
+      <pre id="hierarchy-json">—</pre>
+    </section>
+    <section id="panel-delegations" class="panel">
+      <h2>Delegations</h2>
+      <pre id="delegations-json">—</pre>
+    </section>
+    <section id="panel-queues" class="panel">
+      <h2>Queues &amp; work</h2>
+      <pre id="queues-json">—</pre>
+    </section>
+    <section id="panel-findings" class="panel">
+      <h2>Findings</h2>
+      <pre id="findings-json">—</pre>
+      <h3>Recent audit</h3>
+      <pre id="audit-json">—</pre>
+    </section>
+    <section id="panel-gates" class="panel">
+      <h2>Open gates</h2>
+      <ul id="gates-list"></ul>
+    </section>
+    <section id="panel-settings" class="panel">
+      <h2>Settings (read-only)</h2>
+      <pre id="settings-json">—</pre>
+      <p class="muted">Governance docs: <code>docs/read-the-docs.md</code> in Orchestrator repo.</p>
+    </section>
+    <section id="panel-actions" class="panel">
+      <h2>Founder actions</h2>
+      <form id="action-form">
+        <label>Run ID <input name="run_id" required /></label>
+        <div class="action-row">
+          <button type="button" data-action="pause">Pause</button>
+          <button type="button" data-action="resume">Resume</button>
+          <button type="button" data-action="cancel">Cancel</button>
+          <button type="button" data-action="recover">Recover stack</button>
+        </div>
+      </form>
+      <pre id="action-result">—</pre>
+    </section>
+  </main>
+
+  <script src="/app.js" type="module"></script>
 </body>
 </html>
