@@ -66,7 +66,8 @@ up_orchestrator() {
   patch_orch_base_ports
   orch_compose up -d --build \
     redis coordinator api worker scheduler \
-    script-spool-init script-runner script-worker ops-console
+    script-spool-init script-runner script-worker
+  bash "$ORCH_ROOT/deploy/vps/run_ops_console.sh"
 }
 
 up_portfolio() {
@@ -93,24 +94,39 @@ reload_hfm_proxy() {
 install_systemd_user_units() {
   local unit_dir="$HOME/.config/systemd/user"
   mkdir -p "$unit_dir"
-  for unit in orchestrator-ecosystem portfolio-stub orchestrator-verification-ladder.timer; do
+  local units=(
+    orchestrator-ecosystem.service
+    ops-console.service
+    portfolio-stub.service
+    orchestrator-verification-ladder.service
+    orchestrator-verification-ladder.timer
+  )
+  for unit in "${units[@]}"; do
     if [[ -f "$ORCH_ROOT/deploy/vps/systemd/$unit" ]]; then
       cp "$ORCH_ROOT/deploy/vps/systemd/$unit" "$unit_dir/"
     fi
   done
+  chmod +x "$ORCH_ROOT/deploy/vps/run_ops_console.sh" 2>/dev/null || true
   systemctl --user daemon-reload
-  systemctl --user enable orchestrator-ecosystem.service portfolio-stub.service orchestrator-verification-ladder.timer 2>/dev/null || true
-  log "systemd user units installed (enable linger for reboot persistence: loginctl enable-linger \$USER)"
+  systemctl --user enable orchestrator-ecosystem.service ops-console.service portfolio-stub.service orchestrator-verification-ladder.timer 2>/dev/null || true
+  log "systemd user units installed (enable linger: loginctl enable-linger \$USER)"
 }
 
 smoke_local() {
-  curl -fsS "http://127.0.0.1:8000/health/" >/dev/null && log "smoke ok: orchestrator api loopback"
-  curl -fsS "http://127.0.0.1:8081/" >/dev/null && log "smoke ok: ops console loopback"
-  curl -fsS "http://127.0.0.1:3000/health" >/dev/null && log "smoke ok: portfolio loopback"
-  curl -kfsS -H "Host: api.thedirectorate.dev" "https://127.0.0.1:8443/health/" >/dev/null && log "smoke ok: api via proxy"
-  curl -kfsS -H "Host: www.thedirectorate.dev" "https://127.0.0.1:8443/" >/dev/null && log "smoke ok: console via proxy"
-  curl -kfsS -H "Host: www.pproctor.com" "https://127.0.0.1:8443/health" >/dev/null && log "smoke ok: portfolio via proxy"
-  curl -kfsS -H "Host: thehivemanager.com" "https://127.0.0.1:8443/" -o /dev/null && log "smoke ok: HFM regression via proxy"
+  curl -fsS "http://127.0.0.1:8000/health/" >/dev/null || { log "FAIL orchestrator api loopback"; return 1; }
+  log "smoke ok: orchestrator api loopback"
+  curl -fsS "http://127.0.0.1:8081/" >/dev/null || { log "FAIL ops console loopback"; return 1; }
+  log "smoke ok: ops console loopback"
+  curl -fsS "http://127.0.0.1:3000/health" >/dev/null || { log "FAIL portfolio loopback"; return 1; }
+  log "smoke ok: portfolio loopback"
+  curl -kfsS -H "Host: api.thedirectorate.dev" "https://127.0.0.1:8443/health/" >/dev/null || { log "FAIL api via proxy"; return 1; }
+  log "smoke ok: api via proxy"
+  curl -kfsS -H "Host: www.thedirectorate.dev" "https://127.0.0.1:8443/" >/dev/null || { log "FAIL console via proxy"; return 1; }
+  log "smoke ok: console via proxy"
+  curl -kfsS -H "Host: www.pproctor.com" "https://127.0.0.1:8443/health" >/dev/null || { log "FAIL portfolio via proxy"; return 1; }
+  log "smoke ok: portfolio via proxy"
+  curl -kfsS -H "Host: thehivemanager.com" "https://127.0.0.1:8443/" -o /dev/null || { log "FAIL HFM regression"; return 1; }
+  log "smoke ok: HFM regression via proxy"
 }
 
 smoke_public() {

@@ -1,0 +1,13 @@
+[Unit]
+Description=Orchestrator ops console (www.thedirectorate.dev upstream)
+After=network-online.target orchestrator-ecosystem.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=%h/orchestrator/deploy/vps/run_ops_console.sh
+ExecStop=/bin/bash -lc 'podman rm -f orchestrator_ops-console_1'
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

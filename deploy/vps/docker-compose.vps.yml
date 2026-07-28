@@ -11,19 +11,5 @@ services:
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://www.thedirectorate.dev,https://api.thedirectorate.dev}
 
   ops-console:
-    build:
-      context: ./ops-console
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.thedirectorate.dev}
-    ports:
-      - "8081:8081"
-    # podman-compose 1.x fails with empty --net when depends_on uses health conditions.
-    restart: unless-stopped
-    network_mode: bridge
-    read_only: true
-    tmpfs:
-      - /tmp:size=16M,mode=1777
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
+    profiles: ["ops-console-compose-disabled"]
+    # Use deploy/vps/run_ops_console.sh — podman-compose cannot start this service reliably.

@@ -86,6 +86,6 @@ if [[ "$SKIP_PORT" -eq 0 ]]; then
 fi
 
 log "run remote bootstrap"
-run ssh "$VPS_SSH_TARGET" 'bash ~/orchestrator/deploy/vps/vps_bootstrap.sh all'
+run ssh "$VPS_SSH_TARGET" 'chmod +x ~/orchestrator/deploy/vps/vps_bootstrap.sh ~/orchestrator/deploy/vps/run_ops_console.sh 2>/dev/null; bash ~/orchestrator/deploy/vps/vps_bootstrap.sh all'
 
 log "done"
