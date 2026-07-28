@@ -102,6 +102,7 @@ def _row_to_invocation(row: sqlite3.Row) -> dict[str, Any]:
         "provider": row["provider"],
         "status": row["status"],
         "request_digest": row["request_digest"],
+        "invocation_packet_json": row["invocation_packet_json"],
         "result": json.loads(row["result_json"]) if row["result_json"] else None,
         "evidence": json.loads(row["evidence_json"]),
         "created_at": row["created_at"],
