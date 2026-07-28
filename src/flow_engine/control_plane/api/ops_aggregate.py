@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from django.conf import settings
-
 from flow_engine.control_plane.coordinator_client import CoordinatorClient
 from flow_engine.coordinator.commands import CommandContext, RuntimeCommand
 from flow_engine.domain.states import PrincipalRole, Surface

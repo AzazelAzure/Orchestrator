@@ -24,10 +24,10 @@ def _latest_json_summary(glob_pattern: str) -> dict | None:
     if not base.is_dir():
         return None
     candidates = sorted(base.glob(glob_pattern), key=lambda p: p.stat().st_mtime, reverse=True)
-    for path in candidates:
-        if path.is_file():
+    for candidate in candidates:
+        if candidate.is_file():
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
+                return json.loads(candidate.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
     return None
