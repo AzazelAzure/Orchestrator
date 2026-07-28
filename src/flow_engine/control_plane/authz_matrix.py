@@ -77,7 +77,7 @@ COMMAND_KIND_MATRIX: dict[str, frozenset[str]] = {
     "schedule.list_templates": frozenset({"founder", "scheduler", "worker", "mcp_service"}),
     "schedule.status": frozenset({"founder", "scheduler", "worker", "mcp_service"}),
     "schedule.tick": frozenset({"founder", "scheduler"}),
-    "schedule.complete": frozenset({"founder", "scheduler", "worker"}),
+    "schedule.complete": frozenset({"founder", "scheduler"}),
     "schedule.run_on_demand": frozenset({"founder"}),
 }
 

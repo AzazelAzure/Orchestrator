@@ -13,13 +13,14 @@ from flow_engine.application.clock import utc_now_iso
 from flow_engine.application.event_service import append_event
 from flow_engine.application.finding_service import create_finding
 from flow_engine.domain.errors import (
+    AuthzDeniedError,
     BudgetExhaustedError,
     ConflictError,
     UnsupportedSurfaceError,
     ValidationFailedError,
 )
 from flow_engine.domain.models import new_id
-from flow_engine.domain.states import FindingSeverity
+from flow_engine.domain.states import FindingSeverity, PrincipalRole
 from flow_engine.schedules.templates import (
     SCHEDULE_TIMEZONE,
     ScheduleTemplate,
@@ -194,6 +195,7 @@ def complete_schedule_run(
     script_results: list[dict[str, Any]] | None = None,
     attempt_remediation: bool = False,
     provider_calls: int = 0,
+    actor_role: PrincipalRole | str | None = None,
 ) -> dict[str, Any]:
     if attempt_remediation:
         raise UnsupportedSurfaceError(
@@ -207,6 +209,18 @@ def complete_schedule_run(
         raise ValidationFailedError(f"unknown schedule run: {run_id}")
     if row["status"] not in {"claimed", "running"}:
         raise ConflictError(f"schedule run {run_id} is not active")
+    role = (
+        actor_role
+        if isinstance(actor_role, PrincipalRole)
+        else PrincipalRole(str(actor_role))
+        if actor_role is not None
+        else None
+    )
+    if actor != row["actor"] and role != PrincipalRole.FOUNDER:
+        raise AuthzDeniedError(
+            f"schedule run {run_id} may only be completed by claiming actor "
+            f"{row['actor']!r}, not {actor!r}"
+        )
 
     template = require_schedule_template(row["schedule_id"])
     effects = list(effects or [])

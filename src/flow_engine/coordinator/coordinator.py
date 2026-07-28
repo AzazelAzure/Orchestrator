@@ -827,6 +827,7 @@ class StateCoordinator:
                 script_results=payload.get("script_results"),
                 attempt_remediation=False,
                 provider_calls=int(payload.get("provider_calls") or 0),
+                actor_role=command.context.role,
             )
         if ctype == "schedule.run_on_demand":
             # Founder-only on-demand: claim tick then optionally register scripts.

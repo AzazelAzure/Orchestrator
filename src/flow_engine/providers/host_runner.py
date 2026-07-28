@@ -182,6 +182,8 @@ def provider_argv(
             "--mode", "ask", "--model", binding.model,
         ]
         if binding.acceptance_mode:
+            # Ephemeral empty 0700 workspace; --mode ask is read-only; --trust skips
+            # interactive workspace prompt only (bounded acceptance probe, not production).
             argv.append("--trust")
         argv.extend(prompt_args)
         return tuple(argv)

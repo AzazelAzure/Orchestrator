@@ -712,6 +712,14 @@ def test_schedule_dedupe_overlap_budget_remediation(tmp_path) -> None:
                     actor="scheduler",
                     attempt_remediation=True,
                 )
+            with pytest.raises(AuthzDeniedError):
+                complete_schedule_run(
+                    kernel.connection,
+                    run_id=run_id,
+                    actor="worker-other",
+                    actor_role="worker",
+                    effects=[{"type": "evidence", "summary": "forged"}],
+                )
             done = complete_schedule_run(
                 kernel.connection,
                 run_id=run_id,

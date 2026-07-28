@@ -34,7 +34,7 @@ orch-coordinator = "flow_engine.coordinator.http_service:main"
 orch-mcp-lane = "flow_engine.mcp_lanes.service_main:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.9"]
+dev = ["pytest>=8.0", "ruff>=0.9", "pyyaml>=6.0"]
 mcp = ["mcp>=1.27"]
 api = [
   "django>=5.0",
