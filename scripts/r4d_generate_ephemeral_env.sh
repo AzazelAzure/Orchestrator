@@ -58,6 +58,8 @@ umask 077
   echo "ORCH_TOKEN_PROVIDER_INVOCATION=$(_rand)"
   echo "ORCH_SCRIPT_SPOOL_HMAC_KEY=$(_rand)"
   echo "ORCH_ATTESTATION_HMAC_KEY=$(_rand)"
+  echo "ORCH_PROVIDER_MODE=mock"
+  echo "ORCH_R4D_SLOW_MOCK=15"
   # Placeholder until attestation build fills the real digest.
   echo "ORCH_SCRIPT_IMAGE_DIGEST=sha256:0000000000000000000000000000000000000000000000000000000000000000"
 } >"$ENV_FILE"

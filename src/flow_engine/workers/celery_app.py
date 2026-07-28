@@ -67,4 +67,7 @@ app.conf.update(
     beat_schedule=_beat_schedule(),
     broker_connection_retry_on_startup=True,
 )
+if os.environ.get("ORCH_R4D_SLOW_MOCK"):
+    # R4D worker-loss probe: avoid hour-long Redis visibility hiding killed tasks.
+    app.conf.broker_transport_options = {"visibility_timeout": 60}
 app.autodiscover_tasks(["flow_engine.workers"], related_name="tasks")

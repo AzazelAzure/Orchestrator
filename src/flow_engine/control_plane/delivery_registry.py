@@ -71,6 +71,7 @@ def claim_delivery_job(
     job = _row_to_job(row)
     if attempt_id or invocation_id:
         assert_delivery_ownership(
+            conn,
             job,
             worker_principal_id=worker_principal_id,
             attempt_id=attempt_id or job["attempt_id"],
@@ -203,7 +204,26 @@ def acquire_exclusive_dispatch_lease(
     return get_delivery_job(conn, job_id)
 
 
+def _worker_principal_allowed(
+    conn: sqlite3.Connection,
+    *,
+    worker_principal_id: str,
+    provider: str,
+) -> bool:
+    expected_key = f"worker.provider.{provider}"
+    if worker_principal_id in {expected_key, "worker"}:
+        return True
+    row = conn.execute(
+        "SELECT principal_key FROM control_plane_principals WHERE id = ?",
+        (worker_principal_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    return row["principal_key"] in {"worker", expected_key}
+
+
 def assert_delivery_ownership(
+    conn: sqlite3.Connection,
     job: dict[str, Any],
     *,
     worker_principal_id: str,
@@ -216,8 +236,11 @@ def assert_delivery_ownership(
         raise ConflictError("delivery job attempt_id mismatch")
     if job["invocation_id"] != invocation_id:
         raise ConflictError("delivery job invocation_id mismatch")
-    expected = f"worker.provider.{job['provider']}"
-    if worker_principal_id not in {expected, "worker"}:
+    if not _worker_principal_allowed(
+        conn,
+        worker_principal_id=worker_principal_id,
+        provider=job["provider"],
+    ):
         raise ConflictError("delivery worker principal/provider mismatch")
     owner = job.get("worker_principal_id")
     if require_worker_match and owner and owner != worker_principal_id:

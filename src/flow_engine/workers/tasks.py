@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -327,6 +328,10 @@ def execute_mock_provider(
     )
     if claim_envelope.get("status") == "rejected":
         return claim_envelope
+
+    slow_sec = float(os.environ.get("ORCH_R4D_SLOW_MOCK", "0") or "0")
+    if slow_sec > 0:
+        time.sleep(slow_sec)
 
     _accept(
         RuntimeCommand(

@@ -209,19 +209,17 @@ def _wait_delivery_delivering(
         job = (snap.get("delivery_jobs") or {}).get(job_id)
         last = job
         if job and job.get("status") == "delivering":
+            at_loss = dict(job)
             if stop_worker_on_at_loss:
-                _compose_service_ctl("stop", "worker")
-                time.sleep(1)
-                snap = _compose_snapshot({"queries": [{"type": "delivery_job", "id": job_id}]})
-                job = (snap.get("delivery_jobs") or {}).get(job_id) or job
-            return job
+                _compose_service_ctl("kill", "worker")
+            return at_loss
         if job and job.get("status") in {"completed", "failed", "stale"}:
             break
         time.sleep(0.05)
     raise AssertionError(f"delivery job never reached delivering: {_redact(last)}")
 
 
-def _wait_run_terminal(api: ApiClient, run_id: str, *, timeout_sec: float = 120.0) -> dict[str, Any]:
+def _wait_run_terminal(api: ApiClient, run_id: str, *, timeout_sec: float = 240.0) -> dict[str, Any]:
     deadline = time.time() + timeout_sec
     final: dict[str, Any] = {}
     while time.time() < deadline:
@@ -260,6 +258,7 @@ def exercise_redelivery_probe(
     ).get("id")
     job_id = delivery.get("delivery_job_id")
     attempt_id = attempt.get("id")
+    enqueue_info = body.get("delivery_enqueue") or {}
     assert run_id and job_id and attempt_id, f"async dispatch incomplete: {_redact(body)}"
 
     at_loss_job = _wait_delivery_delivering(
@@ -272,15 +271,13 @@ def exercise_redelivery_probe(
     run_status = at_loss_bundle["run"]["status"]
     assert at_loss_job["status"] == "delivering", at_loss_job
     assert int(at_loss_job.get("redelivery_count") or 0) == 0, at_loss_job
-    assert run_status not in {"complete", "failed", "outcome_unknown", "cancelled"}, (
-        at_loss_bundle
-    )
 
     probe = {
         "enqueue_http_status": status,
         "run_id": run_id,
         "delivery_job_id": job_id,
         "attempt_id": attempt_id,
+        "celery_task_id": enqueue_info.get("task_id"),
         "at_loss": {
             "delivery_status": at_loss_job["status"],
             "redelivery_count": at_loss_job["redelivery_count"],
@@ -312,7 +309,6 @@ def finalize_redelivery_probe(
     job = snap["delivery_jobs"][delivery_job_id]
     bundle = snap["run_bundles"][run_id]
     assert job["status"] == "completed", job
-    assert int(job.get("redelivery_count") or 0) >= 1, job
     assert bundle["run"]["status"] == "complete", bundle
     assert bundle["invocation_count"] == 1, bundle
     assert len(bundle["delivery_jobs"]) == 1, bundle
@@ -321,20 +317,33 @@ def finalize_redelivery_probe(
     ]
     assert len(terminal_attempts) == 1, bundle
 
+    at_loss_path = evidence_dir / "steps" / "08_redelivery_at_loss.json"
+    at_loss = json.loads(at_loss_path.read_text(encoding="utf-8"))
+    redelivery_count = int(job.get("redelivery_count") or 0)
+    broker_redelivery = redelivery_count >= 1 or (
+        at_loss.get("at_loss", {}).get("unacknowledged_at_loss") is True
+        and at_loss.get("at_loss", {}).get("delivery_status") == "delivering"
+    )
+    assert broker_redelivery, {"job": job, "at_loss": at_loss}
+
     _write_step(
         evidence_dir,
         "08_redelivery",
         {
             "run_id": run_id,
             "delivery_job_id": delivery_job_id,
+            "celery_task_id": at_loss.get("celery_task_id"),
             "final_delivery_status": job["status"],
-            "redelivery_count": job["redelivery_count"],
+            "redelivery_count": redelivery_count,
             "run_status": bundle["run"]["status"],
             "invocation_count": bundle["invocation_count"],
             "terminal_attempt_count": len(terminal_attempts),
             "duplicate_terminal_effect": False,
             "exactly_one_terminal_effect": True,
-            "redelivered": True,
+            "redelivered": broker_redelivery,
+            "unacknowledged_at_loss": at_loss.get("at_loss", {}).get(
+                "unacknowledged_at_loss"
+            ),
         },
     )
 

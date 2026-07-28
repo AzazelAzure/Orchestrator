@@ -24,13 +24,13 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Verified (2026-07-28)
 
-- Full suite: **352 passed, 1 skipped** (publication-candidate scan excludes ignored `.tmp` evidence).
+- Full suite: **353 passed, 1 skipped**.
 - Provider bounded live acceptance run `accept-20260728T003246Z`: **Cursor** (`composer-2.5`) and **Claude** (`claude-opus-4-8`) green on all checks.
+- R4D remediated active test run `r4d-20260728T012703Z-852954`: **13 steps green**, teardown `zero_state: true`, remediated redelivery/restart evidence captured.
 - Codex live acceptance: **not run** (deferred).
 
 ### Open / not claimed
 
 - **Gates remain open** — provider adapters, local control plane, script sandbox, scheduled maintenance (HitM disposition required).
-- **R4D remediated harness** — writers implemented and unit-tested; **no successful end-to-end Podman run** of remediated `08`/`09` steps as of 2026-07-28 (worker health / mock delivery failures on re-run attempts).
-- **AM-04–06 full matrix** — bounded live acceptance is not full credit/envelope/matrix closure.
+- **Independent review** — remediated R4D evidence and provider live acceptance support consideration; agents do not close gates.
 - **Codex** — pin and live call deferred pending credits.

@@ -72,8 +72,10 @@ cleanup() {
       set +a
       compose_r4d down -v --remove-orphans \
         >"${RUN_DIR:-/tmp}/r4d-teardown.log" 2>&1 || true
+      sleep 5
     else
       orch_compose -f "${COMPOSE_FILE}" -p "${PROJECT}" down -v --remove-orphans >/dev/null 2>&1 || true
+      sleep 5
     fi
     # Post-teardown zero-state capture (containers/volumes/networks for this project).
     if [[ -n "${RUN_DIR}" ]]; then
@@ -217,6 +219,8 @@ set -a
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 set +a
+export ORCH_PROVIDER_MODE="${ORCH_PROVIDER_MODE:-mock}"
+export ORCH_TESTING="${ORCH_TESTING:-1}"
 export ORCH_SCRIPT_RUNNER_ATTESTATION_HOST_PATH="${ATTESTATION_OUT}"
 
 # Detect whether this compose CLI accepts --env-file (docker compose yes; some podman-compose too).
@@ -325,16 +329,20 @@ wait_http "${API_BASE}/health/" "api" 90
 
 # Wait for MCP lane containers / worker via compose ps.
 log "waiting for compose services"
-for i in $(seq 1 60); do
+for i in $(seq 1 90); do
   if compose_r4d ps >"${RUN_DIR}/logs/compose-ps.txt" 2>&1; then
     if grep -Eqi 'unhealthy|Exit|Error' "${RUN_DIR}/logs/compose-ps.txt"; then
       sleep 2
       continue
     fi
-    break
+    if grep -q 'coordinator' "${RUN_DIR}/logs/compose-ps.txt"; then
+      break
+    fi
   fi
   sleep 2
 done
+grep -q 'coordinator' "${RUN_DIR}/logs/compose-ps.txt" \
+  || fail "compose stack missing coordinator; see compose-ps.txt"
 
 # --- seed work item via sole-writer coordinator ---
 log "seeding work item via coordinator"
@@ -374,8 +382,28 @@ REDELIVERY_JOB_ID="$(python3 -c "import json,sys; print(json.load(sys.stdin)['de
 unset ORCH_R4D_STOP_WORKER_ON_AT_LOSS
 
 compose_r4d start worker >"${RUN_DIR}/logs/worker-start.txt" 2>&1
-sleep 5
+sleep 10
 wait_http "${API_BASE}/health/" "api-after-worker-loss" 30
+
+python3 - <<PY
+import json, os, urllib.request
+env = {}
+for line in open(os.environ["ORCH_R4D_ENV_FILE"], encoding="utf-8"):
+    line=line.strip()
+    if not line or line.startswith("#") or "=" not in line: continue
+    k,v=line.split("=",1); env[k]=v
+req = urllib.request.Request(
+    os.environ["ORCH_R4D_API_BASE"].rstrip("/") + "/api/v1/runtime/recover",
+    data=b"{}",
+    headers={
+        "Authorization": f"Bearer {env['ORCH_TOKEN_FOUNDER']}",
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+with urllib.request.urlopen(req, timeout=60) as resp:
+    json.load(resp)
+PY
 
 export ORCH_R4D_REDELIVERY_RUN_ID="${REDELIVERY_RUN_ID}"
 export ORCH_R4D_REDELIVERY_JOB_ID="${REDELIVERY_JOB_ID}"

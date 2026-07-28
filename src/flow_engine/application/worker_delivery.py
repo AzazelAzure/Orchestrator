@@ -186,6 +186,7 @@ def preflight_worker_delivery(
     if invocation is None:
         raise NotFoundError("no invocation for attempt")
     assert_delivery_ownership(
+        conn,
         job,
         worker_principal_id=worker_principal_id,
         attempt_id=attempt_id,
@@ -473,6 +474,7 @@ def prepare_worker_delivery(
 
     if job is not None:
         assert_delivery_ownership(
+            conn,
             job,
             worker_principal_id=worker_principal_id,
             attempt_id=attempt_id,

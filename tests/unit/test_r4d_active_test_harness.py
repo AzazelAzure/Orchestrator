@@ -86,6 +86,7 @@ def test_ephemeral_env_generator_writes_ignored_temp_file(tmp_path, monkeypatch)
         "ORCH_TOKEN_FOUNDER=",
         "ORCH_ATTESTATION_HMAC_KEY=",
         "ORCH_SCRIPT_SPOOL_HMAC_KEY=",
+        "ORCH_PROVIDER_MODE=mock",
     ):
         assert key in text
     # Generator stdout must not echo secret values.

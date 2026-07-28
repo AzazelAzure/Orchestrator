@@ -23,6 +23,7 @@ if [[ -x "$ROOT/.venv/bin/python" ]]; then
 fi
 
 export ORCH_TESTING="${ORCH_TESTING:-1}"
+export ORCH_PROVIDER_MODE="${ORCH_PROVIDER_MODE:-mock}"
 python -m pip install -e '.[control-plane,dev]'
 python scripts/write_testing_attestation.py
 python agentic/generate_catalogs.py
