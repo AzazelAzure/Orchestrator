@@ -12,7 +12,11 @@ from flow_engine.control_plane.service_auth import (
     authenticate_service_credential,
     require_configured_service_credentials,
 )
-from flow_engine.coordinator.commands import CommandContext, RuntimeCommand
+from flow_engine.coordinator.commands import (
+    CommandContext,
+    ResolvedTaskGrant,
+    RuntimeCommand,
+)
 from flow_engine.coordinator.coordinator import StateCoordinator
 from flow_engine.coordinator.mcp_enforce import (
     extract_mcp_context_claims,
@@ -84,6 +88,7 @@ def _resolve_server_context(
     principal_token: str | None,
     surface_hint: str | None,
     mcp_claims: dict[str, str | None] | None = None,
+    command_type: str | None = None,
 ) -> CommandContext:
     """Resolve principal/role/grant server-side; reject caller-supplied authority.
 
@@ -109,6 +114,15 @@ def _resolve_server_context(
     if principal.status == "revoked":
         raise AuthzDeniedError("principal revoked")
     grant = principals.load_grant_for_principal(coord.connection, principal)
+    hierarchy_without_grant = bool(
+        command_type
+        and (
+            command_type.startswith("delegation.")
+            or command_type.startswith("org.")
+        )
+    )
+    if hierarchy_without_grant and not isinstance(grant, ResolvedTaskGrant):
+        grant = None
     surface = Surface(surface_hint) if surface_hint else Surface.REST
     if mcp_identity_present(claims):
         surface = Surface.MCP
@@ -213,6 +227,7 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
                     principal_token=principal_token,
                     surface_hint=surface_hint,
                     mcp_claims=mcp_claims,
+                    command_type=command.command_type,
                 )
                 command = RuntimeCommand(
                     command_type=command.command_type,

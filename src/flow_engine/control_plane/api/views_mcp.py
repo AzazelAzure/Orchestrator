@@ -37,6 +37,7 @@ from flow_engine.domain.states import Surface
 from flow_engine.mcp_lanes.authz import assert_mcp_invoke_allowed
 from flow_engine.mcp_lanes.catalog import LANE_IDS
 from flow_engine.mcp_lanes.handlers import (
+    delegation_command_for_tool,
     describe_lane,
     handle_read_tool,
     workflow_command_for_tool,
@@ -210,7 +211,9 @@ class McpLaneInvokeView(APIView):
             }
             service_dict = service_principal_dict(service)
 
-            command_type = workflow_command_for_tool(tool_name)
+            command_type = workflow_command_for_tool(tool_name) or delegation_command_for_tool(
+                tool_name, data.get("arguments") or {}
+            )
             if command_type:
                 return self._dispatch_workflow(
                     request,
@@ -276,7 +279,7 @@ class McpLaneInvokeView(APIView):
             or payload.get("run_id")
             or payload.get("target_id")
         )
-        context = build_context(request, surface=Surface.MCP)
+        context = build_context(request, surface=Surface.MCP, command_type=command_type)
         from dataclasses import replace
 
         context = replace(

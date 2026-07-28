@@ -1,0 +1,23 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #0f1117;
+  color: #e6edf3;
+}
+body { margin: 0; padding: 1rem 1.25rem 2rem; max-width: 1100px; }
+header h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+.muted { color: #8b949e; font-size: 0.875rem; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 0.75rem; }
+.toolbar input { min-width: 220px; background: #161b22; border: 1px solid #30363d; color: inherit; padding: 0.35rem 0.5rem; border-radius: 6px; }
+button { background: #21262d; color: inherit; border: 1px solid #30363d; border-radius: 6px; padding: 0.35rem 0.75rem; cursor: pointer; }
+button.active, .tabs button.active { background: #388bfd33; border-color: #388bfd; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 1rem 0; }
+.panel { display: none; margin-top: 0.5rem; padding: 1rem; border: 1px solid #30363d; border-radius: 8px; background: #161b22; }
+.panel.active { display: block; }
+pre { overflow: auto; font-size: 0.8rem; background: #0d1117; padding: 0.75rem; border-radius: 6px; }
+.ok { color: #3fb950; } .warn { color: #d29922; } .bad { color: #f85149; }
+#gates-list { padding-left: 1.25rem; }
+#gates-list li { margin-bottom: 0.5rem; }
+.action-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+#action-form label { display: block; margin-bottom: 0.5rem; }
+#action-form input { width: 100%; max-width: 420px; background: #0d1117; border: 1px solid #30363d; color: inherit; padding: 0.35rem 0.5rem; border-radius: 6px; }

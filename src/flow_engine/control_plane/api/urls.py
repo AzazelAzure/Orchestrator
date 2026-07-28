@@ -10,10 +10,13 @@ from flow_engine.control_plane.api.views_mcp import (
 )
 from flow_engine.control_plane.api.views_runtime import (
     DeliveryListView,
+    RuntimeCancelView,
     RuntimeHeartbeatView,
+    RuntimePauseView,
     RuntimePreviewView,
     RuntimeRecoverView,
     RuntimeResultView,
+    RuntimeResumeView,
     RuntimeRunView,
     RuntimeShowView,
 )
@@ -36,6 +39,9 @@ urlpatterns = [
     path("runtime/heartbeat", RuntimeHeartbeatView.as_view(), name="runtime-heartbeat"),
     path("runtime/result", RuntimeResultView.as_view(), name="runtime-result"),
     path("runtime/recover", RuntimeRecoverView.as_view(), name="runtime-recover"),
+    path("runtime/pause", RuntimePauseView.as_view(), name="runtime-pause"),
+    path("runtime/resume", RuntimeResumeView.as_view(), name="runtime-resume"),
+    path("runtime/cancel", RuntimeCancelView.as_view(), name="runtime-cancel"),
     path("delivery/jobs", DeliveryListView.as_view(), name="delivery-list"),
     path(
         "mcp/profiles",

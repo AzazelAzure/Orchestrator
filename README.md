@@ -2,6 +2,9 @@
 
 Generic SQLite-backed workflow orchestrator core.
 
+**Start here:** [`docs/read-the-docs.md`](docs/read-the-docs.md) — full onboarding
+guide (architecture, R1–R4 layers, agent surfaces, local quickstart, boundaries).
+
 This repository is an AGPL-3.0-only public-release **candidate** derived from a
 verified generic engine core. The installable Python package remains
 `flow_engine` for compatibility; the project/distribution name is

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts.verification_ladder import (
     L2_PYTEST_TARGETS,
     default_run_id,
@@ -36,6 +38,16 @@ def test_l2_targets_include_api_and_delivery() -> None:
     joined = " ".join(L2_PYTEST_TARGETS)
     assert "test_r4_api_auth.py" in joined
     assert "test_r4_delivery.py" in joined
+
+
+def test_l25_skipped_when_bridge_not_expected(monkeypatch) -> None:
+    from scripts.verification_ladder import run_l25
+
+    monkeypatch.delenv("ORCH_BRIDGE_EXPECT", raising=False)
+    record = run_l25(root=Path("/tmp"))
+    assert record["level"] == "L2.5"
+    assert record["passed"] is True
+    assert record["actual"]["skipped"] is True
 
 
 def test_level_record_failed_when_mismatch() -> None:

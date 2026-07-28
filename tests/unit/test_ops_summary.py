@@ -13,16 +13,34 @@ def client() -> APIClient:
 
 def test_ops_summary_read_only_no_auth(client: APIClient) -> None:
     mock_health = {"status": "ok", "mode": "inprocess", "schema_version": 7}
-    with patch(
-        "flow_engine.control_plane.api.ops_urls.get_client",
-        return_value=MagicMock(health=MagicMock(return_value=mock_health)),
+    mock_dashboard = {
+        "open_gates": [
+            {"gate_id": "G-ORCH-LOCAL-CONTROL-PLANE", "status": "open"},
+        ],
+    }
+    with (
+        patch(
+            "flow_engine.control_plane.api.ops_urls.get_client",
+            return_value=MagicMock(health=MagicMock(return_value=mock_health)),
+        ),
+        patch(
+            "flow_engine.control_plane.api.ops_urls.fetch_dashboard_payload",
+            return_value=mock_dashboard,
+        ),
+        patch(
+            "flow_engine.control_plane.api.ops_urls.fetch_schedule_status",
+            return_value=None,
+        ),
     ):
         response = client.get("/ops/summary/")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
     assert body["stack_health"]["schema_version"] == 7
-    assert "G-ORCH-LOCAL-CONTROL-PLANE" in body["open_gates"]
+    gate_ids = [
+        g if isinstance(g, str) else g.get("gate_id") for g in body["open_gates"]
+    ]
+    assert "G-ORCH-LOCAL-CONTROL-PLANE" in gate_ids
 
 
 def test_ops_summary_degraded_when_coordinator_unavailable(client: APIClient) -> None:

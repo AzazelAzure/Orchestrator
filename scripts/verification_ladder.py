@@ -181,10 +181,53 @@ def run_l1(*, root: Path, run_dir: Path) -> dict[str, Any]:
     return level_record(level="L1", expected=expected, actual=actual, passed=passed)
 
 
+def run_l25(*, root: Path) -> dict[str, Any]:
+    """Optional installation checkpoint: external bridge summary exists."""
+    expect = os.environ.get("ORCH_BRIDGE_EXPECT", "").strip() == "1"
+    expected = {"bridge_summary_exists": True}
+    if not expect:
+        actual = {"skipped": True, "reason": "ORCH_BRIDGE_EXPECT not set"}
+        return level_record(level="L2.5", expected=expected, actual=actual, passed=True)
+
+    summary_path = os.environ.get("ORCH_BRIDGE_SUMMARY_PATH", "").strip()
+    path: Path | None
+    if summary_path:
+        path = Path(summary_path)
+    else:
+        candidates: list[Path] = []
+        tmp = root / ".tmp"
+        if tmp.is_dir():
+            for pattern in ("orch-bridge/*/summary.json", "hq-orch-bridge/*/summary.json"):
+                candidates.extend(tmp.glob(pattern))
+        path = (
+            max(candidates, key=lambda p: p.stat().st_mtime)
+            if candidates
+            else None
+        )
+
+    exists = path is not None and path.is_file()
+    parsed: dict[str, Any] | None = None
+    if exists and path is not None:
+        try:
+            parsed = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            exists = False
+
+    actual = {
+        "skipped": False,
+        "bridge_summary_exists": exists,
+        "summary_path": str(path) if path else None,
+        "valid_json_object": isinstance(parsed, dict),
+    }
+    passed = actual["bridge_summary_exists"] and actual["valid_json_object"]
+    return level_record(level="L2.5", expected=expected, actual=actual, passed=passed)
+
+
 def run_l2(*, root: Path) -> dict[str, Any]:
     expected = {"pytest_exit_zero": True, "targets": list(L2_PYTEST_TARGETS)}
+    python_bin = str(root / ".venv/bin/python") if (root / ".venv/bin/python").is_file() else sys.executable
     pytest_argv = [
-        sys.executable,
+        python_bin,
         "-m",
         "pytest",
         "-q",
@@ -194,7 +237,11 @@ def run_l2(*, root: Path) -> dict[str, Any]:
     completed = run_command(
         pytest_argv,
         cwd=root,
-        env={"PYTHONPATH": str(root / "src"), "ORCH_TESTING": "1"},
+        env={
+            "PYTHONPATH": str(root / "src"),
+            "ORCH_TESTING": "1",
+            "DJANGO_SETTINGS_MODULE": "flow_engine.control_plane.settings",
+        },
         timeout_sec=600,
     )
     actual = {
@@ -341,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
         levels["L1"] = run_l1(root=root, run_dir=run_dir)
     if "L2" in selected:
         levels["L2"] = run_l2(root=root)
+    if "L2.5" in selected:
+        levels["L2.5"] = run_l25(root=root)
     if "L3" in selected:
         levels["L3"] = run_l3(root=root)
     if "L4" in selected:

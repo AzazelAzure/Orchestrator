@@ -14,6 +14,7 @@ from flow_engine.control_plane.api.serializers import (
     OperationResponseSerializer,
     ResultSubmitSerializer,
     RuntimePreviewSerializer,
+    RuntimeRunControlSerializer,
     RuntimeRunSerializer,
 )
 from flow_engine.control_plane.api.views_helpers import submit_command
@@ -161,6 +162,57 @@ class RuntimeRecoverView(APIView):
     @extend_schema(responses={202: OperationResponseSerializer})
     def post(self, request):
         return submit_command(request, command_type="runtime.recover_restart", payload={})
+
+
+class RuntimePauseView(APIView):
+    command_type = "runtime.pause"
+    permission_classes = [IsAuthenticated, RequireSurface, RequireEndpointCapability, DenyMCPService]
+
+    @extend_schema(request=RuntimeRunControlSerializer, responses={202: OperationResponseSerializer})
+    def post(self, request):
+        ser = RuntimeRunControlSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        run_id = ser.validated_data["run_id"]
+        return submit_command(
+            request,
+            command_type="runtime.pause",
+            target_id=run_id,
+            payload={"run_id": run_id},
+        )
+
+
+class RuntimeResumeView(APIView):
+    command_type = "runtime.resume"
+    permission_classes = [IsAuthenticated, RequireSurface, RequireEndpointCapability, DenyMCPService]
+
+    @extend_schema(request=RuntimeRunControlSerializer, responses={202: OperationResponseSerializer})
+    def post(self, request):
+        ser = RuntimeRunControlSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        run_id = ser.validated_data["run_id"]
+        return submit_command(
+            request,
+            command_type="runtime.resume",
+            target_id=run_id,
+            payload={"run_id": run_id},
+        )
+
+
+class RuntimeCancelView(APIView):
+    command_type = "runtime.cancel"
+    permission_classes = [IsAuthenticated, RequireSurface, RequireEndpointCapability, DenyMCPService]
+
+    @extend_schema(request=RuntimeRunControlSerializer, responses={202: OperationResponseSerializer})
+    def post(self, request):
+        ser = RuntimeRunControlSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        run_id = ser.validated_data["run_id"]
+        return submit_command(
+            request,
+            command_type="runtime.cancel",
+            target_id=run_id,
+            payload={"run_id": run_id},
+        )
 
 
 class DeliveryListView(APIView):

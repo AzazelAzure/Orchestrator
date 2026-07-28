@@ -79,6 +79,7 @@ FRESH_OBSERVATION_COMMANDS = frozenset(
         "delegation.assert_review_separation",
         "delegation.get_request",
         "delegation.get_pin",
+        "ops.dashboard_read",
     }
 )
 
@@ -309,6 +310,11 @@ class StateCoordinator:
         ctype = command.command_type
         payload = command.payload
         actor = command.context.principal_id
+
+        if ctype == "ops.dashboard_read":
+            from flow_engine.control_plane.ops_dashboard import read_ops_dashboard
+
+            return read_ops_dashboard(self._conn)
 
         # --- R3 organization / delegation ---
         org_result = self._dispatch_org(command)

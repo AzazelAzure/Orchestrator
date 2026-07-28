@@ -49,6 +49,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
+    "corsheaders",
     "rest_framework",
     "drf_spectacular",
     "flow_engine.control_plane.api.apps.ControlPlaneApiConfig",
@@ -56,6 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
 
@@ -90,5 +92,9 @@ SPECTACULAR_SETTINGS = {
 }
 
 COORDINATOR_URL = os.environ.get("COORDINATOR_URL", "http://coordinator:9001")
+
+_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+CORS_ALLOW_CREDENTIALS = False
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

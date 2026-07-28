@@ -26,6 +26,10 @@ if TYPE_CHECKING:
 _inprocess_client: CoordinatorClient | None = None
 
 
+def _local_budget_scope() -> str:
+    return (os.environ.get("ORCH_LOCAL_BUDGET_SCOPE") or "acceptance-campaign-r4").strip()
+
+
 def set_inprocess_client(client: CoordinatorClient | None) -> None:
     global _inprocess_client
     _inprocess_client = client
@@ -42,13 +46,26 @@ def get_client() -> CoordinatorClient:
     )
 
 
-def build_context(request: Request, *, surface: Surface = Surface.REST) -> CommandContext:
+def build_context(
+    request: Request,
+    *,
+    surface: Surface = Surface.REST,
+    command_type: str | None = None,
+) -> CommandContext:
     """Build command context from server-resolved principal only.
 
     Caller-supplied role/grant/principal fields in the request body are ignored.
+    Org/delegation commands use role authority without R2 compatibility grants.
     """
     user: OrchestratorUser = request.user  # type: ignore[assignment]
     grant = None
+    hierarchy_without_grant = bool(
+        command_type
+        and (
+            command_type.startswith("delegation.")
+            or command_type.startswith("org.")
+        )
+    )
     if user.grant:
         if user.grant.get("compatibility_mode") == "r3_resolved":
             grant = ResolvedTaskGrant(
@@ -80,16 +97,17 @@ def build_context(request: Request, *, surface: Surface = Surface.REST) -> Comma
                 compatibility_mode=user.grant.get("compatibility_mode", "r2_system_test"),
             )
     elif user.kind == "founder":
-        grant = SystemTestGrant(
-            grant_id=f"api-grant-{user.principal_key}",
-            principal_id=user.principal_id,
-            role=user.role,
-            surfaces=user.surfaces,
-            providers=("codex", "cursor", "claude"),
-            budget_scope_id="acceptance-campaign-r4",
-            policy_revision="r4-local",
-            capabilities=user.capabilities,
-        )
+        if not hierarchy_without_grant:
+            grant = SystemTestGrant(
+                grant_id=f"api-grant-{user.principal_key}",
+                principal_id=user.principal_id,
+                role=user.role,
+                surfaces=user.surfaces,
+                providers=("codex", "cursor", "claude"),
+                budget_scope_id=_local_budget_scope(),
+                policy_revision="r4-local",
+                capabilities=user.capabilities,
+            )
     elif user.kind == "worker":
         grant = SystemTestGrant(
             grant_id=f"api-grant-{user.principal_key}",
@@ -97,7 +115,7 @@ def build_context(request: Request, *, surface: Surface = Surface.REST) -> Comma
             role=user.role,
             surfaces=user.surfaces,
             providers=("codex", "cursor", "claude"),
-            budget_scope_id="acceptance-campaign-r4",
+            budget_scope_id=_local_budget_scope(),
             policy_revision="r4-local",
             capabilities=user.capabilities,
         )
@@ -112,6 +130,10 @@ def build_context(request: Request, *, surface: Surface = Surface.REST) -> Comma
             policy_revision="r4-local",
             capabilities=user.capabilities,
         )
+    if hierarchy_without_grant and not (
+        user.grant and user.grant.get("compatibility_mode") == "r3_resolved"
+    ):
+        grant = None
     return CommandContext(
         principal_id=user.principal_id,
         role=user.role,

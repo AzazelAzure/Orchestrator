@@ -15,6 +15,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -113,14 +114,18 @@ class ApiClient:
         body: dict[str, Any] | None = None,
         mcp_lane: str | None = None,
         expected: set[int] | None = None,
+        idempotency_key: str | None = None,
     ) -> tuple[int, Any]:
         url = f"{self.base}{path}"
         data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = self._headers(token_key=token_key, mcp_lane=mcp_lane)
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
         req = urllib.request.Request(
             url,
             data=data,
             method=method,
-            headers=self._headers(token_key=token_key, mcp_lane=mcp_lane),
+            headers=headers,
         )
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
@@ -454,6 +459,7 @@ def exercise_api_worker_mock(
             "payload": {"r4d": True, "mock": True},
         },
         expected={200, 202},
+        idempotency_key=f"r4d-mock-run-{uuid.uuid4().hex}",
     )
     result = body.get("result") or {}
     created = result.get("created") or {}

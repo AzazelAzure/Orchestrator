@@ -16,10 +16,11 @@ publication.
 ## Reading order
 
 1. This file
-2. `README.md`
-3. `docs/architecture.md`
-4. `docs/skills.md`
-5. Relevant `skills/*/SKILL.md` for the active task
+2. `docs/read-the-docs.md`
+3. `README.md`
+4. `docs/architecture.md`
+5. `docs/skills.md`
+6. Relevant `skills/*/SKILL.md` for the active task
 
 ## Non-negotiables
 

@@ -340,3 +340,61 @@ def test_snapshot_digest_mismatch_denied(r4b_api) -> None:
     )
     assert resp.status_code == 409
     assert resp.json().get("error_code") == "STALE_ASSET"
+
+
+def test_delegation_command_mapping() -> None:
+    from flow_engine.mcp_lanes.handlers import delegation_command_for_tool
+
+    assert delegation_command_for_tool("request") == "delegation.request"
+    assert delegation_command_for_tool("dispatch") == "delegation.dispatch"
+    assert delegation_command_for_tool("handoff") == "delegation.handoff"
+    assert (
+        delegation_command_for_tool("disposition", {"action": "accept"})
+        == "delegation.accept"
+    )
+    assert (
+        delegation_command_for_tool("disposition", {"action": "decline"})
+        == "delegation.decline"
+    )
+    assert (
+        delegation_command_for_tool("disposition", {"action": "reroute"})
+        == "delegation.reroute"
+    )
+
+
+def test_invoke_delegation_request_dispatches_command(r4b_api) -> None:
+    """Mutating delegation tools must use coordinator dispatch, not read stubs."""
+    api, _ = r4b_api
+    _dual(api, initiating="founder", lane_id="delegation-coordination")
+    resp = api.post(
+        "/api/v1/mcp/lanes/delegation-coordination/tools/invoke",
+        {
+            "tool": "request",
+            "arguments": {
+                "parent_assignment_id": "missing-assignment",
+                "to_position_id": "missing-position",
+            },
+        },
+        format="json",
+    )
+    body = resp.json()
+    assert (body.get("result") or {}).get("mode") != "delegation_read"
+    assert body.get("mcp", {}).get("lane_id") == "delegation-coordination"
+    assert body.get("command_type") == "delegation.request"
+
+
+def test_invoke_delegation_disposition_dispatches_command(r4b_api) -> None:
+    api, _ = r4b_api
+    _dual(api, initiating="founder", lane_id="delegation-coordination")
+    resp = api.post(
+        "/api/v1/mcp/lanes/delegation-coordination/tools/invoke",
+        {
+            "tool": "disposition",
+            "arguments": {"request_id": "missing", "actor_id": "missing", "action": "accept"},
+        },
+        format="json",
+    )
+    body = resp.json()
+    assert (body.get("result") or {}).get("mode") != "delegation_read"
+    assert body.get("mcp", {}).get("lane_id") == "delegation-coordination"
+    assert body.get("command_type") == "delegation.accept"
