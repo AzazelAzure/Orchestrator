@@ -1,0 +1,12 @@
+[Unit]
+Description=Orchestrator verification ladder (L1+L2)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/orchestrator
+ExecStart=/usr/bin/python3 scripts/verification_ladder.py --levels L1,L2
+Environment=PYTHONPATH=src
+
+[Install]
+WantedBy=default.target

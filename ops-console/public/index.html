@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Directorate Ops Console</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0f1117; color: #e6edf3; }
+    body { margin: 0; padding: 1.5rem; max-width: 960px; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    .muted { color: #8b949e; font-size: 0.875rem; }
+    section { margin-top: 1.25rem; padding: 1rem; border: 1px solid #30363d; border-radius: 8px; background: #161b22; }
+    .ok { color: #3fb950; } .warn { color: #d29922; } .bad { color: #f85149; }
+    pre { overflow: auto; font-size: 0.8rem; background: #0d1117; padding: 0.75rem; border-radius: 6px; }
+    ul { padding-left: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Directorate Ops Console</h1>
+  <p class="muted">Read-only stack summary — mutations via governed DRF founder paths only.</p>
+  <section>
+    <h2>Stack status <span id="status-badge" class="muted">loading…</span></h2>
+    <pre id="summary-json">Fetching…</pre>
+  </section>
+  <section>
+    <h2>Open gates</h2>
+    <ul id="gates"></ul>
+  </section>
+  <script>
+    const API_BASE = "__API_BASE_URL__";
+    async function load() {
+      const badge = document.getElementById("status-badge");
+      const pre = document.getElementById("summary-json");
+      const gates = document.getElementById("gates");
+      try {
+        const res = await fetch(`${API_BASE}/ops/summary/`);
+        const data = await res.json();
+        pre.textContent = JSON.stringify(data, null, 2);
+        const status = data.status || "unknown";
+        badge.textContent = status;
+        badge.className = status === "ok" ? "ok" : status === "degraded" ? "warn" : "bad";
+        gates.innerHTML = "";
+        for (const gate of data.open_gates || []) {
+          const li = document.createElement("li");
+          li.textContent = gate;
+          gates.appendChild(li);
+        }
+      } catch (err) {
+        badge.textContent = "error";
+        badge.className = "bad";
+        pre.textContent = String(err);
+      }
+    }
+    load();
+    setInterval(load, 30000);
+  </script>
+</body>
+</html>

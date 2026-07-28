@@ -1,0 +1,28 @@
+# VPS deployment overlay — binds Orchestrator API and ops console to host loopback only.
+# Usage: docker compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps up -d
+
+services:
+  api:
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-api.thedirectorate.dev,127.0.0.1,localhost}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://www.thedirectorate.dev}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://www.thedirectorate.dev,https://api.thedirectorate.dev}
+
+  ops-console:
+    build:
+      context: ./ops-console
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
