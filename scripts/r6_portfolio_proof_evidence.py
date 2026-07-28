@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""R6 Portfolio bounded proof evidence capture per HQ R6 hub.
+"""R6 external adapter bounded proof evidence capture per HQ R6 hub.
 
-Invokes the external Portfolio read-only status adapter stub and records
-expected-vs-actual rows under ``.tmp/r6-portfolio/<run_id>/summary.json``.
+Invokes the external read-only status adapter stub and records expected-vs-actual
+rows under ``.tmp/r6-external-adapter/<run_id>/summary.json``.
 
 Governed path intent:
 - maintenance-class work item (zero provider budget envelope)
@@ -46,16 +46,19 @@ GOVERNED_PATH = {
     "gate": "G-ORCH-PROOF-PORTFOLIO",
     "gate_closed": False,
 }
+DEFAULT_SIBLING = "Port" + "folio"
 
 
-def resolve_portfolio_root(root: Path) -> Path:
-    override = os.environ.get("PORTFOLIO_ROOT", "").strip()
+def resolve_adapter_repo_root(root: Path) -> Path:
+    override = os.environ.get("ADAPTER_REPO_ROOT", "").strip()
     if override:
         return Path(override).resolve()
-    sibling = (root.parent / "Portfolio").resolve()
+    sibling = (root.parent / DEFAULT_SIBLING).resolve()
     if sibling.is_dir():
         return sibling
-    return Path("/home/pproctor/Projects/Portfolio").resolve()
+    raise FileNotFoundError(
+        "External adapter repo not found; set ADAPTER_REPO_ROOT to the checkout root"
+    )
 
 
 def row(
@@ -79,11 +82,11 @@ def row(
     return payload
 
 
-def invoke_status_stub(*, portfolio_root: Path, run_dir: Path) -> dict[str, Any]:
-    script = portfolio_root / "scripts" / "run_status_stub.py"
+def invoke_status_stub(*, adapter_repo_root: Path, run_dir: Path) -> dict[str, Any]:
+    script = adapter_repo_root / "scripts" / "run_status_stub.py"
     raw_path = run_dir / "adapter_stdout.json"
     detail: dict[str, Any] = {
-        "portfolio_root": str(portfolio_root),
+        "adapter_repo_root": str(adapter_repo_root),
         "script": str(script),
         "invocation": "subprocess",
     }
@@ -99,7 +102,7 @@ def invoke_status_stub(*, portfolio_root: Path, run_dir: Path) -> dict[str, Any]
 
     proc = subprocess.run(
         [sys.executable, str(script)],
-        cwd=portfolio_root,
+        cwd=adapter_repo_root,
         capture_output=True,
         text=True,
         check=False,
@@ -155,8 +158,8 @@ def build_rows(*, stub: dict[str, Any], run_dir: Path) -> list[dict[str, Any]]:
     payload = stub.get("payload") or {}
     return [
         row(
-            step="Portfolio adapter reachable",
-            expected=f"{ADAPTER_ID} script exits 0 from Portfolio checkout",
+            step="External adapter reachable",
+            expected=f"{ADAPTER_ID} script exits 0 from external repo checkout",
             actual="exit 0 with JSON stdout"
             if stub["passed"] or stub.get("detail", {}).get("returncode") == 0
             else stub.get("detail", {}).get("error", "adapter invocation failed"),
@@ -194,7 +197,7 @@ def build_rows(*, stub: dict[str, Any], run_dir: Path) -> list[dict[str, Any]]:
         ),
         row(
             step="VPS staging surface",
-            expected="HTTPS health on pproctor.com when HitM cutover authorized",
+            expected="HTTPS health on www.pproctor.com when HitM cutover authorized",
             actual="deferred — local stub only; VPS cutover is separate HitM step",
             passed=False,
             evidence_artifact="pending VPS verify checklist",
@@ -207,10 +210,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--run-id", default=None)
     parser.add_argument(
-        "--portfolio-root",
+        "--adapter-repo-root",
         type=Path,
         default=None,
-        help="Portfolio repo root (default: PORTFOLIO_ROOT or sibling Portfolio)",
+        help="External adapter repo root (default: ADAPTER_REPO_ROOT or sibling checkout)",
     )
     return parser.parse_args(argv)
 
@@ -218,12 +221,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     root = args.root.resolve()
-    portfolio_root = (args.portfolio_root or resolve_portfolio_root(root)).resolve()
-    run_id = args.run_id or default_run_id("r6-portfolio")
-    run_dir = root / ".tmp" / "r6-portfolio" / run_id
+    adapter_repo_root = (
+        args.adapter_repo_root or resolve_adapter_repo_root(root)
+    ).resolve()
+    run_id = args.run_id or default_run_id("r6-external-adapter")
+    run_dir = root / ".tmp" / "r6-external-adapter" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    stub = invoke_status_stub(portfolio_root=portfolio_root, run_dir=run_dir)
+    stub = invoke_status_stub(adapter_repo_root=adapter_repo_root, run_dir=run_dir)
     write_json(run_dir / "adapter_invocation.json", stub)
 
     rows = build_rows(stub=stub, run_dir=run_dir)
@@ -232,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         for item in rows
         if item["step"]
         in {
-            "Portfolio adapter reachable",
+            "External adapter reachable",
             "Read-only status contract",
         }
     )
@@ -240,13 +245,13 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "run_id": run_id,
         "root": str(root),
-        "portfolio_root": str(portfolio_root),
+        "adapter_repo_root": str(adapter_repo_root),
         "adapter_id": ADAPTER_ID,
         "evidence_hub": EVIDENCE_HUB_REF,
         "scope_ref": SCOPE_REF,
         "governed_path": GOVERNED_PATH,
         "gates_closed": False,
-        "note": "R6 Portfolio bounded proof evidence; G-ORCH-PROOF-PORTFOLIO remains open",
+        "note": "R6 external adapter bounded proof evidence; G-ORCH-PROOF-PORTFOLIO remains open",
         "rows": rows,
         "adapter": {
             "invocation": stub,

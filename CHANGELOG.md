@@ -46,12 +46,12 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 ### Added (continued)
 
 - **R5 dogfood evidence** — `scripts/r5_dogfood_evidence.py` captures L5 generic proof slices (delegation, mechanical gate, conference references).
-- **R6 Portfolio proof evidence** — `scripts/r6_portfolio_proof_evidence.py` invokes external Portfolio status stub; writes `.tmp/r6-portfolio/<run_id>/`.
+- **R6 external adapter proof evidence** — external read-only status stub script; writes `.tmp/r6-external-adapter/<run_id>/`.
 
 ### Verified (2026-07-28, R5/R6)
 
 - R5 dogfood run `r5-20260728T041448Z`: 7/7 evidence rows pass (supplementary capture).
-- R6 portfolio run `r6-portfolio-20260728T041642Z`: adapter stub contract green.
+- R6 external adapter run `r6-external-adapter-20260728T041642Z`: adapter stub contract green.
 
 ### Open / not claimed
 

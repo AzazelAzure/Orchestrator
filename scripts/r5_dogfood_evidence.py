@@ -63,7 +63,9 @@ def resolve_hq_root(root: Path) -> Path:
     sibling = (root.parent / "Headquarters").resolve()
     if sibling.is_dir():
         return sibling
-    return Path("/home/pproctor/Headquarters").resolve()
+    raise FileNotFoundError(
+        "Headquarters root not found; set ORCH_HQ_ROOT to the installation HQ checkout"
+    )
 
 
 def row(
