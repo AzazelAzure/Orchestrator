@@ -1,0 +1,10 @@
+[Unit]
+Description=Orchestrator verification ladder every 6 hours (L1+L2)
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

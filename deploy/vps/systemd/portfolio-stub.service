@@ -1,0 +1,14 @@
+[Unit]
+Description=Portfolio read-only status stub (www.pproctor.com upstream)
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/portfolio
+ExecStart=/bin/bash -lc 'podman-compose -f deploy/docker-compose.vps.yml up -d --build'
+ExecStop=/bin/bash -lc 'podman-compose -f deploy/docker-compose.vps.yml down'
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

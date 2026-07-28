@@ -13,12 +13,13 @@ services:
   ops-console:
     build:
       context: ./ops-console
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.thedirectorate.dev}
     ports:
       - "8081:8081"
-    depends_on:
-      api:
-        condition: service_healthy
+    # podman-compose 1.x fails with empty --net when depends_on uses health conditions.
     restart: unless-stopped
+    network_mode: bridge
     read_only: true
     tmpfs:
       - /tmp:size=16M,mode=1777

@@ -1,0 +1,9 @@
+[Unit]
+Description=Orchestrator verification ladder (L1+L2)
+After=orchestrator-ecosystem.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/orchestrator
+Environment=PYTHONPATH=src
+ExecStart=/bin/bash -lc 'python3 scripts/verification_ladder.py --levels L1,L2'
