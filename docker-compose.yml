@@ -102,6 +102,7 @@ services:
       ORCH_ATTESTATION_HMAC_KEY: ${ORCH_ATTESTATION_HMAC_KEY:?ORCH_ATTESTATION_HMAC_KEY is required}
       ORCH_SCRIPT_RUNNER_ATTESTATION_FILE: /etc/orch/script-runner.attestation.json
       ORCH_SCRIPT_IMAGE_DIGEST: ${ORCH_SCRIPT_IMAGE_DIGEST:?ORCH_SCRIPT_IMAGE_DIGEST is required}
+      ORCH_LOCAL_BUDGET_SCOPE: ${ORCH_LOCAL_BUDGET_SCOPE:-acceptance-campaign-r4}
     volumes:
       - orchestrator-data:/data
       - ${ORCH_SCRIPT_RUNNER_ATTESTATION_HOST_PATH:-./deploy/attestations/script-runner.attestation.json}:/etc/orch/script-runner.attestation.json:ro,z
@@ -168,7 +169,8 @@ services:
       coordinator:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A flow_engine.workers.celery_app inspect ping -d \"celery@$${HOSTNAME}\""]
+      # Prefer hostname(1): Podman often leaves $HOSTNAME unset while the nodename is set.
+      test: ["CMD-SHELL", "celery -A flow_engine.workers.celery_app inspect ping -d \"celery@$(hostname)\""]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from dataclasses import dataclass
 from typing import Any
@@ -21,6 +22,11 @@ from flow_engine.domain.states import PrincipalRole, Surface
 
 def token_digest(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def local_budget_scope_id() -> str:
+    """Installation-local acceptance scope; rotatable without reseeding principals."""
+    return (os.environ.get("ORCH_LOCAL_BUDGET_SCOPE") or "acceptance-campaign-r4").strip()
 
 
 @dataclass(frozen=True)
@@ -241,7 +247,7 @@ def load_grant_for_principal(conn: sqlite3.Connection, principal: ResolvedPrinci
             role=PrincipalRole.FOUNDER,
             surfaces=principal.surfaces,
             providers=("codex", "cursor", "claude"),
-            budget_scope_id="acceptance-campaign-r4",
+            budget_scope_id=local_budget_scope_id(),
             capabilities=principal.capabilities,
             policy_revision="r4-local",
         )
@@ -252,7 +258,7 @@ def load_grant_for_principal(conn: sqlite3.Connection, principal: ResolvedPrinci
             role=PrincipalRole.WORKER,
             surfaces=principal.surfaces,
             providers=("codex", "cursor", "claude"),
-            budget_scope_id="acceptance-campaign-r4",
+            budget_scope_id=local_budget_scope_id(),
             capabilities=principal.capabilities,
             policy_revision="r4-local",
         )

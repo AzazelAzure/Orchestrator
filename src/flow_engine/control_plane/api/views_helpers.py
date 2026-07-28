@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from flow_engine.control_plane.authz_matrix import assert_command_allowed_for_kind
 from flow_engine.control_plane.coordinator_client import CoordinatorClient
 from flow_engine.control_plane.errors import http_status_for_envelope
+from flow_engine.control_plane.principal_registry import local_budget_scope_id
 from flow_engine.coordinator.commands import (
     CommandContext,
     ResolvedTaskGrant,
@@ -27,7 +28,7 @@ _inprocess_client: CoordinatorClient | None = None
 
 
 def _local_budget_scope() -> str:
-    return (os.environ.get("ORCH_LOCAL_BUDGET_SCOPE") or "acceptance-campaign-r4").strip()
+    return local_budget_scope_id()
 
 
 def set_inprocess_client(client: CoordinatorClient | None) -> None:

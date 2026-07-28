@@ -132,6 +132,9 @@ def refresh_work_item(manifest: dict[str, Any]) -> str:
             str(ROOT / "scripts/r4d_compose.sh"),
             "up",
             "-d",
+            "--force-recreate",
+            "--no-deps",
+            "coordinator",
             "api",
         ],
         cwd=ROOT,
@@ -147,7 +150,10 @@ def refresh_work_item(manifest: dict[str, Any]) -> str:
         timeout=180,
     )
     if proc_reload.returncode != 0:
-        raise RuntimeError(f"reload api for budget scope failed: {(proc_reload.stderr or proc_reload.stdout)[:400]}")
+        raise RuntimeError(
+            f"reload coordinator/api for budget scope failed: "
+            f"{(proc_reload.stderr or proc_reload.stdout)[:400]}"
+        )
     import urllib.request
     import time
 

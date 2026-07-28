@@ -400,7 +400,8 @@ def test_compose_log_capture_and_worker_healthcheck_are_runtime_safe() -> None:
     assert "compose_r4d logs --no-color" in harness
     assert worker_block.count("test:") == 1
     assert 'test: ["CMD-SHELL"' in worker_block
-    assert 'celery@$${HOSTNAME}' in worker_block
+    assert 'celery@$(hostname)' in worker_block
+    assert 'celery@$${HOSTNAME}' not in worker_block
     assert '["CMD", "celery"' not in worker_block
 
 
