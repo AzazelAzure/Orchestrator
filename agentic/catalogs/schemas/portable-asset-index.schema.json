@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/portable-asset-index.json",
+  "title": "PortableAssetIndex",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "kind",
+    "lifecycle_state",
+    "activation",
+    "count",
+    "records",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "catalog_version": { "type": "string" },
+    "kind": { "const": "portable_asset_index" },
+    "lifecycle_state": { "const": "inert" },
+    "activation": { "const": "inert" },
+    "count": { "type": "integer", "minimum": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "kind",
+          "content_sha256",
+          "lifecycle_state",
+          "package_shipped"
+        ],
+        "properties": {
+          "kind": { "const": "skill_package" },
+          "lifecycle_state": { "const": "inert" },
+          "package_shipped": { "type": "boolean" },
+          "scheduling_ref": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,23 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.session.read"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "d4e6e9db2be9b22320aa0923106cea5a2fe9d304f996d592fbccb6fd9e1c72e7",
+  "degraded_behavior": "If required authority, evidence, or persistence is unavailable, stop consequential work and report the gap.",
+  "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.loadout-selection",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": []
+}

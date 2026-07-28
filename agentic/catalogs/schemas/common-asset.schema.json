@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/common-asset.json",
+  "title": "CommonAssetFields",
+  "type": "object",
+  "required": [
+    "asset_id",
+    "kind",
+    "version",
+    "content_sha256",
+    "owner",
+    "source",
+    "compatibility",
+    "sensitivity",
+    "lifecycle_state",
+    "provenance"
+  ],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "owner": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "compatibility": { "type": "string", "minLength": 1 },
+    "sensitivity": { "type": "string", "minLength": 1 },
+    "lifecycle_state": { "const": "inert" },
+    "provenance": { "type": "string", "minLength": 1 },
+    "activation": { "const": "inert" },
+    "executable": { "const": false },
+    "notes": { "type": "string" },
+    "captured_at": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

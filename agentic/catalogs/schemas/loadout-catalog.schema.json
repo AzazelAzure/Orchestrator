@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/loadout-catalog.json",
+  "title": "LoadoutCatalog",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "kind",
+    "lifecycle_state",
+    "activation",
+    "count",
+    "expected_count",
+    "records",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "catalog_version": { "type": "string" },
+    "kind": { "const": "loadout_catalog" },
+    "lifecycle_state": { "const": "inert" },
+    "activation": { "const": "inert" },
+    "count": { "type": "integer", "const": 12 },
+    "expected_count": { "type": "integer", "const": 12 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "records": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "loadout_id",
+          "department",
+          "position",
+          "skill_refs",
+          "mcp_lane_refs",
+          "script_refs",
+          "effect_ceiling",
+          "budget_ceiling",
+          "forbidden",
+          "precedence_inputs",
+          "content_sha256",
+          "lifecycle_state",
+          "executable"
+        ],
+        "properties": {
+          "department": {
+            "type": "string",
+            "enum": ["admin-ops", "qa", "tech"]
+          },
+          "position": {
+            "type": "string",
+            "enum": ["executive", "manager", "supervisor", "worker"]
+          },
+          "skill_refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "capability_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mcp_lane_refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "script_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "effect_ceiling": { "type": "string" },
+          "budget_ceiling": { "type": "string" },
+          "forbidden": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "precedence_inputs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "lifecycle_state": { "const": "inert" },
+          "executable": { "const": false }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

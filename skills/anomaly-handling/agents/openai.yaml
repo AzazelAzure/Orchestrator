@@ -1,0 +1,4 @@
+interface:
+  display_name: "Anomaly Handling"
+  short_description: "Classify and persist A0–A5 anomalies"
+  default_prompt: "Use $anomaly-handling to classify and record anomalies."

@@ -1,0 +1,23 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.session.read"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "a4364d0635e738ada649b9aea1b9d41d30cfd318667d19500d165eaecd7dc7b3",
+  "degraded_behavior": "If persistence is unavailable, stop mutation and report the gap explicitly.",
+  "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.anomaly-handling",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": []
+}

@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.git
+.validation_evidence.txt
+*.egg-info
+dist
+build
+.cursor

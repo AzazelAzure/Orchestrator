@@ -34,7 +34,14 @@ from flow_engine.application import (
 )
 from flow_engine.cli.capability_cmds import add_capability_parser, run_capability_command
 from flow_engine.cli.context import db_session, require_initialized, resolve_db_path
+from flow_engine.cli.org_cmds import (
+    add_delegation_parser,
+    add_org_parser,
+    run_delegation_command,
+    run_org_command,
+)
 from flow_engine.cli.output import emit_result
+from flow_engine.cli.runtime_cmds import add_runtime_parser, run_runtime_command
 from flow_engine.domain.errors import (
     AdvisoryConflictError,
     ConflictError,
@@ -165,6 +172,9 @@ def build_parser() -> argparse.ArgumentParser:
     event_list.add_argument("--type")
 
     add_capability_parser(sub)
+    add_runtime_parser(sub)
+    add_org_parser(sub)
+    add_delegation_parser(sub)
 
     return parser
 
@@ -195,6 +205,12 @@ def main(argv: list[str] | None = None) -> int:
                 return _cmd_gate(args, conn)
             elif args.command == "event":
                 return _cmd_event(args, conn)
+            elif args.command == "runtime":
+                return run_runtime_command(args, conn)
+            elif args.command == "org":
+                return run_org_command(args, conn)
+            elif args.command == "delegation":
+                return run_delegation_command(args, conn)
         return 0
     except AdvisoryConflictError as exc:
         print(str(exc), file=sys.stderr)

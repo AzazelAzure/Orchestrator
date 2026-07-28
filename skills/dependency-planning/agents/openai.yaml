@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dependency Planning"
+  short_description: "Order work, gates, and dependencies"
+  default_prompt: "Use $dependency-planning to order dependencies and gates."

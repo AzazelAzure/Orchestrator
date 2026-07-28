@@ -131,7 +131,7 @@ def test_migration_from_populated_v001_to_v002(tmp_path: Path) -> None:
 
     upgraded = open_connection(db_path, initialize=True)
     try:
-        assert current_version(upgraded) == 2
+        assert current_version(upgraded) == 7
         assert set(KERNEL_TABLES).issubset(set(list_tables(upgraded)))
         gate = upgraded.execute(
             "SELECT requirement, revision, created_at FROM gates LIMIT 1"
@@ -149,7 +149,7 @@ def test_migration_from_populated_v001_to_v002(tmp_path: Path) -> None:
 
     fresh = Kernel.init(tmp_path / "fresh.db")
     try:
-        assert fresh.schema_version == 2
+        assert fresh.schema_version == 7
         assert set(KERNEL_TABLES).issubset(set(fresh.tables))
     finally:
         fresh.close()
@@ -658,7 +658,7 @@ def test_backup_restore_preserves_governed_records(engine: Kernel, tmp_path: Pat
     shutil.copyfile(backup_path, restored_path)
     restored = open_connection(restored_path)
     try:
-        assert current_version(restored) == 2
+        assert current_version(restored) == 7
         assert restored.execute("SELECT COUNT(*) FROM gate_actions").fetchone()[0] == 1
         assert restored.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0] == 1
         assert restored.execute("SELECT COUNT(*) FROM policy_versions").fetchone()[0] == 1

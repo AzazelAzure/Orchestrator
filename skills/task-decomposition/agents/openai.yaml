@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Decomposition"
+  short_description: "Slice work into assignable packets"
+  default_prompt: "Use $task-decomposition to slice work into packets."

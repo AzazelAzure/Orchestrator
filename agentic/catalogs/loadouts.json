@@ -1,0 +1,714 @@
+{
+  "activation": "inert",
+  "catalog_version": "0.1.0",
+  "content_sha256": "9fcd34fc8201ab6fde376567be8e3f2cc1f3d65a4823c31867cba789ffe195e2",
+  "count": 12,
+  "expected_count": 12,
+  "kind": "loadout_catalog",
+  "lifecycle_state": "inert",
+  "records": [
+    {
+      "activation": "inert",
+      "asset_id": "loadout.admin-ops.executive",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "cdc198daf60b6eb3cba9c4882d7a30f3674ef234916ae7543a7533287a615d9e",
+      "department": "admin-ops",
+      "effect_ceiling": "read_heavy_coordination",
+      "executable": false,
+      "forbidden": [
+        "deep_implementation",
+        "self_review",
+        "merge_deploy",
+        "waiver_via_mcp"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.admin-ops.executive",
+      "mcp_lane_refs": [
+        "mcp.lane.workflow-control",
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.evidence-governance",
+        "mcp.lane.context-assets"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "executive",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health",
+        "script.generic.git_diff_summary"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.orchestrator-admin-ops-exec",
+        "skill.task-decomposition",
+        "skill.loadout-selection",
+        "skill.conference-facilitation",
+        "skill.governance-audit",
+        "skill.anomaly-handling"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.admin-ops.manager",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "0957e2b867b0d12f2309b653de32a0fb003bb74fdeb1a57ee3bbada796b733f1",
+      "department": "admin-ops",
+      "effect_ceiling": "coordination_limited",
+      "executable": false,
+      "forbidden": [
+        "implementation_binding",
+        "upward_authority",
+        "founder_ops"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.admin-ops.manager",
+      "mcp_lane_refs": [
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.evidence-governance",
+        "mcp.lane.context-assets",
+        "mcp.lane.workflow-control"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "manager",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.task-decomposition",
+        "skill.dependency-planning",
+        "skill.report-acceptance",
+        "skill.loadout-selection",
+        "skill.conference-facilitation"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.admin-ops.supervisor",
+      "budget_ceiling": "supervision_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "d8082a1d019ceec0bb21033fc24435fd06f3703e18f264c27ef4418bc1fff1b8",
+      "department": "admin-ops",
+      "effect_ceiling": "supervision",
+      "executable": false,
+      "forbidden": [
+        "implementation",
+        "waiver",
+        "schedule_activation"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.admin-ops.supervisor",
+      "mcp_lane_refs": [
+        "mcp.lane.workflow-control",
+        "mcp.lane.evidence-governance",
+        "mcp.lane.context-assets",
+        "mcp.lane.maintenance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "supervisor",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health",
+        "script.generic.queue_worker_heartbeat_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.execution-supervision",
+        "skill.report-acceptance",
+        "skill.recovery-triage",
+        "skill.anomaly-handling",
+        "skill.ci-test-triage"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.admin-ops.worker",
+      "budget_ceiling": "worker_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "4f40e0ec81fc2f023f86c1d8ad55871ebcfa30d31660a3f0d4cad4dffa6c1152",
+      "department": "admin-ops",
+      "effect_ceiling": "assigned_read_or_evidence",
+      "executable": false,
+      "forbidden": [
+        "implementation_code_writes",
+        "review_of_own_work",
+        "founder_ops"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.admin-ops.worker",
+      "mcp_lane_refs": [
+        "mcp.lane.context-assets",
+        "mcp.lane.evidence-governance",
+        "mcp.lane.maintenance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "worker",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.documentation_link_sweep",
+        "script.generic.documentation_metadata_sweep"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.task-execution",
+        "skill.documentation-maintenance",
+        "skill.conference-facilitation",
+        "skill.schedule-operations",
+        "skill.cpprd-changelog-authoring"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.qa.executive",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "5c1c216cb9b869622942e0f3b4673bddb8c8b9b4dadbcf70ef279fa2c8b0b810",
+      "department": "qa",
+      "effect_ceiling": "review_coordination",
+      "executable": false,
+      "forbidden": [
+        "implementation",
+        "reuse_implementation_context_for_review_or_merge"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.qa.executive",
+      "mcp_lane_refs": [
+        "mcp.lane.evidence-governance",
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.context-assets",
+        "mcp.lane.workflow-control"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "executive",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.orchestrator-admin-qa-exec",
+        "skill.review-gate",
+        "skill.governance-audit",
+        "skill.loadout-selection",
+        "skill.anomaly-handling"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.qa.manager",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "e35841cd5120cc65baecc1974d46a39b6bbf56cba411bf7405dad678392b75e7",
+      "department": "qa",
+      "effect_ceiling": "review_coordination",
+      "executable": false,
+      "forbidden": [
+        "implementation",
+        "self_merge"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.qa.manager",
+      "mcp_lane_refs": [
+        "mcp.lane.evidence-governance",
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.context-assets"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "manager",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.review-gate",
+        "skill.report-acceptance",
+        "skill.dependency-planning",
+        "skill.security-audit-procedure"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.qa.supervisor",
+      "budget_ceiling": "supervision_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "72f72a9d66e30c0b4172cfa5fc9005d6f1480ff212b87dcc2a33c6fab39cd284",
+      "department": "qa",
+      "effect_ceiling": "review_supervision",
+      "executable": false,
+      "forbidden": [
+        "implementation_of_reviewed_work"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.qa.supervisor",
+      "mcp_lane_refs": [
+        "mcp.lane.evidence-governance",
+        "mcp.lane.workflow-control",
+        "mcp.lane.context-assets"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "supervisor",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.secret_pattern_scan",
+        "script.generic.catalog_integrity_sweep"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.execution-supervision",
+        "skill.code-review-risk-triage",
+        "skill.ci-test-triage",
+        "skill.security-audit-procedure",
+        "skill.report-acceptance",
+        "skill.anomaly-handling"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.qa.worker",
+      "budget_ceiling": "worker_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "d3cb9c66e069e80013fc32c89e7aad467afdea2989ec2b1cb4a880b461d714d5",
+      "department": "qa",
+      "effect_ceiling": "independent_review_only",
+      "executable": false,
+      "forbidden": [
+        "any_implementation_of_item_under_review",
+        "same_invocation_as_implementer"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.qa.worker",
+      "mcp_lane_refs": [
+        "mcp.lane.evidence-governance",
+        "mcp.lane.context-assets"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "worker",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.review-gate",
+        "skill.code-review-risk-triage",
+        "skill.security-audit-procedure",
+        "skill.ci-test-triage",
+        "skill.governance-audit"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.tech.executive",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "b19c97aaa72cebdf335046b608f8de5dc8a4908a86e0e1448815120043c564eb",
+      "department": "tech",
+      "effect_ceiling": "tech_coordination",
+      "executable": false,
+      "forbidden": [
+        "deep_implementation_in_executive_context",
+        "self_review"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.tech.executive",
+      "mcp_lane_refs": [
+        "mcp.lane.workflow-control",
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.context-assets",
+        "mcp.lane.evidence-governance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "executive",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.orchestrator-admin-tech-exec",
+        "skill.task-decomposition",
+        "skill.loadout-selection",
+        "skill.dependency-planning",
+        "skill.anomaly-handling"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.tech.manager",
+      "budget_ceiling": "coordination_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "4d5dbfa3ce02a78115977ca13f31a80d0c4a0dd1a8699fed9a0a03fdfc51f0a1",
+      "department": "tech",
+      "effect_ceiling": "tech_coordination",
+      "executable": false,
+      "forbidden": [
+        "self_review",
+        "founder_ops"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.tech.manager",
+      "mcp_lane_refs": [
+        "mcp.lane.delegation-coordination",
+        "mcp.lane.workflow-control",
+        "mcp.lane.context-assets",
+        "mcp.lane.evidence-governance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "manager",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.repository_health",
+        "script.generic.repository_inventory"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.task-decomposition",
+        "skill.dependency-planning",
+        "skill.report-acceptance",
+        "skill.repo-exploration-briefing"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.tech.supervisor",
+      "budget_ceiling": "supervision_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "4e447848a7b41619f9fd591f39e0cb19826f39ead4cc2e4f7338a4b16361c963",
+      "department": "tech",
+      "effect_ceiling": "tech_supervision",
+      "executable": false,
+      "forbidden": [
+        "self_merge",
+        "waiver"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.tech.supervisor",
+      "mcp_lane_refs": [
+        "mcp.lane.workflow-control",
+        "mcp.lane.evidence-governance",
+        "mcp.lane.context-assets",
+        "mcp.lane.maintenance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "supervisor",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.queue_worker_heartbeat_health",
+        "script.generic.repository_health"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.execution-supervision",
+        "skill.ci-test-triage",
+        "skill.code-review-risk-triage",
+        "skill.recovery-triage",
+        "skill.report-acceptance",
+        "skill.anomaly-handling"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "loadout.tech.worker",
+      "budget_ceiling": "worker_default",
+      "capability_refs": [],
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "a8d2e79255b17567974acf526c929c78e4e2d07324f9791ce4d5b98cd7ccff56",
+      "department": "tech",
+      "effect_ceiling": "implementation_within_grant",
+      "executable": false,
+      "forbidden": [
+        "independent_self_review_of_own_implementation",
+        "merge_deploy"
+      ],
+      "kind": "loadout",
+      "lifecycle_state": "inert",
+      "loadout_id": "loadout.tech.worker",
+      "mcp_lane_refs": [
+        "mcp.lane.context-assets",
+        "mcp.lane.workflow-control",
+        "mcp.lane.evidence-governance"
+      ],
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "owner": "platform.orchestrator",
+      "position": "worker",
+      "precedence_inputs": [
+        "engine_safety_floor",
+        "handbook_version",
+        "installation_policy",
+        "orchestrator_base",
+        "department",
+        "hierarchy_layer",
+        "position",
+        "project_repo_extension",
+        "task_class",
+        "explicit_task_grant"
+      ],
+      "provenance": "r1-design-contract",
+      "script_refs": [
+        "script.generic.git_diff_summary",
+        "script.generic.dependency_manifest_inventory"
+      ],
+      "sensitivity": "public",
+      "skill_refs": [
+        "skill.session-orientation",
+        "skill.design-first-gate",
+        "skill.investigation-report",
+        "skill.handoff-contract",
+        "skill.trust-but-verify",
+        "skill.task-execution",
+        "skill.implementation-loop",
+        "skill.repo-exploration-briefing",
+        "skill.ci-test-triage",
+        "skill.cpprd-changelog-authoring"
+      ],
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0"
+    }
+  ],
+  "schema_version": 1
+}

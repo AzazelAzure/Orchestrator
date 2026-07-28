@@ -6,7 +6,7 @@
     "manifest_path": "agentic/manifest.json",
     "revision": null
   },
-  "captured_at": "2026-07-17T03:52:14+00:00",
+  "captured_at": "2026-07-26T07:43:40+00:00",
   "entities": [
     {
       "id": "bundle.orchestrator.core",
@@ -45,6 +45,33 @@
       "source": "skills/bundles/extended.json",
       "version": "1",
       "content_sha256": "d0388ffed59e7ceec4f8ec02b771412f67b2c02af95591d1c792c90cbd6a2008",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation": "opt_in"
+      },
+      "notes": "References packages by stable skill ID; contains no copied skill body.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "bundle.orchestrator.positional",
+      "kind": "skill_bundle",
+      "name": "positional",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/bundles/positional.json",
+      "version": "1",
+      "content_sha256": "9c740727c7b78566c60b1f518f7e8173bd9da562364a034036cca06649157fa7",
       "authority": "repository-package-owner",
       "sensitivity": "public",
       "mutation_class": "none",
@@ -190,6 +217,671 @@
       "verification": {
         "source_present": true,
         "package_valid": null,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "catalog.orchestrator.r1.assets",
+      "kind": "binding",
+      "name": "assets",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/assets.json",
+      "version": "0.1.0",
+      "content_sha256": "91f9b8e606758fcd65b44d9d5ec4d197ac65ab40aae473f01d06f0ca6123aacf",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "runtime_enforcement": false,
+        "kind": "portable_asset_index",
+        "count": 28
+      },
+      "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "catalog.orchestrator.r1.loadouts",
+      "kind": "binding",
+      "name": "loadouts",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "9fcd34fc8201ab6fde376567be8e3f2cc1f3d65a4823c31867cba789ffe195e2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "runtime_enforcement": false,
+        "kind": "loadout_catalog",
+        "count": 12
+      },
+      "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "catalog.orchestrator.r1.mcp-lanes",
+      "kind": "binding",
+      "name": "mcp_lanes",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "33525083a1fab44fdd3d7fc92107077e06fb5540fde2c5a5d7c6f4869197cac2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "runtime_enforcement": false,
+        "kind": "mcp_lane_catalog",
+        "count": 5
+      },
+      "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "catalog.orchestrator.r1.policy",
+      "kind": "binding",
+      "name": "policy",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/policy.json",
+      "version": "0.1.0",
+      "content_sha256": "cff5baf6d2ccc17632bc041a6fa90b92e9e2cff74e85cf272572fbb05226c203",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "runtime_enforcement": false,
+        "kind": "policy_contract",
+        "count": null
+      },
+      "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "catalog.orchestrator.r1.scripts",
+      "kind": "binding",
+      "name": "scripts",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "e8e61beeb9d16b83a810d3fe2412d75ce26a1cc9a3e100ac2858d5a38c6b1560",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "runtime_enforcement": false,
+        "kind": "registered_script_catalog",
+        "count": 12
+      },
+      "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.admin-ops.executive",
+      "kind": "binding",
+      "name": "executive",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "cdc198daf60b6eb3cba9c4882d7a30f3674ef234916ae7543a7533287a615d9e",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.admin-ops.manager",
+      "kind": "binding",
+      "name": "manager",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "0957e2b867b0d12f2309b653de32a0fb003bb74fdeb1a57ee3bbada796b733f1",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.admin-ops.supervisor",
+      "kind": "binding",
+      "name": "supervisor",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "d8082a1d019ceec0bb21033fc24435fd06f3703e18f264c27ef4418bc1fff1b8",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.admin-ops.worker",
+      "kind": "binding",
+      "name": "worker",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "4f40e0ec81fc2f023f86c1d8ad55871ebcfa30d31660a3f0d4cad4dffa6c1152",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.qa.executive",
+      "kind": "binding",
+      "name": "executive",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "5c1c216cb9b869622942e0f3b4673bddb8c8b9b4dadbcf70ef279fa2c8b0b810",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.qa.manager",
+      "kind": "binding",
+      "name": "manager",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "e35841cd5120cc65baecc1974d46a39b6bbf56cba411bf7405dad678392b75e7",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.qa.supervisor",
+      "kind": "binding",
+      "name": "supervisor",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "72f72a9d66e30c0b4172cfa5fc9005d6f1480ff212b87dcc2a33c6fab39cd284",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.qa.worker",
+      "kind": "binding",
+      "name": "worker",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "d3cb9c66e069e80013fc32c89e7aad467afdea2989ec2b1cb4a880b461d714d5",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.tech.executive",
+      "kind": "binding",
+      "name": "executive",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "b19c97aaa72cebdf335046b608f8de5dc8a4908a86e0e1448815120043c564eb",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.tech.manager",
+      "kind": "binding",
+      "name": "manager",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "4d5dbfa3ce02a78115977ca13f31a80d0c4a0dd1a8699fed9a0a03fdfc51f0a1",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.tech.supervisor",
+      "kind": "binding",
+      "name": "supervisor",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "4e447848a7b41619f9fd591f39e0cb19826f39ead4cc2e4f7338a4b16361c963",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "loadout.tech.worker",
+      "kind": "binding",
+      "name": "worker",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/loadouts.json",
+      "version": "0.1.0",
+      "content_sha256": "a8d2e79255b17567974acf526c929c78e4e2d07324f9791ce4d5b98cd7ccff56",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert positional loadout design; native enforcement is R3.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.context-assets",
+      "kind": "mcp_server",
+      "name": "context-assets",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "dcc22fc8f29061fead19386bbf156af21cf249c797fcca40c0aa6b2022b6ecc5",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Also binds the existing five read-only stdio MCP tools.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.delegation-coordination",
+      "kind": "mcp_server",
+      "name": "delegation-coordination",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "f7599023f20418c8a860d198d7a4ace641881fdf07ef21b3011d4dd909f5b1fe",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert R1 catalog member.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.evidence-governance",
+      "kind": "mcp_server",
+      "name": "evidence-governance",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "76333c8b648629f4d88248714489a9ef719709fc489886dc3176a5099831d69f",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert R1 catalog member.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.maintenance",
+      "kind": "mcp_server",
+      "name": "maintenance",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "7afd9e28d3ac3e55e9fe8935bee181cc9ae03d55641d591586c4bfc9013513e5",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Inert R1 catalog member.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.workflow-control",
+      "kind": "mcp_server",
+      "name": "workflow-control",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "32ebb2651aa9d227ea871da491a28d85c007d8972e5eeabb060a060c2bcfc595",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Design-only lane profile; calls DRF only in later milestones.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
         "binding_configured": null,
         "executable_resolves": null,
         "smoke_pass": null,
@@ -362,6 +1054,423 @@
       }
     },
     {
+      "id": "policy.contract.r1.governance",
+      "kind": "binding",
+      "name": "governance",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/policy.json",
+      "version": "0.1.0",
+      "content_sha256": "1344ed67708c1e42e0e7d4379941a6da59d696e95195c683393cb176c814f1b6",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "deny_wins": true
+      },
+      "notes": "Inert governance contract for R1. Does not activate installation policy or make any Headquarters project contract executable.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.backup_restore_probe",
+      "kind": "binding",
+      "name": "backup_restore_probe",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "1889ff9398bc9ff607c052ffac9a79dbd553669a2bb189c1ce5f9cd3c5055324",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.catalog_integrity_sweep",
+      "kind": "binding",
+      "name": "catalog_integrity_sweep",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "d7e2f58703c8a946320b951f00fa0d0c21e2e94bfb66c2ad205bf2b8089d0382",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.dependency_manifest_inventory",
+      "kind": "binding",
+      "name": "dependency_manifest_inventory",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "902699be204ebbf813fa5da9f896ef83a2f68d45eca4d86ff35fa0c4f9827745",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.documentation_link_sweep",
+      "kind": "binding",
+      "name": "documentation_link_sweep",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "e6ab825f97ee8440f497d443e71229c881f271ed1e5a6ea295bbe4352e7d5029",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.documentation_metadata_sweep",
+      "kind": "binding",
+      "name": "documentation_metadata_sweep",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "b7c03d69ed88495023e49c6f214170e7b311a368b1c49b001bd97ea7289d8467",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.git_diff_summary",
+      "kind": "binding",
+      "name": "git_diff_summary",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "be41e71ac9a3c697c21ea76d0966a896788812471b6d0a1178ec9e9db484b33b",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.governance_integrity_sweep",
+      "kind": "binding",
+      "name": "governance_integrity_sweep",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "583e9351b8190c157a58262a60d25e57042be381d1a79042c52d940e07105d74",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.queue_worker_heartbeat_health",
+      "kind": "binding",
+      "name": "queue_worker_heartbeat_health",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "a8b9a30ee2acebe7c18a56e92a1a852b5947d1bbf227b5fb6bb6a852801a34ff",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.repository_health",
+      "kind": "binding",
+      "name": "repository_health",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "38beda0cd2483cf4bec27a993387d3ad4b094f3dee9670feed001892fd35cd53",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.repository_inventory",
+      "kind": "binding",
+      "name": "repository_inventory",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "e77829e3634f027c08366822795db9c555e0378f7a600ad8e2d490aefa2281b6",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.secret_pattern_scan",
+      "kind": "binding",
+      "name": "secret_pattern_scan",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "a765eea6e2575ad80dd61306ce566cb7e727b64276154a9ea9b8cd0ed76c35c2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "script.generic.stale_work_sweep",
+      "kind": "binding",
+      "name": "stale_work_sweep",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/scripts.json",
+      "version": "0.1.0",
+      "content_sha256": "e2b3a0c47d118d3757f344802f0310b7cd236f2850a7417844e9f0f19902d115",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog-only at R1; registry presence is not authority.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.anomaly-handling",
+      "kind": "skill_package",
+      "name": "anomaly-handling",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/anomaly-handling",
+      "version": "0.1.0",
+      "content_sha256": "a4364d0635e738ada649b9aea1b9d41d30cfd318667d19500d165eaecd7dc7b3",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
       "id": "skill.ci-test-triage",
       "kind": "skill_package",
       "name": "ci-test-triage",
@@ -418,6 +1527,34 @@
       }
     },
     {
+      "id": "skill.conference-facilitation",
+      "kind": "skill_package",
+      "name": "conference-facilitation",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/conference-facilitation",
+      "version": "0.1.0",
+      "content_sha256": "b9d421979df45aa659436dc129131187516d99c53e2f9759eeeb87b1d701b8ae",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
       "id": "skill.cpprd-changelog-authoring",
       "kind": "skill_package",
       "name": "cpprd-changelog-authoring",
@@ -435,6 +1572,34 @@
         "scheduling_ref": null
       },
       "notes": "Public Orchestrator extended skill. CPPRD is compatibility vocabulary, not product coupling.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.dependency-planning",
+      "kind": "skill_package",
+      "name": "dependency-planning",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/dependency-planning",
+      "version": "0.1.0",
+      "content_sha256": "b5caa0741034c5101bd62d7f4ccc724aa0746cd0775f2e5bad2a4f8dcfad47cb",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
       "verification": {
         "source_present": true,
         "package_valid": true,
@@ -474,6 +1639,90 @@
       }
     },
     {
+      "id": "skill.documentation-maintenance",
+      "kind": "skill_package",
+      "name": "documentation-maintenance",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/documentation-maintenance",
+      "version": "0.1.0",
+      "content_sha256": "b26a758a92ebaabc2577b250fc0f283555985382d8bce4250a8f0773cc61e1f2",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.execution-supervision",
+      "kind": "skill_package",
+      "name": "execution-supervision",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/execution-supervision",
+      "version": "0.1.0",
+      "content_sha256": "b7bbd3df2da80140f096e7bb518aa9887c6c998627e447e0a949a5d7457cc34c",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.governance-audit",
+      "kind": "skill_package",
+      "name": "governance-audit",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/governance-audit",
+      "version": "0.1.0",
+      "content_sha256": "daee471b44836ff61e2e3b8d234edf2a99e0bdb8ff51bb7470ca4f3a0c25395e",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
       "id": "skill.handoff-contract",
       "kind": "skill_package",
       "name": "handoff-contract",
@@ -491,6 +1740,34 @@
         "scheduling_ref": null
       },
       "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.implementation-loop",
+      "kind": "skill_package",
+      "name": "implementation-loop",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/implementation-loop",
+      "version": "0.1.0",
+      "content_sha256": "559c585e0c8da320846071e6ba79c7c66dc1a81c7f9f7288155fbd3ec468cf2f",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
       "verification": {
         "source_present": true,
         "package_valid": true,
@@ -530,6 +1807,146 @@
       }
     },
     {
+      "id": "skill.loadout-selection",
+      "kind": "skill_package",
+      "name": "loadout-selection",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/loadout-selection",
+      "version": "0.1.0",
+      "content_sha256": "d4e6e9db2be9b22320aa0923106cea5a2fe9d304f996d592fbccb6fd9e1c72e7",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.orchestrator-admin-ops-exec",
+      "kind": "skill_package",
+      "name": "orchestrator-admin-ops-exec",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/orchestrator-admin-ops-exec",
+      "version": "0.1.0",
+      "content_sha256": "be35888c096d251273f37bf6d8fdf54979dd1b305669a67ac65924f52c37b3fc",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.orchestrator-admin-qa-exec",
+      "kind": "skill_package",
+      "name": "orchestrator-admin-qa-exec",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/orchestrator-admin-qa-exec",
+      "version": "0.1.0",
+      "content_sha256": "d778a8a46358b0ea24cabfbf9bd8ed937e29fb7e396b208dfe340fe7ce1b8f39",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.orchestrator-admin-tech-exec",
+      "kind": "skill_package",
+      "name": "orchestrator-admin-tech-exec",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/orchestrator-admin-tech-exec",
+      "version": "0.1.0",
+      "content_sha256": "bc2bb864758ae3c86fa2290dc2a9e7039a3c9a8134a730b8bdf784b5a06c704c",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.recovery-triage",
+      "kind": "skill_package",
+      "name": "recovery-triage",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/recovery-triage",
+      "version": "0.1.0",
+      "content_sha256": "50180323dd831f961e9e02b641c60155e028dd62097f48357ae9f8def0bba7ff",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
       "id": "skill.repo-exploration-briefing",
       "kind": "skill_package",
       "name": "repo-exploration-briefing",
@@ -547,6 +1964,90 @@
         "scheduling_ref": null
       },
       "notes": "Public Orchestrator seed skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.report-acceptance",
+      "kind": "skill_package",
+      "name": "report-acceptance",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/report-acceptance",
+      "version": "0.1.0",
+      "content_sha256": "728fe639dfe6aba55fc7f02e933c2dfbf22860ac77e18a73f64f8ffbcad2975a",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.review-gate",
+      "kind": "skill_package",
+      "name": "review-gate",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/review-gate",
+      "version": "0.1.0",
+      "content_sha256": "aa131e2638f8f89b32fc2b6cf9ebc676e7670a3bc412ce4890ceace726aeb7cc",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.schedule-operations",
+      "kind": "skill_package",
+      "name": "schedule-operations",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/schedule-operations",
+      "version": "0.1.0",
+      "content_sha256": "3d7ff30a4d313b9371b3dc8e79fde0b596a18b8f06a0d0615a290e8296da249c",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
       "verification": {
         "source_present": true,
         "package_valid": true,
@@ -642,6 +2143,62 @@
       }
     },
     {
+      "id": "skill.task-decomposition",
+      "kind": "skill_package",
+      "name": "task-decomposition",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/task-decomposition",
+      "version": "0.1.0",
+      "content_sha256": "5344b694668630c027df166f8f17d054a25844376d9aa56a82609a52b69d5495",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "skill.task-execution",
+      "kind": "skill_package",
+      "name": "task-execution",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "active",
+      "source": "skills/task-execution",
+      "version": "0.1.0",
+      "content_sha256": "e758d36e563d3678657d9c920a6e0a29a2192726b3de3ae45ec007aac3d198f5",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "active",
+        "scheduling_ref": null
+      },
+      "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
       "id": "skill.trust-but-verify",
       "kind": "skill_package",
       "name": "trust-but-verify",
@@ -671,6 +2228,91 @@
     }
   ],
   "relationships": [
+    {
+      "from": "loadout.admin-ops.executive",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.admin-ops.manager",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.admin-ops.supervisor",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.admin-ops.worker",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.qa.executive",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.qa.manager",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.qa.supervisor",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.qa.worker",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.tech.executive",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.tech.manager",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.tech.supervisor",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "loadout.tech.worker",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.loadouts"
+    },
+    {
+      "from": "mcp.lane.context-assets",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
+    {
+      "from": "mcp.lane.delegation-coordination",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
+    {
+      "from": "mcp.lane.evidence-governance",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
+    {
+      "from": "mcp.lane.maintenance",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
+    {
+      "from": "mcp.lane.workflow-control",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
     {
       "from": "mcp.server.orchestrator.read-only",
       "type": "exposes",
@@ -722,6 +2364,76 @@
       "to": "capability.orchestrator.work-lookup"
     },
     {
+      "from": "policy.contract.r1.governance",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.policy"
+    },
+    {
+      "from": "script.generic.backup_restore_probe",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.catalog_integrity_sweep",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.dependency_manifest_inventory",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.documentation_link_sweep",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.documentation_metadata_sweep",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.git_diff_summary",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.governance_integrity_sweep",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.queue_worker_heartbeat_health",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.repository_health",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.repository_inventory",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.secret_pattern_scan",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "script.generic.stale_work_sweep",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.scripts"
+    },
+    {
+      "from": "skill.anomaly-handling",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
       "from": "skill.ci-test-triage",
       "type": "member_of",
       "to": "bundle.orchestrator.extended"
@@ -732,9 +2444,19 @@
       "to": "bundle.orchestrator.extended"
     },
     {
+      "from": "skill.conference-facilitation",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
       "from": "skill.cpprd-changelog-authoring",
       "type": "member_of",
       "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.dependency-planning",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
     },
     {
       "from": "skill.design-first-gate",
@@ -742,9 +2464,29 @@
       "to": "bundle.orchestrator.core"
     },
     {
+      "from": "skill.documentation-maintenance",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.execution-supervision",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.governance-audit",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
       "from": "skill.handoff-contract",
       "type": "member_of",
       "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.implementation-loop",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
     },
     {
       "from": "skill.investigation-report",
@@ -752,9 +2494,49 @@
       "to": "bundle.orchestrator.extended"
     },
     {
+      "from": "skill.loadout-selection",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.orchestrator-admin-ops-exec",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.orchestrator-admin-qa-exec",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.orchestrator-admin-tech-exec",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.recovery-triage",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
       "from": "skill.repo-exploration-briefing",
       "type": "member_of",
       "to": "bundle.orchestrator.extended"
+    },
+    {
+      "from": "skill.report-acceptance",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.review-gate",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.schedule-operations",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
     },
     {
       "from": "skill.security-audit-procedure",
@@ -770,6 +2552,16 @@
       "from": "skill.skill-gap-detection",
       "type": "member_of",
       "to": "bundle.orchestrator.core"
+    },
+    {
+      "from": "skill.task-decomposition",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
+    },
+    {
+      "from": "skill.task-execution",
+      "type": "member_of",
+      "to": "bundle.orchestrator.positional"
     },
     {
       "from": "skill.trust-but-verify",

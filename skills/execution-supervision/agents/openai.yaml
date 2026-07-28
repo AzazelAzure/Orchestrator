@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execution Supervision"
+  short_description: "Supervise delegated execution safely"
+  default_prompt: "Use $execution-supervision to supervise delegated work."

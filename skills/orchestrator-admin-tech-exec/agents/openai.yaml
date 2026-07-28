@@ -1,0 +1,4 @@
+interface:
+  display_name: "Admin Tech Executive"
+  short_description: "Coordinate Tech executive implementation work"
+  default_prompt: "Use $orchestrator-admin-tech-exec to coordinate portable Orchestrator Tech executive work."

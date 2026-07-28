@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "bundle_id": "bundle.orchestrator.positional",
+  "activation": "opt_in",
+  "members": [
+    "skill.anomaly-handling",
+    "skill.task-decomposition",
+    "skill.dependency-planning",
+    "skill.loadout-selection",
+    "skill.execution-supervision",
+    "skill.report-acceptance",
+    "skill.recovery-triage",
+    "skill.task-execution",
+    "skill.implementation-loop",
+    "skill.review-gate",
+    "skill.governance-audit",
+    "skill.documentation-maintenance",
+    "skill.conference-facilitation",
+    "skill.schedule-operations",
+    "skill.orchestrator-admin-ops-exec",
+    "skill.orchestrator-admin-qa-exec",
+    "skill.orchestrator-admin-tech-exec"
+  ]
+}

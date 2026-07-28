@@ -1,0 +1,4 @@
+interface:
+  display_name: "Report Acceptance"
+  short_description: "Accept or reject terminal reports"
+  default_prompt: "Use $report-acceptance to accept or reject a report."

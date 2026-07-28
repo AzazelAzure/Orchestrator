@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loadout Selection"
+  short_description: "Choose department×position loadouts"
+  default_prompt: "Use $loadout-selection to choose a positional loadout."

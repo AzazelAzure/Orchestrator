@@ -40,6 +40,7 @@ coverage.xml
 .env
 .env.*
 !.env.example
+!.env.example
 *.pem
 *.key
 id_rsa*
@@ -56,6 +57,13 @@ tmp/
 .local/
 out/
 artifacts/
+
+# R4D / Compose local attestation outputs (never commit real inspect attestations)
+deploy/attestations/script-runner.attestation.json
+deploy/attestations/*.local.json
+!deploy/attestations/README.md
+!deploy/attestations/script-runner.testing.attestation.json
+
 
 # Agent local state directories (do not commit machine-local agent roots)
 .claude/

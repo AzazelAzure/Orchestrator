@@ -255,6 +255,10 @@ def _assert_completion_prerequisites(conn: sqlite3.Connection, work_id: str) -> 
             )
 
 
+def assert_completion_prerequisites(conn: sqlite3.Connection, work_id: str) -> None:
+    _assert_completion_prerequisites(conn, work_id)
+
+
 def complete_work(
     conn: sqlite3.Connection,
     *,

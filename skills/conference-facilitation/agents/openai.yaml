@@ -1,0 +1,4 @@
+interface:
+  display_name: "Conference Facilitation"
+  short_description: "Structure multi-seat decisions"
+  default_prompt: "Use $conference-facilitation to structure a multi-seat decision."

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/policy-contract.json",
+  "title": "PolicyContractCatalog",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "kind",
+    "lifecycle_state",
+    "activation",
+    "record",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "catalog_version": { "type": "string" },
+    "kind": { "const": "policy_contract" },
+    "lifecycle_state": { "const": "inert" },
+    "activation": { "const": "inert" },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "record": {
+      "type": "object",
+      "required": [
+        "asset_id",
+        "policy_id",
+        "deny_wins",
+        "precedence",
+        "immutable_dispatch_pin_fields",
+        "mandatory_anomaly_reporting",
+        "independent_review_separation",
+        "stdio_mcp_compatibility",
+        "r1_activation",
+        "content_sha256"
+      ],
+      "properties": {
+        "deny_wins": { "const": true },
+        "precedence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "immutable_dispatch_pin_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "mandatory_anomaly_reporting": {
+          "type": "object",
+          "required": ["required", "omission_invalid", "taxonomy"],
+          "properties": {
+            "required": { "const": true },
+            "omission_invalid": { "const": true }
+          }
+        },
+        "independent_review_separation": {
+          "type": "object",
+          "required": [
+            "required",
+            "distinct_provider_principal",
+            "distinct_seat",
+            "distinct_invocation",
+            "distinct_attempt"
+          ],
+          "properties": {
+            "required": { "const": true },
+            "distinct_provider_principal": { "const": true },
+            "distinct_seat": { "const": true },
+            "distinct_invocation": { "const": true },
+            "distinct_attempt": { "const": true }
+          }
+        },
+        "r1_activation": {
+          "type": "object",
+          "required": [
+            "runtime_enforcement",
+            "installation_policy_active",
+            "project_contract_executable",
+            "assets_inert"
+          ],
+          "properties": {
+            "runtime_enforcement": { "const": false },
+            "installation_policy_active": { "const": false },
+            "project_contract_executable": { "const": false },
+            "assets_inert": { "const": true }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
