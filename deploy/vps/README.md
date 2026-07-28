@@ -46,8 +46,8 @@ bash ~/orchestrator/deploy/vps/vps_bootstrap.sh all
 ## Verify
 
 ```bash
-curl -sS https://api.thedirectorate.dev/health/
-curl -sS https://www.thedirectorate.dev/
+curl -sS https://api.thedirectorate.app/health/
+curl -sS https://www.thedirectorate.app/
 curl -sS https://www.pproctor.com/health
 curl -kfsS -H "Host: thehivemanager.com" https://127.0.0.1:8443/ -o /dev/null -w '%{http_code}\n'
 ```

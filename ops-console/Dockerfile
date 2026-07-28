@@ -1,6 +1,6 @@
 FROM docker.io/library/nginx:1.27-alpine
 
-ARG VITE_API_BASE_URL=https://api.thedirectorate.dev
+ARG VITE_API_BASE_URL=https://api.thedirectorate.app
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 COPY nginx.conf /etc/nginx/nginx.conf

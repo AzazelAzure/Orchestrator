@@ -4,7 +4,7 @@ set -euo pipefail
 ORCH_ROOT="${ORCH_ROOT:-$HOME/orchestrator}"
 cd "$ORCH_ROOT"
 IMAGE="${ORCH_OPS_CONSOLE_IMAGE:-orchestrator-ops-console:vps}"
-API_BASE="${VITE_API_BASE_URL:-https://api.thedirectorate.dev}"
+API_BASE="${VITE_API_BASE_URL:-https://api.thedirectorate.app}"
 
 podman build -t "$IMAGE" ./ops-console --build-arg "VITE_API_BASE_URL=${API_BASE}"
 podman rm -f orchestrator_ops-console_1 2>/dev/null || true

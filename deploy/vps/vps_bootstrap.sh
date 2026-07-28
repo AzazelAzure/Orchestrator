@@ -20,6 +20,10 @@ ensure_orch_env() {
     log "generating $ORCH_ROOT/.env.vps"
     bash "$ORCH_ROOT/scripts/generate_vps_env.sh" "$ORCH_ROOT/.env.vps"
   fi
+  if grep -q 'thedirectorate\.dev' "$ORCH_ROOT/.env.vps" 2>/dev/null; then
+    sed -i 's/thedirectorate\.dev/thedirectorate.app/g' "$ORCH_ROOT/.env.vps"
+    log "patched .env.vps hostnames to thedirectorate.app"
+  fi
 }
 
 patch_orch_base_ports() {
@@ -119,9 +123,9 @@ smoke_local() {
   log "smoke ok: ops console loopback"
   curl -fsS "http://127.0.0.1:3000/health" >/dev/null || { log "FAIL portfolio loopback"; return 1; }
   log "smoke ok: portfolio loopback"
-  curl -kfsS -H "Host: api.thedirectorate.dev" "https://127.0.0.1:8443/health/" >/dev/null || { log "FAIL api via proxy"; return 1; }
+  curl -kfsS -H "Host: api.thedirectorate.app" "https://127.0.0.1:8443/health/" >/dev/null || { log "FAIL api via proxy"; return 1; }
   log "smoke ok: api via proxy"
-  curl -kfsS -H "Host: www.thedirectorate.dev" "https://127.0.0.1:8443/" >/dev/null || { log "FAIL console via proxy"; return 1; }
+  curl -kfsS -H "Host: www.thedirectorate.app" "https://127.0.0.1:8443/" >/dev/null || { log "FAIL console via proxy"; return 1; }
   log "smoke ok: console via proxy"
   curl -kfsS -H "Host: www.pproctor.com" "https://127.0.0.1:8443/health" >/dev/null || { log "FAIL portfolio via proxy"; return 1; }
   log "smoke ok: portfolio via proxy"
@@ -130,8 +134,8 @@ smoke_local() {
 }
 
 smoke_public() {
-  curl -fsS "https://api.thedirectorate.dev/health/" >/dev/null && log "smoke ok: api public ZT"
-  curl -fsS "https://www.thedirectorate.dev/" >/dev/null && log "smoke ok: console public ZT"
+  curl -fsS "https://api.thedirectorate.app/health/" >/dev/null && log "smoke ok: api public ZT"
+  curl -fsS "https://www.thedirectorate.app/" >/dev/null && log "smoke ok: console public ZT"
   curl -fsS "https://www.pproctor.com/health" >/dev/null && log "smoke ok: portfolio public ZT"
 }
 
