@@ -43,5 +43,17 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Open / not claimed
 
-- **Gates (HitM 2026-07-28):** provider adapters **partial close** (Cursor+Claude; Codex waived NLT review 2026-08-05); script sandbox and scheduled maintenance **closed**; local control plane **open** (AM-10 security review).
-- **Codex** — pin and live call deferred; review NLT 2026-08-05.
+### Added (continued)
+
+- **R5 dogfood evidence** — `scripts/r5_dogfood_evidence.py` captures L5 generic proof slices (delegation, mechanical gate, conference references).
+- **R6 external adapter proof evidence** — external read-only status stub script; writes `.tmp/r6-external-adapter/<run_id>/`.
+
+### Verified (2026-07-28, R5/R6)
+
+- R5 dogfood run `r5-20260728T041448Z`: 7/7 evidence rows pass (supplementary capture).
+- R6 external adapter run `r6-external-adapter-20260728T041642Z`: adapter stub contract green.
+
+### Open / not claimed
+
+- **G-ORCH-PROOF-GENERIC** and **G-ORCH-PROOF-PORTFOLIO** — gate close requests prepared; HitM disposition required.
+- **G-ORCH-LOCAL-CONTROL-PLANE** — open (AM-10 security review).
