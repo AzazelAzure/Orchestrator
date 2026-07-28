@@ -5,11 +5,10 @@ from pathlib import Path
 
 from scripts.r5_dogfood_evidence import (
     DELEGATION_FALLBACK_NOTE,
-    OPEN_LCP_GATE,
     R4D_REFERENCE_RUN_ID,
     build_rows,
-    load_r4d_reference,
     load_governed_run_reference,
+    load_r4d_reference,
     probe_delegation,
     probe_hq_supplementary,
     resolve_hq_root,
