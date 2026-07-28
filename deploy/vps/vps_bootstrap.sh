@@ -138,12 +138,12 @@ smoke_public() {
 main() {
   ensure_orch_env
   ensure_attestation
-  up_orchestrator
-  up_portfolio
-  reload_hfm_proxy
+  up_orchestrator || log "orchestrator up had errors"
+  up_portfolio || log "portfolio up had errors"
+  reload_hfm_proxy || log "proxy reload had errors"
   install_systemd_user_units
-  smoke_local
-  smoke_public || log "public ZT smokes skipped or failed (DNS/tunnel/access policy)"
+  smoke_local || log "local smokes had failures"
+  smoke_public || log "public ZT smokes skipped or failed"
 }
 
 case "${1:-all}" in

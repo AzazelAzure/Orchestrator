@@ -18,5 +18,13 @@ podman run -d \
   --security-opt no-new-privileges \
   "$IMAGE"
 
-curl -fsS "http://127.0.0.1:8081/" >/dev/null
-echo "ops-console running on :8081"
+for _ in 1 2 3 4 5; do
+  if curl -fsS "http://127.0.0.1:8081/health" >/dev/null 2>&1; then
+    echo "ops-console running on :8081"
+    exit 0
+  fi
+  sleep 1
+done
+echo "ops-console failed health check" >&2
+podman logs orchestrator_ops-console_1 2>&1 | tail -20
+exit 1
