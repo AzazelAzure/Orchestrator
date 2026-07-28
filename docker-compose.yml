@@ -1,0 +1,365 @@
+# R4A/R4B/R4C local control-plane stack — hardened defaults.
+# Secrets must be injected via environment (see .env.example). Never commit secrets.
+# Never publish coordinator port 9001; it is backend-internal only.
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs:
+    - /tmp:size=64M,mode=1777
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  mem_limit: 512m
+  cpus: 1.0
+  pids_limit: 256
+
+# MCP lanes: frontend only (reach API; never coordinator/redis/SQLite).
+x-mcp-lane: &mcp-lane
+  <<: *hardening
+  build:
+    context: .
+    target: mcp-lane
+  depends_on:
+    api:
+      condition: service_healthy
+  networks:
+    - frontend
+  healthcheck:
+    test: ["CMD", "python", "-m", "flow_engine.mcp_lanes.service_main", "--healthcheck"]
+    interval: 15s
+    timeout: 5s
+    retries: 5
+    start_period: 10s
+
+x-provider-worker: &provider-worker
+  <<: *hardening
+  profiles: ["real-providers"]
+  build:
+    context: .
+    target: worker
+  depends_on: [redis, coordinator]
+  networks:
+    - backend
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+services:
+  redis:
+    image: docker.io/library/redis:7-alpine
+    <<: *hardening
+    # Run directly as the image's redis account.  Its root entrypoint otherwise
+    # attempts chown after cap_drop: ALL, which correctly fails under rootless OCI.
+    user: "999:1000"
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - --appendonly
+      - "no"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+      - /data:size=64M,mode=1777
+
+  coordinator:
+    build:
+      context: .
+      target: coordinator
+    <<: *hardening
+    environment:
+      FLOW_DB_PATH: /data/state.db
+      COORDINATOR_HOST: "0.0.0.0"
+      COORDINATOR_PORT: "9001"
+      ORCH_BOOTSTRAP_PRINCIPALS: "1"
+      ORCH_SCRIPT_ROLE: control
+      ORCH_API_SERVICE_TOKEN: ${ORCH_API_SERVICE_TOKEN:?ORCH_API_SERVICE_TOKEN is required}
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      ORCH_TOKEN_FOUNDER: ${ORCH_TOKEN_FOUNDER:?ORCH_TOKEN_FOUNDER is required}
+      ORCH_TOKEN_SCHEDULER: ${ORCH_TOKEN_SCHEDULER:?ORCH_TOKEN_SCHEDULER is required}
+      ORCH_TOKEN_MCP: ${ORCH_TOKEN_MCP:?ORCH_TOKEN_MCP is required}
+      ORCH_TOKEN_MCP_CONTEXT_ASSETS: ${ORCH_TOKEN_MCP_CONTEXT_ASSETS:?ORCH_TOKEN_MCP_CONTEXT_ASSETS is required}
+      ORCH_TOKEN_MCP_WORKFLOW_CONTROL: ${ORCH_TOKEN_MCP_WORKFLOW_CONTROL:?ORCH_TOKEN_MCP_WORKFLOW_CONTROL is required}
+      ORCH_TOKEN_MCP_DELEGATION_COORDINATION: ${ORCH_TOKEN_MCP_DELEGATION_COORDINATION:?ORCH_TOKEN_MCP_DELEGATION_COORDINATION is required}
+      ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE: ${ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE:?ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE is required}
+      ORCH_TOKEN_MCP_MAINTENANCE: ${ORCH_TOKEN_MCP_MAINTENANCE:?ORCH_TOKEN_MCP_MAINTENANCE is required}
+      ORCH_TOKEN_WORKER: ${ORCH_TOKEN_WORKER:?ORCH_TOKEN_WORKER is required}
+      ORCH_TOKEN_WORKER_CODEX: ${ORCH_TOKEN_WORKER_CODEX:?ORCH_TOKEN_WORKER_CODEX is required}
+      ORCH_TOKEN_WORKER_CURSOR: ${ORCH_TOKEN_WORKER_CURSOR:?ORCH_TOKEN_WORKER_CURSOR is required}
+      ORCH_TOKEN_WORKER_CLAUDE: ${ORCH_TOKEN_WORKER_CLAUDE:?ORCH_TOKEN_WORKER_CLAUDE is required}
+      ORCH_TOKEN_PROVIDER_INVOCATION: ${ORCH_TOKEN_PROVIDER_INVOCATION:?ORCH_TOKEN_PROVIDER_INVOCATION is required}
+      ORCH_ATTESTATION_HMAC_KEY: ${ORCH_ATTESTATION_HMAC_KEY:?ORCH_ATTESTATION_HMAC_KEY is required}
+      ORCH_SCRIPT_RUNNER_ATTESTATION_FILE: /etc/orch/script-runner.attestation.json
+      ORCH_SCRIPT_IMAGE_DIGEST: ${ORCH_SCRIPT_IMAGE_DIGEST:?ORCH_SCRIPT_IMAGE_DIGEST is required}
+    volumes:
+      - orchestrator-data:/data
+      - ${ORCH_SCRIPT_RUNNER_ATTESTATION_HOST_PATH:-./deploy/attestations/script-runner.attestation.json}:/etc/orch/script-runner.attestation.json:ro,z
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      target: api
+    <<: *hardening
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      DJANGO_SETTINGS_MODULE: flow_engine.control_plane.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      ORCH_SCRIPT_ROLE: control
+      ORCH_API_SERVICE_TOKEN: ${ORCH_API_SERVICE_TOKEN:?ORCH_API_SERVICE_TOKEN is required}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - frontend
+      - backend
+
+  worker:
+    build:
+      context: .
+      target: worker
+    <<: *hardening
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_SCRIPT_ROLE: control
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A flow_engine.workers.celery_app inspect ping -d \"celery@$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - backend
+
+  provider-worker-codex:
+    <<: *provider-worker
+    command: ["celery", "-A", "flow_engine.workers.celery_app", "worker", "-Q", "provider-codex", "--concurrency", "1"]
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      ORCH_TOKEN_WORKER_CODEX: ${ORCH_TOKEN_WORKER_CODEX:?ORCH_TOKEN_WORKER_CODEX is required}
+      ORCH_HOST_RUNNER_TOKEN_CODEX: ${ORCH_HOST_RUNNER_TOKEN_CODEX:?ORCH_HOST_RUNNER_TOKEN_CODEX is required}
+      ORCH_HOST_RUNNER_SOCKET_CODEX: /run/orch-provider/codex.sock
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+    volumes:
+      - ${ORCH_HOST_RUNNER_DIR_CODEX:-./.tmp/provider-sockets/codex}:/run/orch-provider:ro,z
+
+  provider-worker-cursor:
+    <<: *provider-worker
+    command: ["celery", "-A", "flow_engine.workers.celery_app", "worker", "-Q", "provider-cursor", "--concurrency", "1"]
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      ORCH_TOKEN_WORKER_CURSOR: ${ORCH_TOKEN_WORKER_CURSOR:?ORCH_TOKEN_WORKER_CURSOR is required}
+      ORCH_HOST_RUNNER_TOKEN_CURSOR: ${ORCH_HOST_RUNNER_TOKEN_CURSOR:?ORCH_HOST_RUNNER_TOKEN_CURSOR is required}
+      ORCH_HOST_RUNNER_SOCKET_CURSOR: /run/orch-provider/cursor.sock
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+    volumes:
+      - ${ORCH_HOST_RUNNER_DIR_CURSOR:-./.tmp/provider-sockets/cursor}:/run/orch-provider:ro,z
+
+  provider-worker-claude:
+    <<: *provider-worker
+    command: ["celery", "-A", "flow_engine.workers.celery_app", "worker", "-Q", "provider-claude", "--concurrency", "1"]
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      ORCH_TOKEN_WORKER_CLAUDE: ${ORCH_TOKEN_WORKER_CLAUDE:?ORCH_TOKEN_WORKER_CLAUDE is required}
+      ORCH_HOST_RUNNER_TOKEN_CLAUDE: ${ORCH_HOST_RUNNER_TOKEN_CLAUDE:?ORCH_HOST_RUNNER_TOKEN_CLAUDE is required}
+      ORCH_HOST_RUNNER_SOCKET_CLAUDE: /run/orch-provider/claude.sock
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+    volumes:
+      - ${ORCH_HOST_RUNNER_DIR_CLAUDE:-./.tmp/provider-sockets/claude}:/run/orch-provider:ro,z
+
+  # One-shot ownership boundary for the shared named spool volume.  Neither
+  # long-running consumer receives root or ownership-changing capabilities.
+  script-spool-init:
+    image: localhost/orchestrator-script-spool-init:local
+    build:
+      context: .
+      target: base
+    <<: *hardening
+    user: "0:0"
+    network_mode: "none"
+    cap_add:
+      - CHOWN
+      # Required to enter/create within a pre-existing rootless-remapped volume
+      # before its ownership is corrected; not granted to either consumer.
+      - DAC_OVERRIDE
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        chown -R 0:0 /var/orch/spool
+        mkdir -p /var/orch/spool/jobs /var/orch/spool/results /var/orch/spool/cancels /var/orch/spool/seen /var/orch/spool/tmp /var/orch/spool/claimed /var/orch/spool/quarantine
+        chmod 0750 /var/orch/spool /var/orch/spool/jobs /var/orch/spool/results /var/orch/spool/cancels /var/orch/spool/seen /var/orch/spool/tmp /var/orch/spool/claimed /var/orch/spool/quarantine
+        chown -R 10001:10001 /var/orch/spool
+    volumes:
+      - script-spool:/var/orch/spool
+    restart: "no"
+
+  # R4C: networked script-worker controller (spool dispatch; no subprocess).
+  script-worker:
+    build:
+      context: .
+      target: script-worker
+    <<: *hardening
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_SCRIPT_ROLE: script-worker
+      ORCH_WORKER_SERVICE_TOKEN: ${ORCH_WORKER_SERVICE_TOKEN:?ORCH_WORKER_SERVICE_TOKEN is required}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+      ORCH_SCRIPT_SPOOL_DIR: /var/orch/spool
+      ORCH_SCRIPT_SPOOL_HMAC_KEY: ${ORCH_SCRIPT_SPOOL_HMAC_KEY:?ORCH_SCRIPT_SPOOL_HMAC_KEY is required}
+      ORCH_ATTESTATION_HMAC_KEY: ${ORCH_ATTESTATION_HMAC_KEY:?ORCH_ATTESTATION_HMAC_KEY is required}
+      ORCH_SCRIPT_RUNNER_ATTESTATION_FILE: /etc/orch/script-runner.attestation.json
+      ORCH_SCRIPT_IMAGE_DIGEST: ${ORCH_SCRIPT_IMAGE_DIGEST:?ORCH_SCRIPT_IMAGE_DIGEST is required}
+    depends_on:
+      script-spool-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_healthy
+      script-runner:
+        condition: service_started
+    networks:
+      - backend
+    volumes:
+      - script-spool:/var/orch/spool
+      - ${ORCH_SCRIPT_RUNNER_ATTESTATION_HOST_PATH:-./deploy/attestations/script-runner.attestation.json}:/etc/orch/script-runner.attestation.json:ro,z
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+
+  # R4C: networkless script-runner — true network denial; no backend credentials.
+  script-runner:
+    build:
+      context: .
+      target: script-runner
+    <<: *hardening
+    network_mode: "none"
+    environment:
+      ORCH_SCRIPT_ROLE: script-runner
+      ORCH_SCRIPT_EXECUTABLE: /usr/local/bin/orch-script
+      ORCH_SCRIPT_WORKSPACE: /tmp/orch/workspace
+      ORCH_SCRIPT_SPOOL_DIR: /var/orch/spool
+      ORCH_SCRIPT_SPOOL_HMAC_KEY: ${ORCH_SCRIPT_SPOOL_HMAC_KEY:?ORCH_SCRIPT_SPOOL_HMAC_KEY is required}
+      ORCH_ATTESTATION_HMAC_KEY: ${ORCH_ATTESTATION_HMAC_KEY:?ORCH_ATTESTATION_HMAC_KEY is required}
+      ORCH_SCRIPT_RUNNER_ATTESTATION_FILE: /etc/orch/script-runner.attestation.json
+      ORCH_SCRIPT_IMAGE_DIGEST: ${ORCH_SCRIPT_IMAGE_DIGEST:?ORCH_SCRIPT_IMAGE_DIGEST is required}
+    depends_on:
+      script-spool-init:
+        condition: service_completed_successfully
+    volumes:
+      - script-spool:/var/orch/spool
+      - ${ORCH_SCRIPT_RUNNER_ATTESTATION_HOST_PATH:-./deploy/attestations/script-runner.attestation.json}:/etc/orch/script-runner.attestation.json:ro,z
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+      - /tmp/orch:size=32M,mode=1777
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./deploy/seccomp/script-worker.json
+
+  # R4C: Celery Beat scheduler — authenticates with scheduler token; zero provider budget.
+  scheduler:
+    build:
+      context: .
+      target: scheduler
+    <<: *hardening
+    environment:
+      COORDINATOR_URL: http://coordinator:9001
+      ORCH_SCRIPT_ROLE: control
+      ORCH_API_SERVICE_TOKEN: ${ORCH_API_SERVICE_TOKEN:?ORCH_API_SERVICE_TOKEN is required}
+      ORCH_TOKEN_SCHEDULER: ${ORCH_TOKEN_SCHEDULER:?ORCH_TOKEN_SCHEDULER is required}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+      TZ: Asia/Manila
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_healthy
+    networks:
+      - backend
+
+  mcp-context-assets:
+    <<: *mcp-lane
+    environment:
+      ORCH_API_BASE_URL: http://api:8000
+      ORCH_MCP_LANE_ID: context-assets
+      ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_CONTEXT_ASSETS:?ORCH_TOKEN_MCP_CONTEXT_ASSETS is required}
+
+  mcp-workflow-control:
+    <<: *mcp-lane
+    environment:
+      ORCH_API_BASE_URL: http://api:8000
+      ORCH_MCP_LANE_ID: workflow-control
+      ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_WORKFLOW_CONTROL:?ORCH_TOKEN_MCP_WORKFLOW_CONTROL is required}
+
+  mcp-delegation-coordination:
+    <<: *mcp-lane
+    environment:
+      ORCH_API_BASE_URL: http://api:8000
+      ORCH_MCP_LANE_ID: delegation-coordination
+      ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_DELEGATION_COORDINATION:?ORCH_TOKEN_MCP_DELEGATION_COORDINATION is required}
+
+  mcp-evidence-governance:
+    <<: *mcp-lane
+    environment:
+      ORCH_API_BASE_URL: http://api:8000
+      ORCH_MCP_LANE_ID: evidence-governance
+      ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE:?ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE is required}
+
+  mcp-maintenance:
+    <<: *mcp-lane
+    environment:
+      ORCH_API_BASE_URL: http://api:8000
+      ORCH_MCP_LANE_ID: maintenance
+      ORCH_MCP_LANE_TOKEN: ${ORCH_TOKEN_MCP_MAINTENANCE:?ORCH_TOKEN_MCP_MAINTENANCE is required}
+
+volumes:
+  orchestrator-data:
+  script-spool:

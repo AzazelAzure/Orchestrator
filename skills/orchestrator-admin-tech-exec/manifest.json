@@ -1,0 +1,23 @@
+{
+  "activation_state": "active",
+  "capabilities_required": [
+    "cap.session.read"
+  ],
+  "conflicts_with": [],
+  "content_sha256": "bc2bb864758ae3c86fa2290dc2a9e7039a3c9a8134a730b8bdf784b5a06c704c",
+  "degraded_behavior": "If required authority, evidence, or persistence is unavailable, stop consequential work and report the gap.",
+  "notes": "Public Orchestrator portable skill. On-demand. No private installation paths.",
+  "portability": "portable",
+  "product_coupling": "none",
+  "scheduling_ref": null,
+  "schema_version": 1,
+  "skill_id": "skill.orchestrator-admin-tech-exec",
+  "triggers": [
+    {
+      "condition": "Operator or agent invokes this skill intentionally.",
+      "kind": "on_demand"
+    }
+  ],
+  "version": "0.1.0",
+  "write_set": []
+}

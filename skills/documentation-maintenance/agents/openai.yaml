@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Maintenance"
+  short_description: "Keep docs aligned with code changes"
+  default_prompt: "Use $documentation-maintenance to update docs with the change."

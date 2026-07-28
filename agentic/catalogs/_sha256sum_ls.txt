@@ -1,0 +1,1 @@
+-rwxr-xr-x. 1 root root 44792 Jun 11 08:00 /usr/bin/sha256sum

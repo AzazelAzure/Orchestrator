@@ -26,6 +26,7 @@ from flow_engine.application.resource_service import (
     show_resource,
 )
 from flow_engine.application.work_service import (
+    assert_completion_prerequisites,
     claim_work,
     complete_work,
     fail_work,
@@ -38,6 +39,7 @@ from flow_engine.application.work_service import (
 __all__ = [
     "amend_finding",
     "append_event",
+    "assert_completion_prerequisites",
     "claim_resource",
     "claim_work",
     "complete_work",

@@ -53,5 +53,8 @@ security suspicion):
 
 - Creating public forge remotes or force-pushing
 - Adding deploy containers, Django apps, or paid SaaS integrations
+  (**exception:** R4A–R4D local control-plane Django/DRF + Compose active-test
+  harness is authorized by the Headquarters R4 implementation packet; do not
+  expand to hosting, real providers, or publication without a new authorization)
 - Enabling scheduled skill-gap or any automation schedule
 - Broad filesystem scans outside this repository

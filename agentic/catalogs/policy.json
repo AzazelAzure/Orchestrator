@@ -1,0 +1,151 @@
+{
+  "activation": "inert",
+  "catalog_version": "0.1.0",
+  "content_sha256": "cff5baf6d2ccc17632bc041a6fa90b92e9e2cff74e85cf272572fbb05226c203",
+  "kind": "policy_contract",
+  "lifecycle_state": "inert",
+  "record": {
+    "activation": "inert",
+    "asset_id": "policy.contract.r1.governance",
+    "capabilities_intersect_parent_ceilings": true,
+    "compatibility": "orchestrator>=0.1.0",
+    "content_sha256": "1344ed67708c1e42e0e7d4379941a6da59d696e95195c683393cb176c814f1b6",
+    "deny_wins": true,
+    "executable": false,
+    "fail_closed_on_hash_mismatch": true,
+    "forbidden_on_mcp_and_schedules": [
+      "waiver",
+      "hitm_exception",
+      "paid_retry_after_unknown",
+      "merge",
+      "deploy",
+      "publication",
+      "schedule_activation",
+      "arbitrary_script_execution",
+      "policy_profile_activation",
+      "credential_projection",
+      "unrestricted_state_mutation",
+      "direct_database_access",
+      "provider_cli_invocation"
+    ],
+    "immutable_dispatch_pin_fields": [
+      "policy_identity",
+      "policy_hash",
+      "organization_profile_identity",
+      "organization_profile_hash",
+      "loadout_identity",
+      "loadout_hash",
+      "member_asset_hashes",
+      "packet_hash",
+      "budget_identity",
+      "grant_identity",
+      "attempt_id",
+      "invocation_id"
+    ],
+    "independent_review_separation": {
+      "defaults": {
+        "admin_ops": "codex",
+        "qa_independent_review": "claude",
+        "tech_implementation": "cursor"
+      },
+      "distinct_attempt": true,
+      "distinct_invocation": true,
+      "distinct_provider_principal": true,
+      "distinct_seat": true,
+      "required": true
+    },
+    "kind": "policy",
+    "lifecycle_state": "inert",
+    "mandatory_anomaly_reporting": {
+      "omission_invalid": true,
+      "required": true,
+      "stop_mutation_if_persistence_unavailable": true,
+      "taxonomy": [
+        {
+          "behavior": "stop_mutation_critical_finding",
+          "class": "integrity_security",
+          "code": "A0"
+        },
+        {
+          "behavior": "stop_mark_unknown_reconcile",
+          "class": "uncertain_side_effect",
+          "code": "A1"
+        },
+        {
+          "behavior": "deny_high_finding_revoke_grant",
+          "class": "authority_scope_gate",
+          "code": "A2"
+        },
+        {
+          "behavior": "pause_preserve_recovery",
+          "class": "runtime_resource",
+          "code": "A3"
+        },
+        {
+          "behavior": "reject_completion_require_correction",
+          "class": "evidence_report",
+          "code": "A4"
+        },
+        {
+          "behavior": "record_route_gate_conditional",
+          "class": "quality_maintenance",
+          "code": "A5"
+        }
+      ],
+      "terminal_report_requires": [
+        "anomalies_or_findings",
+        "gaps",
+        "evidence",
+        "terminal_status"
+      ]
+    },
+    "mandatory_controls_union": true,
+    "most_restrictive_numeric_wins": true,
+    "notes": "Inert governance contract for R1. Does not activate installation policy or make any Headquarters project contract executable.",
+    "owner": "platform.orchestrator",
+    "policy_id": "policy.contract.r1.governance",
+    "precedence": [
+      "engine_safety_floor",
+      "handbook_version",
+      "installation_policy",
+      "orchestrator_base",
+      "department",
+      "hierarchy_layer",
+      "position",
+      "project_repo_extension",
+      "task_class",
+      "explicit_task_grant"
+    ],
+    "provenance": "r1-design-contract",
+    "r1_activation": {
+      "assets_inert": true,
+      "installation_policy_active": false,
+      "project_contract_executable": false,
+      "runtime_enforcement": false
+    },
+    "r3_activation": {
+      "hierarchy_delegation_enforcement": true,
+      "mcp_lane_containers": false,
+      "r2_system_test_compatibility_retained": true,
+      "resolved_loadout_pins_required": true,
+      "schedules_active": false,
+      "scripts_executable": false
+    },
+    "sensitivity": "public",
+    "source": "agentic/catalogs/policy.json",
+    "stdio_mcp_compatibility": {
+      "also_bound_into_lane": "mcp.lane.context-assets",
+      "retain_five_tool_stdio_surface": true,
+      "silent_removal_forbidden": true,
+      "tools": [
+        "repo_health",
+        "open_prs",
+        "ci_status",
+        "work_lookup",
+        "session_brief"
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": 1
+}

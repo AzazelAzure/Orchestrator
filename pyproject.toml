@@ -28,10 +28,35 @@ dependencies = []
 [project.scripts]
 flowctl = "flow_engine.cli.app:main"
 flowctl-mcp = "flow_engine.mcp.server:main"
+orchestrator-host-runner = "flow_engine.providers.host_runner_main:main"
+orch-api = "flow_engine.control_plane.manage:main"
+orch-coordinator = "flow_engine.coordinator.http_service:main"
+orch-mcp-lane = "flow_engine.mcp_lanes.service_main:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.9"]
 mcp = ["mcp>=1.27"]
+api = [
+  "django>=5.0",
+  "djangorestframework>=3.15",
+  "drf-spectacular>=0.27",
+  "gunicorn>=22.0",
+  "pytest-django>=4.8",
+]
+worker = [
+  "celery[redis]>=5.4",
+  "redis>=5.0",
+]
+control-plane = [
+  "django>=5.0",
+  "djangorestframework>=3.15",
+  "drf-spectacular>=0.27",
+  "gunicorn>=22.0",
+  "celery[redis]>=5.4",
+  "redis>=5.0",
+  "pytest-django>=4.8",
+  "mcp>=1.27",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flow_engine"]

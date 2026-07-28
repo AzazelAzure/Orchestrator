@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,7 +52,7 @@ FORBIDDEN_PATTERNS = [
 ]
 
 TRACKED_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".json", ".sql", ".txt"}
-SKIP_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+SKIP_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".tmp"}
 SKIP_FILES = {Path(__file__).resolve()}
 
 SEED_SKILLS = {
@@ -69,12 +70,39 @@ SEED_SKILLS = {
 }
 
 
-def _candidate_files() -> list[Path]:
+def _git_publication_paths(root: Path) -> list[Path]:
+    """Return tracked plus nonignored untracked publication candidates."""
+    proc = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return [
+        root / raw.decode("utf-8", errors="surrogateescape")
+        for raw in proc.stdout.split(b"\0")
+        if raw
+    ]
+
+
+def _candidate_files(
+    root: Path = ROOT,
+    *,
+    skip_files: set[Path] = SKIP_FILES,
+) -> list[Path]:
     files: list[Path] = []
-    for path in ROOT.rglob("*"):
+    for path in _git_publication_paths(root):
         if not path.is_file():
             continue
-        if path.resolve() in SKIP_FILES:
+        if path.resolve() in skip_files:
             continue
         if any(part in SKIP_DIRS for part in path.parts):
             continue
@@ -91,6 +119,26 @@ def _candidate_files() -> list[Path]:
             continue
         files.append(path)
     return files
+
+
+def test_candidate_discovery_excludes_ignored_evidence_not_untracked_source(
+    tmp_path,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text(".tmp/\n", encoding="utf-8")
+    evidence = tmp_path / ".tmp" / "r4d" / "compose-config.yml"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text("workspace: /home/pproctor/private\n", encoding="utf-8")
+    source = tmp_path / "new_source.py"
+    source.write_text("# /home/pproctor/must-still-be-scanned\n", encoding="utf-8")
+
+    candidates = _candidate_files(tmp_path, skip_files=set())
+    assert evidence not in candidates
+    assert source in candidates
+    assert any(
+        pattern.search(source.read_text(encoding="utf-8"))
+        for pattern in FORBIDDEN_PATTERNS
+    )
 
 
 def test_no_product_branding_or_private_paths() -> None:
@@ -158,14 +206,39 @@ def test_skill_bundles_partition_all_seed_packages() -> None:
     bundles = ROOT / "skills" / "bundles"
     core = json.loads((bundles / "core.json").read_text(encoding="utf-8"))
     extended = json.loads((bundles / "extended.json").read_text(encoding="utf-8"))
+    positional = json.loads((bundles / "positional.json").read_text(encoding="utf-8"))
     core_members = set(core["members"])
     extended_members = set(extended["members"])
+    positional_members = set(positional["members"])
     assert core["activation"] == "default"
     assert extended["activation"] == "opt_in"
+    assert positional["activation"] == "opt_in"
     assert core_members.isdisjoint(extended_members)
+    assert core_members.isdisjoint(positional_members)
+    assert extended_members.isdisjoint(positional_members)
     assert core_members | extended_members == set(SEED_SKILLS.values())
     assert len(core_members) == 5
     assert len(extended_members) == 6
+    assert len(positional_members) == 17
+
+
+def test_positional_skill_packages_valid() -> None:
+    skills_root = ROOT / "skills"
+    positional = json.loads(
+        (skills_root / "bundles" / "positional.json").read_text(encoding="utf-8")
+    )
+    for skill_id in positional["members"]:
+        dirname = skill_id.removeprefix("skill.")
+        skill_dir = skills_root / dirname
+        assert (skill_dir / "SKILL.md").is_file(), dirname
+        assert (skill_dir / "agents" / "openai.yaml").is_file(), dirname
+        manifest = json.loads((skill_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["skill_id"] == skill_id
+        assert manifest["activation_state"] == "active"
+        assert manifest["product_coupling"] == "none"
+        assert manifest["scheduling_ref"] is None
+        assert all(t.get("kind") == "on_demand" for t in manifest["triggers"])
+        assert manifest["content_sha256"] == _skill_content_hash(skill_dir)
 
 
 def test_skill_gap_is_ondemand_local_only() -> None:

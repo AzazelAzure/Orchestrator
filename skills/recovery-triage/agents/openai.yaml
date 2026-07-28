@@ -1,0 +1,4 @@
+interface:
+  display_name: "Recovery Triage"
+  short_description: "Classify recovery without duplicate paid calls"
+  default_prompt: "Use $recovery-triage to classify a recovery path."

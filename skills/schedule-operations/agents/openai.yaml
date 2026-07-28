@@ -1,0 +1,4 @@
+interface:
+  display_name: "Schedule Operations"
+  short_description: "Grant-only schedule status guidance"
+  default_prompt: "Use $schedule-operations for grant-scoped schedule status."

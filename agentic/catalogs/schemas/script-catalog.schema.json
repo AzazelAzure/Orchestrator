@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/script-catalog.json",
+  "title": "RegisteredScriptCatalog",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "kind",
+    "lifecycle_state",
+    "activation",
+    "count",
+    "expected_count",
+    "repository_scripts_executable",
+    "records",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "catalog_version": { "type": "string" },
+    "kind": { "const": "registered_script_catalog" },
+    "lifecycle_state": { "const": "inert" },
+    "activation": { "const": "inert" },
+    "count": { "type": "integer", "const": 12 },
+    "expected_count": { "type": "integer", "const": 12 },
+    "repository_scripts_executable": { "const": false },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "records": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "script_id",
+          "name",
+          "mutation_class",
+          "repository_script",
+          "executable",
+          "content_sha256",
+          "lifecycle_state"
+        ],
+        "properties": {
+          "mutation_class": {
+            "type": "string",
+            "enum": ["read_only", "evidence_producing"]
+          },
+          "repository_script": { "const": true },
+          "executable": { "const": false },
+          "network_policy": { "const": "deny_by_default" },
+          "argv_only": { "const": true },
+          "lifecycle_state": { "const": "inert" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

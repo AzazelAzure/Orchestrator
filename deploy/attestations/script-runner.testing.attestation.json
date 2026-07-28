@@ -1,0 +1,11 @@
+{
+  "built_at": "1970-01-01T00:00:00Z",
+  "executable_digest": "sha256:3052b0726150e91d41e81d1710079d8bd5ebe438ce02aa9b221ef2a2ff289abc",
+  "image_digest": "sha256:d5c6f5e9f36ea240ac90631bd4cec7a7619d104e94769a2a23290d35a323d537",
+  "image_id": "sha256:e365a9ad8eb1f728b0d3af0c02d294ebae68ec4cc017859bc33c35ccf785702c",
+  "mac": "sha256:e8c42278cf602853e97274860aa1bc1efe57a5dcdc3b62b9d1ffba494f975d66",
+  "payload_hash": "sha256:c295a652b666aea73df69076cb510d335ce6092969dd0cae3226d2d913c4f350",
+  "schema_version": 1,
+  "source": "orch_testing_fixture",
+  "target": "script-runner"
+}

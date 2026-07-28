@@ -12,12 +12,16 @@ verified generic engine core. The installable Python package remains
 - Work items, queues, resources/leases, gates/waivers, findings, artifacts, and policy metadata in SQLite
 - CLI (`flowctl`) for core operations
 - Optional read-only MCP stdio server (`flowctl-mcp`) over generic project capabilities
+- R4A–R4D local control-plane stack: DRF API, coordinator service, Redis/Celery
+  mock delivery, five MCP lanes, registered-script sandbox, schedules, and a
+  rootless-container active-test harness (see `docs/r4-control-plane.md`)
 - Portable repo-local skills under `skills/`
 
 ## What this is not
 
 - Not a product adapter for any specific business application
-- Not a deployed SaaS, Django app, or container image (none are included yet)
+- Not a deployed SaaS or production-hosted control plane (R4 Compose is local
+  active-test only)
 - Not production-hardened by publication of this candidate alone
 
 ## Requirements
@@ -64,8 +68,44 @@ projects via `FLOW_PROJECTS_CONFIG` pointing at a `projects.json` (see
 ## Skills
 
 Eleven canonical packages live in `skills/`, split into a five-skill default
-core bundle and a six-skill opt-in extended bundle. See `docs/skills.md` for
+core bundle and a six-skill opt-in extended bundle. Seventeen positional R3
+skills ship in the opt-in `positional` bundle. See `docs/skills.md` for
 discovery and install mappings.
+
+## R1 inert catalogs
+
+Portable asset, MCP-lane, loadout, script, and policy contracts live under
+`agentic/catalogs/`. They are schema-validated and content-hashed, discoverable
+from the agentic manifest, and **inert** (not runtime activation). See
+`docs/r1-assets.md`.
+
+## R2 persistent runtime
+
+Governed runs, attempts, credits, mock providers, and recovery are documented in
+`docs/r2-runtime.md`.
+
+## R3 organization and delegation
+
+Hierarchy, scoped delegation, twelve resolved positional loadouts, and dispatch
+pins are documented in `docs/r3-organization.md`. R2 system-test grants remain
+as an explicit compatibility path.
+
+## R4 local control plane (R4A–R4D)
+
+Django/DRF API, coordinator HTTP service, Redis/Celery mock delivery, and
+Compose-based MCP, script, and schedule services are documented in
+`docs/r4-control-plane.md`. Install optional extras with
+`pip install -e '.[control-plane,dev]'`.
+
+The final local active-test functional run
+`r4d-20260726T113210Z-2768705` passed all 11 evidence steps under rootless
+Podman with runtime fingerprint
+`956096e8560ceea53b33e5420c58f4ad6ca7da606c5587475a296e05c39f51cb`.
+The full source suite also passed with **316 passed, 1 skipped**. This is
+technical evidence only: independent review found the
+`G-ORCH-LOCAL-CONTROL-PLANE` acceptance package insufficient, it does not close
+any governance gate, and real Codex/Cursor/Claude provider adapters remain out
+of scope.
 
 ## License
 

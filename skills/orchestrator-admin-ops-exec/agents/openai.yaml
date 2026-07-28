@@ -1,0 +1,4 @@
+interface:
+  display_name: "Admin Ops Executive"
+  short_description: "Coordinate Admin/Ops executive work"
+  default_prompt: "Use $orchestrator-admin-ops-exec to coordinate portable Orchestrator Admin/Ops executive work."

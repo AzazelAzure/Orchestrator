@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Gate"
+  short_description: "Independent review with distinct identities"
+  default_prompt: "Use $review-gate for independent review of a handoff."

@@ -5,8 +5,10 @@ Canonical skill packages live in this repository under `skills/`.
 The default `core` bundle contains five workflow-floor skills. The `extended`
 bundle ships with the repository but is opt-in and contains investigation,
 exploration, security, publication documentation, CI triage, and code-review
-risk triage. Bundle declarations live under `skills/bundles/` and reference
-package IDs rather than copying package bodies.
+risk triage. The `positional` bundle is opt-in and contains the seventeen R3
+department/position skills referenced by the twelve loadouts. Bundle
+declarations live under `skills/bundles/` and reference package IDs rather than
+copying package bodies.
 
 ## Layout
 

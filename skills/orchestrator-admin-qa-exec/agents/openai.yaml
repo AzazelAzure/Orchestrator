@@ -1,0 +1,4 @@
+interface:
+  display_name: "Admin QA Executive"
+  short_description: "Coordinate QA executive review work"
+  default_prompt: "Use $orchestrator-admin-qa-exec to coordinate portable Orchestrator QA executive work."

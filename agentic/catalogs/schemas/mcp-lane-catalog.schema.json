@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/mcp-lane-catalog.json",
+  "title": "McpLaneCatalog",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_version",
+    "kind",
+    "lifecycle_state",
+    "activation",
+    "count",
+    "records",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "catalog_version": { "type": "string" },
+    "kind": { "const": "mcp_lane_catalog" },
+    "lifecycle_state": { "const": "inert" },
+    "activation": { "const": "inert" },
+    "count": { "type": "integer", "const": 5 },
+    "stdio_compat_tools_bound_into": { "const": "mcp.lane.context-assets" },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "records": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "lane_id",
+          "tools",
+          "forbidden_operations",
+          "content_sha256",
+          "lifecycle_state",
+          "executable"
+        ],
+        "properties": {
+          "lane_id": {
+            "type": "string",
+            "enum": [
+              "workflow-control",
+              "delegation-coordination",
+              "evidence-governance",
+              "context-assets",
+              "maintenance"
+            ]
+          },
+          "tools": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "binds_stdio_compat_tools": { "type": "boolean" },
+          "stdio_compat_tools": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "forbidden_operations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "lifecycle_state": { "const": "inert" },
+          "executable": { "const": false }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

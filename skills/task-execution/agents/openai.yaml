@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Execution"
+  short_description: "Execute within grant and pin envelopes"
+  default_prompt: "Use $task-execution to execute within the grant envelope."

@@ -10,7 +10,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "agentic/manifest.json"
+CATALOGS = ROOT / "agentic" / "catalogs"
 TOOLS = ("ci_status", "open_prs", "repo_health", "session_brief", "work_lookup")
+CATALOG_FILES = (
+    "assets.json",
+    "mcp_lanes.json",
+    "loadouts.json",
+    "scripts.json",
+    "policy.json",
+)
 
 
 def verification(source: str, *, valid: bool | None = None) -> dict:
@@ -23,6 +31,110 @@ def verification(source: str, *, valid: bool | None = None) -> dict:
         "captured_at": None,
         "method": "tracked-source inspection; live binding and smoke are installation-local",
     }
+
+
+def _catalog_entities(entities: list[dict], relationships: list[dict]) -> None:
+    """Discover R1 inert catalogs; registry presence is not runtime authority."""
+    for name in CATALOG_FILES:
+        path = CATALOGS / name
+        if not path.is_file():
+            raise SystemExit(f"missing inert catalog: {path.relative_to(ROOT)}")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        catalog_id = f"catalog.orchestrator.r1.{path.stem.replace('_', '-')}"
+        entities.append(
+            {
+                "id": catalog_id,
+                "kind": "binding",
+                "name": path.stem,
+                "owner": "platform.orchestrator",
+                "domain": "orchestrator",
+                "status": "inert",
+                "source": path.relative_to(ROOT).as_posix(),
+                "version": str(payload.get("catalog_version") or payload.get("version") or "0.1.0"),
+                "content_sha256": payload.get("content_sha256"),
+                "authority": "repository-package-owner",
+                "sensitivity": "public",
+                "mutation_class": "none",
+                "interface": {
+                    "activation_state": "inert",
+                    "executable": False,
+                    "runtime_enforcement": False,
+                    "kind": payload.get("kind"),
+                    "count": payload.get("count"),
+                },
+                "notes": (
+                    "R1 discoverable contract only. Not an active runtime loadout, "
+                    "script executor, MCP lane container, or installation policy."
+                ),
+                "verification": verification(path.relative_to(ROOT).as_posix(), valid=True),
+            }
+        )
+        for record in payload.get("records") or []:
+            asset_id = record.get("asset_id") or record.get("loadout_id") or record.get("script_id")
+            if not asset_id:
+                continue
+            if record.get("kind") == "skill_package":
+                # Skill packages are discovered from their package manifests.
+                # Planned logical skill IDs remain inside the inert catalog and
+                # must not collide with installation-owned package identities.
+                continue
+            manifest_kind = {
+                "loadout": "binding",
+                "mcp_lane_profile": "mcp_server",
+                "registered_script": "script",
+            }.get(record.get("kind"), "binding")
+            entities.append(
+                {
+                    "id": asset_id,
+                    "kind": manifest_kind,
+                    "name": asset_id.rsplit(".", 1)[-1],
+                    "owner": "platform.orchestrator",
+                    "domain": "orchestrator",
+                    "status": "inert",
+                    "source": path.relative_to(ROOT).as_posix(),
+                    "version": str(record.get("version") or "0.1.0"),
+                    "content_sha256": record.get("content_sha256"),
+                    "authority": "repository-package-owner",
+                    "sensitivity": "public",
+                    "mutation_class": "none",
+                    "interface": {
+                        "activation_state": "inert",
+                        "executable": False,
+                        "lifecycle_state": record.get("lifecycle_state", "inert"),
+                        "package_shipped": record.get("package_shipped"),
+                    },
+                    "notes": record.get("notes") or "Inert R1 catalog member.",
+                    "verification": verification(path.relative_to(ROOT).as_posix(), valid=True),
+                }
+            )
+            relationships.append({"from": asset_id, "type": "member_of", "to": catalog_id})
+        policy_record = payload.get("record")
+        if isinstance(policy_record, dict) and policy_record.get("asset_id"):
+            asset_id = policy_record["asset_id"]
+            entities.append(
+                {
+                    "id": asset_id,
+                    "kind": "binding",
+                    "name": asset_id.rsplit(".", 1)[-1],
+                    "owner": "platform.orchestrator",
+                    "domain": "orchestrator",
+                    "status": "inert",
+                    "source": path.relative_to(ROOT).as_posix(),
+                    "version": str(policy_record.get("version") or "0.1.0"),
+                    "content_sha256": policy_record.get("content_sha256"),
+                    "authority": "repository-package-owner",
+                    "sensitivity": "public",
+                    "mutation_class": "none",
+                    "interface": {
+                        "activation_state": "inert",
+                        "executable": False,
+                        "deny_wins": policy_record.get("deny_wins"),
+                    },
+                    "notes": policy_record.get("notes") or "Inert R1 policy contract.",
+                    "verification": verification(path.relative_to(ROOT).as_posix(), valid=True),
+                }
+            )
+            relationships.append({"from": asset_id, "type": "member_of", "to": catalog_id})
 
 
 def main() -> None:
@@ -106,6 +218,7 @@ def main() -> None:
             {"from": server_id, "type": "exposes", "to": tool_id},
             {"from": tool_id, "type": "wraps", "to": capability_id},
         ])
+    _catalog_entities(entities, relationships)
     data = {
         "schema_version": 1,
         "repository": {"id": "orchestrator", "domain": "orchestrator", "manifest_path": "agentic/manifest.json", "revision": None},

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Governance Audit"
+  short_description: "Audit authority, gates, and exceptions"
+  default_prompt: "Use $governance-audit to audit governance controls."
