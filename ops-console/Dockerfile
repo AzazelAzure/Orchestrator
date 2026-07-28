@@ -7,6 +7,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY public/index.html /usr/share/nginx/html/index.html.template
 RUN sed "s|__API_BASE_URL__|${VITE_API_BASE_URL}|g" /usr/share/nginx/html/index.html.template \
     > /usr/share/nginx/html/index.html \
-    && rm /usr/share/nginx/html/index.html.template
+    && rm /usr/share/nginx/html/index.html.template \
+    && mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 
 EXPOSE 8081

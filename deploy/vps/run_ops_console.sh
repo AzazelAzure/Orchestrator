@@ -12,7 +12,6 @@ podman run -d \
   --name orchestrator_ops-console_1 \
   --restart unless-stopped \
   -p 8081:8081 \
-  --read-only \
   --tmpfs /tmp:size=16M,mode=1777 \
   --cap-drop ALL \
   --security-opt no-new-privileges \
