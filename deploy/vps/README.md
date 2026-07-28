@@ -12,14 +12,28 @@ Install Orchestrator on the shared hosting VPS loopback for Cloudflare Tunnel or
 
 ```bash
 mkdir -p ~/orchestrator && cd ~/orchestrator
-git clone https://github.com/AzazelAzure/Orchestrator.git .
-cp deploy/vps/.env.vps.example .env.vps
-# Edit .env.vps — set REDIS_PASSWORD, DJANGO_SECRET_KEY, FOUNDER_API_TOKEN
+git clone https://github.com/AzazelAzure/Orchestrator.git . 2>/dev/null || git pull origin main
+bash scripts/generate_vps_env.sh .env.vps
+bash scripts/build_script_runner_attestation.sh
+# Update digest after attestation build (compose reads ORCH_SCRIPT_IMAGE_DIGEST from env file)
+python3 - <<'PY'
+import json, pathlib, re
+root = pathlib.Path(".")
+att = json.loads((root / "deploy/attestations/script-runner.testing.attestation.json").read_text())
+digest = att.get("digest") or att.get("image_digest")
+env = root / ".env.vps"
+text = env.read_text()
+if digest and not digest.startswith("sha256:"):
+    digest = f"sha256:{digest}"
+if digest:
+    if re.search(r"^ORCH_SCRIPT_IMAGE_DIGEST=", text, flags=re.M):
+        text = re.sub(r"^ORCH_SCRIPT_IMAGE_DIGEST=.*$", f"ORCH_SCRIPT_IMAGE_DIGEST={digest}", text, flags=re.M)
+    else:
+        text += f"\nORCH_SCRIPT_IMAGE_DIGEST={digest}\n"
+    env.write_text(text)
+PY
 
-./scripts/build_script_runner_attestation.sh
-export ORCH_SCRIPT_ATTESTATION_DIGEST=$(jq -r .digest deploy/attestations/script-runner.testing.attestation.json)
-
-docker compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps up -d --build
+docker compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps up -d --build redis coordinator api worker scheduler script-spool-init script-runner script-worker ops-console
 ```
 
 ## Verify
