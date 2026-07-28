@@ -1,6 +1,6 @@
 # Orchestrator VPS bootstrap (shared hosting VPS)
 
-Install Orchestrator on the shared hosting VPS for Cloudflare Tunnel → HFM proxy `:8443` routing.
+Install Orchestrator on the shared hosting VPS for Cloudflare Tunnel → edge proxy `:8443` routing.
 
 ## One-command deploy (from dev machine)
 
@@ -11,18 +11,18 @@ bash deploy/vps/deploy_ecosystem.sh
 
 Options: `--dry-run`, `--skip-hfm`, `--skip-orch`, `--skip-portfolio`
 
-SSH target: `VPS_SSH_TARGET`, or `HFM/.env` → `VPS_ORIGIN_IP` / `FM_SPRINT_SSH`.
+SSH target: `VPS_SSH_TARGET`, or sibling finance-manager `.env` → `VPS_ORIGIN_IP` / `FM_SPRINT_SSH`.
 
 ## What deploy does
 
-1. Rsync HFM proxy ecosystem files (`ecosystem-hosts.conf`, nginx, compose, TLS script)
-2. Rsync Orchestrator → `~/orchestrator`, Portfolio → `~/portfolio`
+1. Rsync edge-proxy ecosystem files (`ecosystem-hosts.conf`, nginx, compose, TLS script)
+2. Rsync Orchestrator → `~/orchestrator`, sibling site tree → `~/portfolio`
 3. Remote [`vps_bootstrap.sh`](vps_bootstrap.sh):
    - Generate `.env.vps` if missing
    - Build script-runner attestation (sources `.env.vps` first)
    - Patch base API port bind for podman-compose merge behavior
-   - `up` Orchestrator MVP + ops-console, Portfolio stub
-   - Reload HFM proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only)
+   - `up` Orchestrator MVP + ops-console, sibling site stub
+   - Reload edge proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only)
    - Install systemd **user** units for reboot persistence
    - Smoke loopback, proxy Host-header, and public ZT URLs
 

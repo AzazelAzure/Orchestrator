@@ -214,7 +214,7 @@ python3 scripts/local_delegation_stress.py  # org seed + MCP delegation lifecycl
 python3 scripts/local_stress_test.py        # L1/L2 + live acceptance + delegation + HQ bridge
 ```
 
-Set `ORCH_HQ_ROOT=/home/pproctor/Headquarters` when HQ is not a sibling of the Orchestrator repo.
+Set `ORCH_HQ_ROOT` to your local Headquarters checkout when it is not a sibling of the Orchestrator repo.
 
 After Compose is up:
 
