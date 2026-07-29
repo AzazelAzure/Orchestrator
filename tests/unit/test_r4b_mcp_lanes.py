@@ -82,7 +82,7 @@ def test_all_lane_snapshots_exact() -> None:
         for tool in snap["tools"]:
             assert tool not in FORBIDDEN_TOOL_NAMES
             verify_tool_in_snapshot(lane_id=lane_id, tool_name=tool)
-    assert len(digests) == 5
+    assert len(digests) == 6
 
 
 def test_department_profiles_narrow_only() -> None:
@@ -297,6 +297,7 @@ def test_compose_mcp_lanes_frontend_only_no_db() -> None:
         "mcp-delegation-coordination",
         "mcp-evidence-governance",
         "mcp-maintenance",
+        "mcp-skills-scripts",
     ):
         assert f"  {name}:" in text
         service = payload["services"][name]

@@ -1,8 +1,8 @@
 {
   "activation": "inert",
   "catalog_version": "0.1.0",
-  "content_sha256": "33525083a1fab44fdd3d7fc92107077e06fb5540fde2c5a5d7c6f4869197cac2",
-  "count": 5,
+  "content_sha256": "6cd321242f888639f478db933df4388632c0f4455b288f16f94f9cdf6985bb36",
+  "count": 6,
   "kind": "mcp_lane_catalog",
   "lifecycle_state": "inert",
   "records": [
@@ -174,6 +174,45 @@
         "maintenance_evidence",
         "health",
         "recovery_test_results"
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "activation": "inert",
+      "asset_id": "mcp.lane.skills-scripts",
+      "binds_stdio_compat_tools": false,
+      "compatibility": "orchestrator>=0.1.0",
+      "content_sha256": "d2db799ebd1e5bc78ccb2a3fe829b09109726a34f07813dc14cd6d9bd8c381dd",
+      "executable": false,
+      "forbidden_operations": [
+        "waiver",
+        "hitm_exception",
+        "paid_retry_after_unknown",
+        "merge",
+        "deploy",
+        "publication",
+        "schedule_activation",
+        "arbitrary_script_execution",
+        "policy_profile_activation",
+        "credential_projection",
+        "unrestricted_state_mutation",
+        "direct_database_access",
+        "provider_cli_invocation"
+      ],
+      "kind": "mcp_lane_profile",
+      "lane_id": "skills-scripts",
+      "lifecycle_state": "inert",
+      "notes": "Catalog reads for shipped skills and allowlisted scripts; request_script_run dispatches script.register via DRF dual-principal invoke (never MCP-side shell or direct script.execute).",
+      "owner": "platform.orchestrator",
+      "provenance": "r1-design-contract",
+      "sensitivity": "public",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "tools": [
+        "list_skills",
+        "get_skill",
+        "list_scripts",
+        "describe_script",
+        "request_script_run"
       ],
       "version": "0.1.0"
     },

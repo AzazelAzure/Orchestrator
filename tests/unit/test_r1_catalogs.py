@@ -114,12 +114,12 @@ def test_catalog_schemas_exist_and_cover_required_shape() -> None:
         _structural_schema_check(committed, schema, where=f"committed:{name}")
 
 
-def test_memberships_five_lanes_twelve_loadouts_twelve_scripts() -> None:
+def test_memberships_six_lanes_twelve_loadouts_twelve_scripts() -> None:
     data = build_all()
-    assert data["mcp_lanes.json"]["count"] == 5
+    assert data["mcp_lanes.json"]["count"] == 6
     assert data["loadouts.json"]["count"] == 12
     assert data["scripts.json"]["count"] == 12
-    assert len(data["mcp_lanes.json"]["records"]) == 5
+    assert len(data["mcp_lanes.json"]["records"]) == 6
     assert len(data["loadouts.json"]["records"]) == 12
     assert len(data["scripts.json"]["records"]) == 12
 

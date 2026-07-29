@@ -15,6 +15,7 @@ LANE_IDS: tuple[str, ...] = (
     "delegation-coordination",
     "evidence-governance",
     "maintenance",
+    "skills-scripts",
 )
 
 _LANE_ASSET_PREFIX = "mcp.lane."
@@ -48,8 +49,8 @@ def load_lane_catalog() -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("kind") != "mcp_lane_catalog":
         raise StaleAssetError("invalid MCP lane catalog kind")
-    if int(payload.get("count", 0)) != 5:
-        raise StaleAssetError("MCP lane catalog must contain exactly five lanes")
+    if int(payload.get("count", 0)) != 6:
+        raise StaleAssetError("MCP lane catalog must contain exactly six lanes")
     return payload
 
 

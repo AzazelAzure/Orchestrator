@@ -1,7 +1,7 @@
 {
   "activation": "inert",
   "catalog_version": "0.1.0",
-  "content_sha256": "9fcd34fc8201ab6fde376567be8e3f2cc1f3d65a4823c31867cba789ffe195e2",
+  "content_sha256": "fff8ff5c6730c01039fbca47866b34753c2d39a0baff50317d7e5ad02b2559a7",
   "count": 12,
   "expected_count": 12,
   "kind": "loadout_catalog",
@@ -13,7 +13,7 @@
       "budget_ceiling": "coordination_default",
       "capability_refs": [],
       "compatibility": "orchestrator>=0.1.0",
-      "content_sha256": "cdc198daf60b6eb3cba9c4882d7a30f3674ef234916ae7543a7533287a615d9e",
+      "content_sha256": "f9f8aa698a4d854f0b02b7ce1eecaf8fd02d294df74a1d869ab02a364e412458",
       "department": "admin-ops",
       "effect_ceiling": "read_heavy_coordination",
       "executable": false,
@@ -30,7 +30,8 @@
         "mcp.lane.workflow-control",
         "mcp.lane.delegation-coordination",
         "mcp.lane.evidence-governance",
-        "mcp.lane.context-assets"
+        "mcp.lane.context-assets",
+        "mcp.lane.skills-scripts"
       ],
       "notes": "Inert positional loadout design; native enforcement is R3.",
       "owner": "platform.orchestrator",
@@ -194,7 +195,7 @@
       "budget_ceiling": "worker_default",
       "capability_refs": [],
       "compatibility": "orchestrator>=0.1.0",
-      "content_sha256": "4f40e0ec81fc2f023f86c1d8ad55871ebcfa30d31660a3f0d4cad4dffa6c1152",
+      "content_sha256": "00e80bf9bbca7222ca8e6b2943ac1f1e9b4aff63fe4643b4af0dc8560fb89f25",
       "department": "admin-ops",
       "effect_ceiling": "assigned_read_or_evidence",
       "executable": false,
@@ -209,7 +210,8 @@
       "mcp_lane_refs": [
         "mcp.lane.context-assets",
         "mcp.lane.evidence-governance",
-        "mcp.lane.maintenance"
+        "mcp.lane.maintenance",
+        "mcp.lane.skills-scripts"
       ],
       "notes": "Inert positional loadout design; native enforcement is R3.",
       "owner": "platform.orchestrator",

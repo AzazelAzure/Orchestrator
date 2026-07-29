@@ -119,8 +119,8 @@ def validate_catalogs(*, require_committed: bool = True) -> dict[str, Any]:
             raise CatalogValidationError(f"{record['asset_id']}: lifecycle must be inert")
 
     lane_records = lanes["records"]
-    if len(lane_records) != 5:
-        raise CatalogValidationError(f"expected 5 MCP lanes, got {len(lane_records)}")
+    if len(lane_records) != 6:
+        raise CatalogValidationError(f"expected 6 MCP lanes, got {len(lane_records)}")
     lane_ids = {item["lane_id"] for item in lane_records}
     if lane_ids != {
         "workflow-control",
@@ -128,6 +128,7 @@ def validate_catalogs(*, require_committed: bool = True) -> dict[str, Any]:
         "evidence-governance",
         "context-assets",
         "maintenance",
+        "skills-scripts",
     }:
         raise CatalogValidationError(f"unexpected MCP lane set: {sorted(lane_ids)}")
 

@@ -19,13 +19,13 @@
     "kind": { "const": "mcp_lane_catalog" },
     "lifecycle_state": { "const": "inert" },
     "activation": { "const": "inert" },
-    "count": { "type": "integer", "const": 5 },
+    "count": { "type": "integer", "const": 6 },
     "stdio_compat_tools_bound_into": { "const": "mcp.lane.context-assets" },
     "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "records": {
       "type": "array",
-      "minItems": 5,
-      "maxItems": 5,
+      "minItems": 6,
+      "maxItems": 6,
       "items": {
         "type": "object",
         "required": [
@@ -45,7 +45,8 @@
               "delegation-coordination",
               "evidence-governance",
               "context-assets",
-              "maintenance"
+              "maintenance",
+              "skills-scripts"
             ]
           },
           "tools": {

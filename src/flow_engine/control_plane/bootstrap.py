@@ -64,6 +64,7 @@ _LANE_ENV_TOKEN_KEYS = {
         "delegation-coordination": "ORCH_TOKEN_MCP_DELEGATION_COORDINATION",
         "evidence-governance": "ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE",
         "maintenance": "ORCH_TOKEN_MCP_MAINTENANCE",
+        "skills-scripts": "ORCH_TOKEN_MCP_SKILLS_SCRIPTS",
     }[lane_id]
     for lane_id in LANE_IDS
 }

@@ -40,6 +40,7 @@ from flow_engine.mcp_lanes.handlers import (
     delegation_command_for_tool,
     describe_lane,
     handle_read_tool,
+    script_command_for_tool,
     workflow_command_for_tool,
 )
 from flow_engine.mcp_lanes.profiles import profiles_with_snapshots
@@ -211,8 +212,10 @@ class McpLaneInvokeView(APIView):
             }
             service_dict = service_principal_dict(service)
 
-            command_type = workflow_command_for_tool(tool_name) or delegation_command_for_tool(
-                tool_name, data.get("arguments") or {}
+            command_type = (
+                workflow_command_for_tool(tool_name)
+                or delegation_command_for_tool(tool_name, data.get("arguments") or {})
+                or script_command_for_tool(tool_name)
             )
             if command_type:
                 return self._dispatch_workflow(
@@ -270,6 +273,15 @@ class McpLaneInvokeView(APIView):
             "tool_snapshot_digest",
             "mcp_tool_name",
             "mcp_tool_snapshot_digest",
+            "workspace_root",
+            "override_argv",
+            "override_cwd",
+            "inject_env",
+            "force_timeout",
+            "simulate_network",
+            "cwd",
+            "argv",
+            "env",
         ):
             payload.pop(banned, None)
 
@@ -278,6 +290,7 @@ class McpLaneInvokeView(APIView):
             payload.get("work_item_id")
             or payload.get("run_id")
             or payload.get("target_id")
+            or payload.get("script_id")
         )
         context = build_context(request, surface=Surface.MCP, command_type=command_type)
         from dataclasses import replace
