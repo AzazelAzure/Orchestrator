@@ -6,7 +6,7 @@
     "manifest_path": "agentic/manifest.json",
     "revision": null
   },
-  "captured_at": "2026-07-26T07:43:40+00:00",
+  "captured_at": "2026-07-29T02:33:20+00:00",
   "entities": [
     {
       "id": "bundle.orchestrator.core",
@@ -264,7 +264,7 @@
       "status": "inert",
       "source": "agentic/catalogs/loadouts.json",
       "version": "0.1.0",
-      "content_sha256": "9fcd34fc8201ab6fde376567be8e3f2cc1f3d65a4823c31867cba789ffe195e2",
+      "content_sha256": "fff8ff5c6730c01039fbca47866b34753c2d39a0baff50317d7e5ad02b2559a7",
       "authority": "repository-package-owner",
       "sensitivity": "public",
       "mutation_class": "none",
@@ -295,7 +295,7 @@
       "status": "inert",
       "source": "agentic/catalogs/mcp_lanes.json",
       "version": "0.1.0",
-      "content_sha256": "33525083a1fab44fdd3d7fc92107077e06fb5540fde2c5a5d7c6f4869197cac2",
+      "content_sha256": "6cd321242f888639f478db933df4388632c0f4455b288f16f94f9cdf6985bb36",
       "authority": "repository-package-owner",
       "sensitivity": "public",
       "mutation_class": "none",
@@ -304,7 +304,7 @@
         "executable": false,
         "runtime_enforcement": false,
         "kind": "mcp_lane_catalog",
-        "count": 5
+        "count": 6
       },
       "notes": "R1 discoverable contract only. Not an active runtime loadout, script executor, MCP lane container, or installation policy.",
       "verification": {
@@ -388,7 +388,7 @@
       "status": "inert",
       "source": "agentic/catalogs/loadouts.json",
       "version": "0.1.0",
-      "content_sha256": "cdc198daf60b6eb3cba9c4882d7a30f3674ef234916ae7543a7533287a615d9e",
+      "content_sha256": "f9f8aa698a4d854f0b02b7ce1eecaf8fd02d294df74a1d869ab02a364e412458",
       "authority": "repository-package-owner",
       "sensitivity": "public",
       "mutation_class": "none",
@@ -478,7 +478,7 @@
       "status": "inert",
       "source": "agentic/catalogs/loadouts.json",
       "version": "0.1.0",
-      "content_sha256": "4f40e0ec81fc2f023f86c1d8ad55871ebcfa30d31660a3f0d4cad4dffa6c1152",
+      "content_sha256": "00e80bf9bbca7222ca8e6b2943ac1f1e9b4aff63fe4643b4af0dc8560fb89f25",
       "authority": "repository-package-owner",
       "sensitivity": "public",
       "mutation_class": "none",
@@ -849,6 +849,36 @@
         "package_shipped": null
       },
       "notes": "Inert R1 catalog member.",
+      "verification": {
+        "source_present": true,
+        "package_valid": true,
+        "binding_configured": null,
+        "executable_resolves": null,
+        "smoke_pass": null,
+        "captured_at": null,
+        "method": "tracked-source inspection; live binding and smoke are installation-local"
+      }
+    },
+    {
+      "id": "mcp.lane.skills-scripts",
+      "kind": "mcp_server",
+      "name": "skills-scripts",
+      "owner": "platform.orchestrator",
+      "domain": "orchestrator",
+      "status": "inert",
+      "source": "agentic/catalogs/mcp_lanes.json",
+      "version": "0.1.0",
+      "content_sha256": "d2db799ebd1e5bc78ccb2a3fe829b09109726a34f07813dc14cd6d9bd8c381dd",
+      "authority": "repository-package-owner",
+      "sensitivity": "public",
+      "mutation_class": "none",
+      "interface": {
+        "activation_state": "inert",
+        "executable": false,
+        "lifecycle_state": "inert",
+        "package_shipped": null
+      },
+      "notes": "Catalog reads for shipped skills and allowlisted scripts; request_script_run dispatches script.register via DRF dual-principal invoke (never MCP-side shell or direct script.execute).",
       "verification": {
         "source_present": true,
         "package_valid": true,
@@ -2305,6 +2335,11 @@
     },
     {
       "from": "mcp.lane.maintenance",
+      "type": "member_of",
+      "to": "catalog.orchestrator.r1.mcp-lanes"
+    },
+    {
+      "from": "mcp.lane.skills-scripts",
       "type": "member_of",
       "to": "catalog.orchestrator.r1.mcp-lanes"
     },

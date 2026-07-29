@@ -251,6 +251,28 @@ def mcp_lane_defs() -> list[dict[str, Any]]:
             "binds_stdio_compat_tools": False,
             "forbidden_operations": list(FORBIDDEN_MCP_AND_SCHEDULE_OPS),
         },
+        {
+            **_asset_base(
+                asset_id="mcp.lane.skills-scripts",
+                kind="mcp_lane_profile",
+                source="agentic/catalogs/mcp_lanes.json",
+                notes=(
+                    "Catalog reads for shipped skills and allowlisted scripts; "
+                    "request_script_run dispatches script.register via DRF dual-principal "
+                    "invoke (never MCP-side shell or direct script.execute)."
+                ),
+            ),
+            "lane_id": "skills-scripts",
+            "tools": [
+                "list_skills",
+                "get_skill",
+                "list_scripts",
+                "describe_script",
+                "request_script_run",
+            ],
+            "binds_stdio_compat_tools": False,
+            "forbidden_operations": list(FORBIDDEN_MCP_AND_SCHEDULE_OPS),
+        },
     ]
     for record in lanes:
         tools = list(record.get("tools") or [])
@@ -395,6 +417,7 @@ def loadout_defs() -> list[dict[str, Any]]:
                 "delegation-coordination",
                 "evidence-governance",
                 "context-assets",
+                "skills-scripts",
             ],
             scripts=["script.generic.repository_health", "script.generic.git_diff_summary"],
             forbidden=[
@@ -464,7 +487,12 @@ def loadout_defs() -> list[dict[str, Any]]:
                 "skill.schedule-operations",
                 "skill.cpprd-changelog-authoring",
             ],
-            mcp_lanes=["context-assets", "evidence-governance", "maintenance"],
+            mcp_lanes=[
+                "context-assets",
+                "evidence-governance",
+                "maintenance",
+                "skills-scripts",
+            ],
             scripts=[
                 "script.generic.documentation_link_sweep",
                 "script.generic.documentation_metadata_sweep",

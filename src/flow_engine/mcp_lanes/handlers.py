@@ -9,6 +9,7 @@ from flow_engine.application.loadout_resolution import (
     load_catalog_lanes,
     load_catalog_loadouts,
     load_catalog_scripts,
+    load_shipped_skill_hashes,
 )
 from flow_engine.domain.errors import UnsupportedSurfaceError, ValidationFailedError
 from flow_engine.mcp_lanes.catalog import load_lane_by_id
@@ -33,6 +34,35 @@ DELEGATION_TOOL_TO_COMMAND: dict[str, str] = {
     "handoff": "delegation.handoff",
 }
 
+# Skills/scripts lane — register via coordinator under initiating principal authz.
+SCRIPT_TOOL_TO_COMMAND: dict[str, str] = {
+    "request_script_run": "script.register",
+}
+
+SCRIPT_READ_TOOLS = frozenset(
+    {
+        "list_skills",
+        "get_skill",
+        "list_scripts",
+        "describe_script",
+    }
+)
+
+# Keys stripped from request_script_run arguments (mirror ScriptExecuteView bans).
+SCRIPT_SMUGGLING_KEYS = frozenset(
+    {
+        "workspace_root",
+        "override_argv",
+        "override_cwd",
+        "inject_env",
+        "force_timeout",
+        "simulate_network",
+        "cwd",
+        "argv",
+        "env",
+    }
+)
+
 # Maintenance tools — status/run via coordinator; never remediation.
 MAINTENANCE_TOOLS = frozenset(
     {
@@ -56,6 +86,7 @@ def _bounded_args(arguments: dict[str, Any] | None) -> dict[str, Any]:
         "worker_principal_id",
         "raw_token",
         "service_token",
+        *SCRIPT_SMUGGLING_KEYS,
     ):
         raw.pop(banned, None)
     return raw
@@ -105,6 +136,14 @@ def handle_read_tool(
             args=args,
         )
 
+    if lane_id == "skills-scripts" and tool_name in SCRIPT_READ_TOOLS:
+        return _skills_scripts_read_result(
+            lane_id=lane_id,
+            tool_name=tool_name,
+            base=base,
+            args=args,
+        )
+
     if tool_name in {
         "catalog_search_get",
         "loadout_resolution",
@@ -143,7 +182,107 @@ def handle_read_tool(
             f"tool {tool_name} requires workflow command dispatch, not read handler"
         )
 
+    if tool_name in SCRIPT_TOOL_TO_COMMAND:
+        raise ValidationFailedError(
+            f"tool {tool_name} requires script command dispatch, not read handler"
+        )
+
     raise ValidationFailedError(f"no handler for tool {tool_name} on lane {lane_id}")
+
+
+def _skills_scripts_read_result(
+    *,
+    lane_id: str,
+    tool_name: str,
+    base: dict[str, Any],
+    args: dict[str, Any],
+) -> dict[str, Any]:
+    """Publication-neutral skill/script catalog reads — no activation or writes."""
+    if tool_name == "list_skills":
+        hashes = load_shipped_skill_hashes()
+        skills = [
+            {"skill_id": skill_id, "content_sha256": digest}
+            for skill_id, digest in sorted(hashes.items())
+        ]
+        return {
+            **base,
+            "status": "ok",
+            "result": {
+                "mode": "skills_catalog",
+                "skills": skills,
+                "count": len(skills),
+                "publication_candidate": False,
+                "activation": False,
+            },
+        }
+
+    if tool_name == "get_skill":
+        skill_id = str(args.get("skill_id") or "")
+        if not skill_id:
+            raise ValidationFailedError("skill_id is required")
+        hashes = load_shipped_skill_hashes()
+        digest = hashes.get(skill_id)
+        if digest is None:
+            raise ValidationFailedError(f"unknown skill_id: {skill_id}")
+        # Metadata only — do not mutate manifests or activate packages.
+        return {
+            **base,
+            "status": "ok",
+            "result": {
+                "mode": "skill_metadata",
+                "skill_id": skill_id,
+                "content_sha256": digest,
+                "publication_candidate": False,
+                "activation": False,
+            },
+        }
+
+    if tool_name == "list_scripts":
+        scripts = load_catalog_scripts()
+        rows = [
+            {
+                "script_id": sid,
+                "executable": bool(rec.get("executable")),
+                "kind": rec.get("kind"),
+                "content_sha256": rec.get("content_sha256"),
+            }
+            for sid, rec in sorted(scripts.items())
+        ]
+        return {
+            **base,
+            "status": "ok",
+            "result": {
+                "mode": "scripts_catalog",
+                "scripts": rows,
+                "count": len(rows),
+                "mcp_direct_execution": False,
+            },
+        }
+
+    if tool_name == "describe_script":
+        script_id = str(args.get("script_id") or "")
+        if not script_id:
+            raise ValidationFailedError("script_id is required")
+        scripts = load_catalog_scripts()
+        rec = scripts.get(script_id)
+        if rec is None:
+            raise ValidationFailedError(f"unknown script_id: {script_id}")
+        return {
+            **base,
+            "status": "ok",
+            "result": {
+                "mode": "script_describe",
+                "script_id": script_id,
+                "executable": bool(rec.get("executable")),
+                "kind": rec.get("kind"),
+                "content_sha256": rec.get("content_sha256"),
+                "notes": rec.get("notes") or "",
+                "mcp_direct_execution": False,
+                "executable_via": "drf_script_worker",
+            },
+        }
+
+    raise ValidationFailedError(f"no skills-scripts read handler for {tool_name}")
 
 
 def _catalog_or_status_result(
@@ -311,6 +450,10 @@ def _catalog_or_status_result(
 
 def workflow_command_for_tool(tool_name: str) -> str | None:
     return WORKFLOW_TOOL_TO_COMMAND.get(tool_name)
+
+
+def script_command_for_tool(tool_name: str) -> str | None:
+    return SCRIPT_TOOL_TO_COMMAND.get(tool_name)
 
 
 def delegation_command_for_tool(tool_name: str, arguments: dict[str, Any] | None = None) -> str | None:

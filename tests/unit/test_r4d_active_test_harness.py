@@ -205,6 +205,7 @@ def test_compose_stack_lists_r4d_required_services() -> None:
         "mcp-delegation-coordination:",
         "mcp-evidence-governance:",
         "mcp-maintenance:",
+        "mcp-skills-scripts:",
     ):
         assert svc in compose
     assert "network_mode:" in compose

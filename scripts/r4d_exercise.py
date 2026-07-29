@@ -98,6 +98,7 @@ class ApiClient:
                 "delegation-coordination": "ORCH_TOKEN_MCP_DELEGATION_COORDINATION",
                 "evidence-governance": "ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE",
                 "maintenance": "ORCH_TOKEN_MCP_MAINTENANCE",
+                "skills-scripts": "ORCH_TOKEN_MCP_SKILLS_SCRIPTS",
             }[mcp_lane]
             headers["X-Orchestrator-MCP-Service-Token"] = self.env[lane_env]
             headers["X-Orchestrator-MCP-Lane-Id"] = mcp_lane

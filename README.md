@@ -16,7 +16,7 @@ verified generic engine core. The installable Python package remains
 - CLI (`flowctl`) for core operations
 - Optional read-only MCP stdio server (`flowctl-mcp`) over generic project capabilities
 - R4A–R4D local control-plane stack: DRF API, coordinator service, Redis/Celery
-  mock delivery, five MCP lanes, registered-script sandbox, schedules, and a
+  mock delivery, six MCP lanes, registered-script sandbox, schedules, and a
   rootless-container active-test harness (see `docs/r4-control-plane.md`)
 - Portable repo-local skills under `skills/`
 

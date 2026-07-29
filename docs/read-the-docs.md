@@ -102,7 +102,7 @@ security posture summary.
 | **R1** | Inert versioned catalogs (assets, MCP lanes, loadouts, scripts, policy) — discovery only, not runtime activation | [`r1-assets.md`](r1-assets.md) | `agentic/catalogs/` |
 | **R2** | Governed runs, attempts, credits, mock providers, recovery; `SystemTestGrant` compatibility path | [`r2-runtime.md`](r2-runtime.md) | Coordinator + `flowctl runtime …` |
 | **R3** | Organization profiles, assignments, scoped delegation, resolved loadouts, dispatch pins | [`r3-organization.md`](r3-organization.md) | `flowctl org …`, `flowctl delegation …` |
-| **R4** | Local control plane: DRF API (R4A), five MCP lanes (R4B), script sandbox + schedules (R4C), Compose active-test harness (R4D) | [`r4-control-plane.md`](r4-control-plane.md) | `docker/podman compose`, `scripts/r4d_active_test.sh` |
+| **R4** | Local control plane: DRF API (R4A), six MCP lanes (R4B), script sandbox + schedules (R4C), Compose active-test harness (R4D) | [`r4-control-plane.md`](r4-control-plane.md) | `docker/podman compose`, `scripts/r4d_active_test.sh` |
 
 Read layer docs in order when implementing or reviewing a slice. Higher layers
 assume lower-layer invariants (sole writer, fail-closed authz, no silent gate bypass).

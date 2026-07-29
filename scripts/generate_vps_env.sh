@@ -40,6 +40,7 @@ umask 077
   echo "ORCH_TOKEN_MCP_DELEGATION_COORDINATION=$(_rand)"
   echo "ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE=$(_rand)"
   echo "ORCH_TOKEN_MCP_MAINTENANCE=$(_rand)"
+  echo "ORCH_TOKEN_MCP_SKILLS_SCRIPTS=$(_rand)"
   echo "ORCH_TOKEN_WORKER=$(_rand)"
   echo "ORCH_TOKEN_WORKER_CODEX=$(_rand)"
   echo "ORCH_TOKEN_WORKER_CURSOR=$(_rand)"

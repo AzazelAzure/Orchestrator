@@ -14,7 +14,11 @@ from typing import Any
 from flow_engine.domain.errors import AuthzDeniedError, StaleAssetError
 from flow_engine.domain.states import Surface
 from flow_engine.mcp_lanes.catalog import lane_id_from_principal_key, principal_key_for_lane
-from flow_engine.mcp_lanes.handlers import delegation_command_for_tool, workflow_command_for_tool
+from flow_engine.mcp_lanes.handlers import (
+    delegation_command_for_tool,
+    script_command_for_tool,
+    workflow_command_for_tool,
+)
 from flow_engine.mcp_lanes.snapshots import verify_tool_in_snapshot
 
 # Never trust these when present on the command payload.
@@ -141,8 +145,10 @@ def assert_mcp_coordinator_context(
     if snapshot["snapshot_digest"] != snapshot_digest:
         raise StaleAssetError("MCP tool snapshot digest mismatch")
 
-    mapped = workflow_command_for_tool(tool_name) or delegation_command_for_tool(
-        tool_name, command.payload
+    mapped = (
+        workflow_command_for_tool(tool_name)
+        or delegation_command_for_tool(tool_name, command.payload)
+        or script_command_for_tool(tool_name)
     )
     if mapped != command.command_type:
         raise AuthzDeniedError(

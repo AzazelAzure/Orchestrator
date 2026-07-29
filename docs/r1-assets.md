@@ -10,7 +10,7 @@ and governance precedence. They are discoverable through
 | Artifact | Path | Count / role |
 |----------|------|----------------|
 | Portable asset index | `agentic/catalogs/assets.json` | Existing + planned skill IDs |
-| MCP lane profiles | `agentic/catalogs/mcp_lanes.json` | 5 lanes |
+| MCP lane profiles | `agentic/catalogs/mcp_lanes.json` | 6 lanes |
 | Seat loadouts | `agentic/catalogs/loadouts.json` | 12 department×position |
 | Registered scripts | `agentic/catalogs/scripts.json` | 12 generic scripts |
 | Policy contract | `agentic/catalogs/policy.json` | Precedence, deny-wins, pins |

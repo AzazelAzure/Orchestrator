@@ -19,7 +19,7 @@ rootless-Podman evidence run is recorded below.
 ## Architecture
 
 ```
-MCP lane containers (×5, frontend only)
+MCP lane containers (×6, frontend only)
   ──HTTP + initiating Bearer + MCP service token──► DRF API
 Scheduler (Celery Beat) / script-worker controller / provider-worker
   ──HTTP + service credential──► state-coordinator (internal)
@@ -115,7 +115,7 @@ Services:
 - `script-worker` — networked controller for allowlisted scripts (`script-sandbox` queue)
 - `script-runner` — networkless executor (`network_mode: none`, spool only)
 - `scheduler` — schedule tick queue (Asia/Manila TZ)
-- five MCP lane services — frontend only
+- six MCP lane services — frontend only
 
 ## API (versioned)
 
@@ -174,7 +174,7 @@ All 11 evidence steps passed:
 1. sole-writer seed;
 2. API/coordinator health;
 3. authenticated API-to-worker mock-provider completion;
-4. all five MCP lane snapshots with crafted cross-lane invocation denied
+4. all six MCP lane snapshots with crafted cross-lane invocation denied
    (`403`);
 5. all 12 department-by-position loadouts resolved and hashed;
 6. registered generic script completion, escape-hook rejection (`400`), and

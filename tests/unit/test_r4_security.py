@@ -85,6 +85,7 @@ def test_f2_bootstrap_from_env_fail_closed(monkeypatch, tmp_path) -> None:
             "ORCH_TOKEN_MCP_DELEGATION_COORDINATION",
             "ORCH_TOKEN_MCP_EVIDENCE_GOVERNANCE",
             "ORCH_TOKEN_MCP_MAINTENANCE",
+            "ORCH_TOKEN_MCP_SKILLS_SCRIPTS",
             "ORCH_TOKEN_WORKER",
             "ORCH_TOKEN_PROVIDER_INVOCATION",
         ):
@@ -429,6 +430,7 @@ def test_compose_credential_projection_no_cross_service_tokens() -> None:
         "mcp-maintenance",
         "mcp-delegation-coordination",
         "mcp-evidence-governance",
+        "mcp-skills-scripts",
     ):
         env_keys = _compose_service_environment_keys(text, service)
         assert "ORCH_MCP_LANE_TOKEN" in env_keys
