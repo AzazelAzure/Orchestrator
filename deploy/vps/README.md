@@ -59,3 +59,7 @@ MVP: redis, coordinator, api, worker, scheduler, script sandbox, ops-console. No
 ## Gates
 
 Does not close `G-ORCH-VPS-LIVE` or `G-ORCH-HOSTED-READY` — staging exposure.
+
+## Per-app blue/green (pointer)
+
+Upstream selection (blue vs green) is **per-app**, owned by Orchestrator deploy tooling for directorate hosts. Shared edge proxy terminates TLS; one color flip must not change other products' upstreams. Design home (Headquarters): `programs/orchestrator-platform/discussions/bluegreen-fleet-2026-07-29/`. Off-color smoke hostnames are HitM-gated drafts — do not enable without HitM authorization.
