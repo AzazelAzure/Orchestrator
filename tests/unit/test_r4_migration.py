@@ -69,12 +69,12 @@ def test_bootstrap_registers_base_and_lane_principals(tmp_path) -> None:
     try:
         with transaction(kernel.connection):
             created = bootstrap_test_principals(kernel.connection)
-        # 8 base/provider-worker principals + 5 lane-scoped MCP principals
-        assert len(created) == 13
+        # 8 base/provider-worker principals + 6 lane-scoped MCP principals
+        assert len(created) == 14
         count = kernel.connection.execute(
             "SELECT COUNT(*) AS n FROM control_plane_principals"
         ).fetchone()["n"]
-        assert count == 13
+        assert count == 14
         kinds = {
             r["kind"]
             for r in kernel.connection.execute(
@@ -96,6 +96,6 @@ def test_bootstrap_registers_base_and_lane_principals(tmp_path) -> None:
         }
         assert "mcp-service" in lane_keys
         assert "mcp.lane.workflow-control" in lane_keys
-        assert len(lane_keys) == 6
+        assert len(lane_keys) == 7
     finally:
         kernel.close()
