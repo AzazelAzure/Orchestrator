@@ -18,6 +18,11 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   Registration defaults **off** via `ORCH_ALLOW_USER_REGISTRATION=0`. No JWT
   dependency.
 
+- **Compose auth env propagation** — `docker-compose.yml` now projects
+  `ORCH_ALLOW_USER_REGISTRATION` into `api` and `coordinator` (default `:-0`) and
+  credential TTL / login-throttle settings into `coordinator` only. VPS overlay
+  pins registration off with literal `"0"` on both services.
+
 - **skills-scripts MCP lane** — sixth product MCP lane for publication-neutral skill/script catalog reads (`list_skills`, `get_skill`, `list_scripts`, `describe_script`) and `request_script_run` → coordinator `script.register` under initiating-principal dual-auth (never MCP-side shell or direct `script.execute`). Catalog, Compose service, bootstrap token env, and unit coverage included (`agentic/catalogs/mcp_lanes.json`, `src/flow_engine/mcp_lanes/`, `tests/unit/test_skills_scripts_mcp_lane.py`).
 - **`scripts/lib/http_wait.sh`** — sourceable HTTP readiness helper (`wait_http` returns nonzero on timeout; `fail` remains the fatal abort path). Optional `ORCH_HTTP_PROBE_SLEEP` (default `2`) for deterministic probes. Covered by `tests/unit/test_local_stack_up.py`.
 
