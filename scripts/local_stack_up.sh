@@ -8,6 +8,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/lib/container_runtime.sh"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/lib/http_wait.sh"
 
 STACK_DIR="${ORCH_LOCAL_STACK_DIR:-$ROOT/.tmp/local-stack}"
 ENV_FILE="${STACK_DIR}/env"
@@ -18,27 +20,6 @@ API_BASE="${ORCH_LOCAL_API_BASE:-http://127.0.0.1:8000}"
 FORCE="${ORCH_LOCAL_STACK_FORCE:-0}"
 
 log() { printf '[local-stack] %s\n' "$*"; }
-fail() { printf '[local-stack] ERROR: %s\n' "$*" >&2; exit 1; }
-
-wait_http() {
-  local url="$1" name="$2" attempts="${3:-90}"
-  local i
-  for i in $(seq 1 "${attempts}"); do
-    if python3 - <<PY
-import urllib.request
-try:
-    urllib.request.urlopen("${url}", timeout=3)
-except Exception:
-    raise SystemExit(1)
-PY
-    then
-      log "healthy: ${name}"
-      return 0
-    fi
-    sleep 2
-  done
-  fail "timed out waiting for ${name} at ${url}"
-}
 
 if [[ "${FORCE}" != "1" && -f "${MANIFEST}" ]]; then
   if wait_http "${API_BASE}/health/" "api (existing)" 3; then
@@ -120,7 +101,8 @@ compose_local() {
 log "compose up (project=${PROJECT})"
 compose_local up -d --build >"${STACK_DIR}/logs/compose-up.txt" 2>&1
 
-wait_http "${API_BASE}/health/" "api" 90
+wait_http "${API_BASE}/health/" "api" 90 \
+  || fail "timed out waiting for api at ${API_BASE}/health/"
 
 log "seeding work item"
 SEED_JSON="$(compose_local exec -T coordinator python /app/scripts/r4d_seed_work.py)"
