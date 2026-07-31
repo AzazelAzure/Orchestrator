@@ -103,7 +103,11 @@ tokens:
   **coordinator only** (`ORCH_ACCESS_TOKEN_TTL_SEC`, `ORCH_REFRESH_TOKEN_TTL_SEC`,
   `ORCH_PAT_TTL_SEC`, `ORCH_AUTH_THROTTLE_WINDOW_SEC`, `ORCH_AUTH_THROTTLE_MAX`).
   Enable registration explicitly in Compose `.env` for local self-signup, or
-  create accounts with a founder bearer. New humans get least-privilege
+  create accounts with a founder bearer. Founder-authenticated registration over
+  the API-to-coordinator HTTP boundary requires the API service to forward the
+  raw bearer as `X-Orchestrator-Principal-Token`; the coordinator resolves role
+  server-side and never trusts serialized `context.role` or payload authority
+  fields (`founder_authorized`, `allow_registration`). New humans get least-privilege
   capabilities (no `ops.read` until granted).
   The VPS overlay pins `ORCH_ALLOW_USER_REGISTRATION: "0"` on `api` and
   `coordinator` so a hand-edited `.env.vps` cannot enable signup without an
