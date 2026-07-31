@@ -55,39 +55,25 @@ class AuthRegisterView(APIView):
             "password": body.get("password", ""),
             "display_name": body.get("display_name"),
         }
-        # Optional founder-authenticated create when registration flag is off.
-        # Bypass is carried only via CommandContext.role=FOUNDER — never payload.
+        # Bearer present: coordinator resolves founder authority via principal_token only.
         auth_header = request.META.get("HTTP_AUTHORIZATION", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:].strip()
             if token:
-                probe = get_client().accept(
+                envelope = get_client().accept(
                     RuntimeCommand(
-                        command_type="control_plane.resolve_token",
+                        command_type="auth.register_user",
                         target_id=None,
-                        payload={"raw_token": token},
+                        payload=payload,
                         context=CommandContext(
                             principal_id="auth-resolver",
                             role=PrincipalRole.SYSTEM,
                             surface=Surface.REST,
                         ),
-                    )
+                    ),
+                    principal_token=token,
                 )
-                principal = ((probe.get("result") or {}).get("principal")) or {}
-                if probe.get("status") == "applied" and principal.get("kind") == "founder":
-                    envelope = get_client().accept(
-                        RuntimeCommand(
-                            command_type="auth.register_user",
-                            target_id=None,
-                            payload=payload,
-                            context=CommandContext(
-                                principal_id=principal["principal_id"],
-                                role=PrincipalRole.FOUNDER,
-                                surface=Surface.REST,
-                            ),
-                        )
-                    )
-                    return Response(envelope, status=http_status_for_envelope(envelope))
+                return Response(envelope, status=http_status_for_envelope(envelope))
         if not registration_allowed():
             return Response(
                 {

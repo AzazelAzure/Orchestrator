@@ -21,7 +21,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.local_stack_helpers import refresh_work_item, reset_local_acceptance_budget  # noqa: E402
+from scripts.auth_founder_register_acceptance import check_auth_founder_register  # noqa: E402
+from scripts.local_stack_helpers import (  # noqa: E402
+    refresh_work_item,
+    reset_local_acceptance_budget,
+)
 from scripts.r4d_exercise import ApiClient, _load_env, _redact, run_primary_exercises  # noqa: E402
 from scripts.verification_ladder import default_run_id, write_json  # noqa: E402
 
@@ -105,6 +109,11 @@ def main() -> int:
 
     env = _load_env(env_file)
     api = ApiClient(api_base, env)
+
+    auth_register = check_auth_founder_register(api, env, evidence_dir=evidence_dir)
+    rows.append({"step": "auth_founder_register", **auth_register})
+    write_json(evidence_dir / "auth_founder_register.json", auth_register)
+
     delegation = check_delegation_invoke(api)
     rows.append({"step": "mcp_delegation_invoke", **delegation})
     write_json(evidence_dir / "delegation_invoke.json", delegation)

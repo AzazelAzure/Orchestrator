@@ -8,10 +8,11 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from flow_engine.coordinator.commands import RuntimeCommand
+from flow_engine.coordinator.commands import CommandContext, RuntimeCommand
 from flow_engine.coordinator.coordinator import StateCoordinator
 from flow_engine.coordinator.transport import command_to_dict
-from flow_engine.domain.errors import FlowError
+from flow_engine.domain.errors import AuthzDeniedError, FlowError
+from flow_engine.domain.states import Surface
 from flow_engine.persistence.connection import Kernel
 from flow_engine.persistence.transactions import transaction
 
@@ -58,6 +59,31 @@ class CoordinatorClient:
             return accept_script_execute(self._coordinator, command)
 
         if self._coordinator is not None:
+            if principal_token and command.command_type == "auth.register_user":
+                from flow_engine.control_plane import principal_registry as principals
+
+                principal = principals.resolve_by_token(
+                    self._coordinator.connection, principal_token
+                )
+                if principal.status == "revoked":
+                    raise AuthzDeniedError("principal revoked")
+                grant = principals.load_grant_for_principal(
+                    self._coordinator.connection, principal
+                )
+                surface = command.context.surface if command.context else Surface.REST
+                principals.assert_surface_allowed(principal, surface)
+                command = RuntimeCommand(
+                    command_type=command.command_type,
+                    target_id=command.target_id,
+                    payload=command.payload,
+                    idempotency_key=command.idempotency_key,
+                    context=CommandContext(
+                        principal_id=principal.principal_id,
+                        role=principal.role,
+                        surface=surface,
+                        grant=grant,
+                    ),
+                )
             with transaction(self._coordinator.connection):
                 return self._coordinator.accept(command)
         if not self._base_url:

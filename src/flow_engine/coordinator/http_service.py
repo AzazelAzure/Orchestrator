@@ -208,13 +208,45 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
                 {
                     "control_plane.resolve_token",
                     "auth.login",
-                    "auth.register_user",
                     "auth.refresh",
                     "auth.throttle_check",
                     "auth.logout",
                 }
             )
-            if command.command_type in PUBLIC_AUTH_COMMANDS:
+            if command.command_type == "auth.register_user":
+                if caller.kind != ServiceCallerKind.API:
+                    raise AuthzDeniedError("auth/token commands require API service credential")
+                if principal_token:
+                    resolved_ctx = _resolve_server_context(
+                        coord,
+                        caller=caller,
+                        principal_token=principal_token,
+                        surface_hint=surface_hint,
+                        mcp_claims=mcp_claims,
+                        command_type=command.command_type,
+                    )
+                    command = RuntimeCommand(
+                        command_type=command.command_type,
+                        target_id=command.target_id,
+                        payload=command.payload,
+                        idempotency_key=command.idempotency_key,
+                        context=resolved_ctx,
+                    )
+                else:
+                    command = RuntimeCommand(
+                        command_type=command.command_type,
+                        target_id=command.target_id,
+                        payload=command.payload,
+                        idempotency_key=command.idempotency_key,
+                        context=CommandContext(
+                            principal_id="auth-resolver",
+                            role=PrincipalRole.SYSTEM,
+                            surface=Surface.REST,
+                        ),
+                    )
+                with transaction(coord.connection):
+                    envelope = coord.accept(command)
+            elif command.command_type in PUBLIC_AUTH_COMMANDS:
                 if caller.kind != ServiceCallerKind.API:
                     raise AuthzDeniedError("auth/token commands require API service credential")
                 command = RuntimeCommand(

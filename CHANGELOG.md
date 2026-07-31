@@ -5,6 +5,14 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Founder registration over coordinator HTTP** — `POST /api/v1/auth/register` with a
+  founder bearer now forwards `principal_token` to the coordinator so
+  `auth.register_user` resolves founder authority server-side instead of
+  unconditionally executing as `SYSTEM`. Serialized `context.role` and payload
+  bypass keys remain stripped at the HTTP boundary.
+
 ### Added
 
 - **User authentication + CLI login** — human accounts mapped to `human` principals;
