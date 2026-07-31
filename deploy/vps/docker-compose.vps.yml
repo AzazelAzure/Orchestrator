@@ -9,6 +9,11 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-api.thedirectorate.app,127.0.0.1,localhost}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://www.thedirectorate.app}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://www.thedirectorate.app,https://api.thedirectorate.app}
+      ORCH_ALLOW_USER_REGISTRATION: "0"
+
+  coordinator:
+    environment:
+      ORCH_ALLOW_USER_REGISTRATION: "0"
 
   ops-console:
     profiles: ["ops-console-compose-disabled"]

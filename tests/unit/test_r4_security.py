@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from flow_engine.application import ensure_queue, init_project, submit_work
 from flow_engine.application.runtime_service import (
@@ -441,3 +445,197 @@ def test_compose_credential_projection_no_cross_service_tokens() -> None:
         assert "FLOW_DB_PATH" not in env_keys
         assert "COORDINATOR_URL" not in env_keys
         assert "REDIS_PASSWORD" not in env_keys
+
+
+ROOT = Path(__file__).resolve().parents[2]
+COMPOSE_BASE = ROOT / "docker-compose.yml"
+COMPOSE_VPS = ROOT / "deploy" / "vps" / "docker-compose.vps.yml"
+
+_AUTH_COMPOSE_KEYS = (
+    "ORCH_ALLOW_USER_REGISTRATION",
+    "ORCH_ACCESS_TOKEN_TTL_SEC",
+    "ORCH_REFRESH_TOKEN_TTL_SEC",
+    "ORCH_PAT_TTL_SEC",
+    "ORCH_AUTH_THROTTLE_WINDOW_SEC",
+    "ORCH_AUTH_THROTTLE_MAX",
+)
+_TTL_THROTTLE_KEYS = _AUTH_COMPOSE_KEYS[1:]
+
+
+def _compose_service_environment_entries(compose_text: str, service: str) -> dict[str, str]:
+    """Extract environment KEY -> raw value for a top-level Compose service."""
+    lines = compose_text.splitlines()
+    in_services = False
+    in_service = False
+    in_environment = False
+    entries: dict[str, str] = {}
+    for line in lines:
+        if line.startswith("services:"):
+            in_services = True
+            continue
+        if not in_services:
+            continue
+        if line.startswith("volumes:") or line.startswith("networks:"):
+            break
+        if line.startswith("  ") and not line.startswith("    ") and line.strip().endswith(":"):
+            name = line.strip().rstrip(":")
+            in_service = name == service
+            in_environment = False
+            continue
+        if not in_service:
+            continue
+        stripped = line.strip()
+        if stripped.startswith("environment:"):
+            in_environment = True
+            continue
+        if in_environment:
+            if line.startswith("    ") and not line.startswith("      "):
+                if ":" in stripped and not stripped.startswith("-"):
+                    in_environment = False
+                    continue
+            if stripped.startswith("#"):
+                continue
+            if ":" in stripped:
+                key, value = stripped.split(":", 1)
+                key = key.strip()
+                value = value.strip()
+                if key and key.replace("_", "").isalnum() and key[0].isalpha():
+                    entries[key] = value
+    return entries
+
+
+def _assert_no_nested_quote_or_required_defaults(compose_text: str, keys: tuple[str, ...]) -> None:
+    for key in keys:
+        matched = False
+        for line in compose_text.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith(f"{key}:"):
+                continue
+            matched = True
+            value = stripped.split(":", 1)[1].strip()
+            assert ":?" not in value, f"{key} must not use required-unset substitution"
+            assert ':-"' not in value and ":-'" not in value, (
+                f"{key} must not use nested-quoted defaults (breaks int() on login path)"
+            )
+        assert matched, f"{key} not found in compose text"
+
+
+def test_compose_auth_registration_projected_to_api_and_coordinator() -> None:
+    text = COMPOSE_BASE.read_text(encoding="utf-8")
+    api_env = _compose_service_environment_keys(text, "api")
+    coordinator_env = _compose_service_environment_keys(text, "coordinator")
+    assert "ORCH_ALLOW_USER_REGISTRATION" in api_env
+    assert "ORCH_ALLOW_USER_REGISTRATION" in coordinator_env
+    api_entry = _compose_service_environment_entries(text, "api")[
+        "ORCH_ALLOW_USER_REGISTRATION"
+    ]
+    coordinator_entry = _compose_service_environment_entries(text, "coordinator")[
+        "ORCH_ALLOW_USER_REGISTRATION"
+    ]
+    assert api_entry == "${ORCH_ALLOW_USER_REGISTRATION:-0}"
+    assert coordinator_entry == "${ORCH_ALLOW_USER_REGISTRATION:-0}"
+
+
+def test_compose_auth_ttl_throttle_coordinator_only() -> None:
+    text = COMPOSE_BASE.read_text(encoding="utf-8")
+    coordinator_env = _compose_service_environment_keys(text, "coordinator")
+    api_env = _compose_service_environment_keys(text, "api")
+    worker_env = _compose_service_environment_keys(text, "worker")
+
+    for key in _TTL_THROTTLE_KEYS:
+        assert key in coordinator_env
+        assert key not in api_env
+        assert key not in worker_env
+
+    for service in (
+        "mcp-workflow-control",
+        "mcp-context-assets",
+        "mcp-maintenance",
+        "mcp-delegation-coordination",
+        "mcp-evidence-governance",
+        "mcp-skills-scripts",
+    ):
+        env_keys = _compose_service_environment_keys(text, service)
+        for key in _AUTH_COMPOSE_KEYS:
+            assert key not in env_keys
+
+
+def test_compose_auth_defaults_fail_closed_no_nested_quotes() -> None:
+    text = COMPOSE_BASE.read_text(encoding="utf-8")
+    _assert_no_nested_quote_or_required_defaults(text, _AUTH_COMPOSE_KEYS)
+    entries = _compose_service_environment_entries(text, "coordinator")
+    assert entries["ORCH_ACCESS_TOKEN_TTL_SEC"] == "${ORCH_ACCESS_TOKEN_TTL_SEC:-1800}"
+    assert entries["ORCH_REFRESH_TOKEN_TTL_SEC"] == "${ORCH_REFRESH_TOKEN_TTL_SEC:-1209600}"
+    assert entries["ORCH_PAT_TTL_SEC"] == "${ORCH_PAT_TTL_SEC:-31536000}"
+    assert entries["ORCH_AUTH_THROTTLE_WINDOW_SEC"] == "${ORCH_AUTH_THROTTLE_WINDOW_SEC:-900}"
+    assert entries["ORCH_AUTH_THROTTLE_MAX"] == "${ORCH_AUTH_THROTTLE_MAX:-10}"
+
+
+def test_vps_overlay_pins_registration_off_minimal_coordinator_block() -> None:
+    text = COMPOSE_VPS.read_text(encoding="utf-8")
+    api_env = _compose_service_environment_entries(text, "api")
+    coordinator_env = _compose_service_environment_entries(text, "coordinator")
+
+    assert api_env["ORCH_ALLOW_USER_REGISTRATION"] == '"0"'
+    assert coordinator_env == {"ORCH_ALLOW_USER_REGISTRATION": '"0"'}
+    for key in _TTL_THROTTLE_KEYS:
+        assert key not in api_env
+        assert key not in coordinator_env
+
+
+@pytest.mark.skipif(shutil.which("podman-compose") is None, reason="podman-compose required")
+def test_vps_merged_compose_coordinator_retains_base_env_and_registration_pin(
+    tmp_path,
+) -> None:
+    """Merged base+VPS config must deep-merge coordinator env (not replace base keys)."""
+    run_dir = tmp_path / "r4d-run"
+    env_file = run_dir / "env"
+    run_dir.mkdir()
+    env = {
+        **os.environ,
+        "ORCH_R4D_RUN_ID": "auth-compose-test",
+        "ORCH_R4D_RUN_DIR": str(run_dir),
+        "ORCH_R4D_ENV_FILE": str(env_file),
+    }
+    subprocess.run(
+        ["bash", str(ROOT / "scripts" / "r4d_generate_ephemeral_env.sh")],
+        cwd=str(ROOT),
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    proc = subprocess.run(
+        [
+            "podman-compose",
+            "-f",
+            str(COMPOSE_BASE),
+            "-f",
+            str(COMPOSE_VPS),
+            "--env-file",
+            str(env_file),
+            "config",
+        ],
+        cwd=str(ROOT),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    rendered = yaml.safe_load(proc.stdout)
+    coordinator_env = rendered["services"]["coordinator"]["environment"]
+    if isinstance(coordinator_env, list):
+        coordinator_env = {
+            item.split("=", 1)[0]: item.split("=", 1)[1]
+            for item in coordinator_env
+            if "=" in item
+        }
+    assert coordinator_env["ORCH_ALLOW_USER_REGISTRATION"] == "0"
+    for required in (
+        "ORCH_API_SERVICE_TOKEN",
+        "ORCH_WORKER_SERVICE_TOKEN",
+        "ORCH_TOKEN_FOUNDER",
+        "ORCH_ATTESTATION_HMAC_KEY",
+    ):
+        assert required in coordinator_env, f"merged config lost base key {required}"
+    for key in _TTL_THROTTLE_KEYS:
+        assert key in coordinator_env

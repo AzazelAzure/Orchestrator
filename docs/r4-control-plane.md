@@ -97,9 +97,17 @@ tokens:
   replay-safe family revocation, and independently revocable PATs. No JWT
   package is required.
 - Registration is fail-closed: `ORCH_ALLOW_USER_REGISTRATION` defaults to `0`
-  in every environment. Enable explicitly in `.env` for local self-signup, or
+  in every environment. Compose projects the flag into **both** `api` and
+  `coordinator` (dual gate — either service missing the opt-in breaks open
+  signup). Credential TTL and login-throttle settings are projected into
+  **coordinator only** (`ORCH_ACCESS_TOKEN_TTL_SEC`, `ORCH_REFRESH_TOKEN_TTL_SEC`,
+  `ORCH_PAT_TTL_SEC`, `ORCH_AUTH_THROTTLE_WINDOW_SEC`, `ORCH_AUTH_THROTTLE_MAX`).
+  Enable registration explicitly in Compose `.env` for local self-signup, or
   create accounts with a founder bearer. New humans get least-privilege
   capabilities (no `ops.read` until granted).
+  The VPS overlay pins `ORCH_ALLOW_USER_REGISTRATION: "0"` on `api` and
+  `coordinator` so a hand-edited `.env.vps` cannot enable signup without an
+  overlay edit.
 - Login throttling uses coordinator-durable counters
   (`control_plane_auth_throttle`) so limits hold under gunicorn `--workers 2`.
 - JSON endpoints: `POST /api/v1/auth/register|login|refresh|logout`,
