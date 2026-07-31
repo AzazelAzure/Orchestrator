@@ -14,7 +14,7 @@ from flow_engine.persistence.transactions import transaction
 def test_migration_005_adds_control_plane_tables(tmp_path) -> None:
     kernel = Kernel.init(tmp_path / "r4.db")
     try:
-        assert current_version(kernel.connection) == 7
+        assert current_version(kernel.connection) == 8
         tables = set(list_tables(kernel.connection))
         assert "control_plane_principals" in tables
         assert "control_plane_delivery_jobs" in tables
@@ -54,7 +54,7 @@ def test_migration_preserves_legacy_pending_claim_r4(tmp_path) -> None:
         from flow_engine.persistence.migrations import apply_migrations
 
         apply_migrations(conn)
-        assert current_version(conn) == 7
+        assert current_version(conn) == 8
         row = conn.execute("SELECT status FROM work_items WHERE id = ?", (wid,)).fetchone()
         assert row["status"] == "pending"
         with transaction(conn):

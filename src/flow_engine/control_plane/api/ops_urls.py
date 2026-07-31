@@ -7,13 +7,16 @@ import os
 from pathlib import Path
 
 from django.urls import path
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from flow_engine.control_plane.api.authentication import OrchestratorPrincipalAuthentication
 from flow_engine.control_plane.api.ops_aggregate import (
     fetch_dashboard_payload,
     fetch_schedule_status,
 )
+from flow_engine.control_plane.api.permissions import RequireOpsReadOrFounder
 from flow_engine.control_plane.api.views_helpers import get_client
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -34,8 +37,8 @@ def _latest_json_summary(glob_pattern: str) -> dict | None:
 
 
 class OpsSummaryView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [OrchestratorPrincipalAuthentication]
+    permission_classes = [IsAuthenticated, RequireOpsReadOrFounder]
 
     def get(self, request):
         stack_health: dict = {"status": "unknown"}
@@ -48,8 +51,8 @@ class OpsSummaryView(APIView):
         delegate_probe = _latest_json_summary("hq-delegate-probe/*/summary.json")
         bridge_probe = _latest_json_summary("hq-orch-bridge/*/summary.json")
 
-        dashboard = fetch_dashboard_payload()
-        schedule = fetch_schedule_status()
+        dashboard = fetch_dashboard_payload(request)
+        schedule = fetch_schedule_status(request)
 
         open_gates = dashboard.get("open_gates")
         if not open_gates:

@@ -20,9 +20,7 @@ def validate_runtime_settings(
         if testing:
             secret = "test-only-insecure-secret"
         else:
-            raise RuntimeError(
-                "DJANGO_SECRET_KEY is required (fail closed; no default secret)"
-            )
+            raise RuntimeError("DJANGO_SECRET_KEY is required (fail closed; no default secret)")
 
     hosts_raw = (allowed_hosts or "").strip()
     if not hosts_raw or hosts_raw == "*":
@@ -45,6 +43,9 @@ SECRET_KEY, ALLOWED_HOSTS = validate_runtime_settings(
 
 # Default DEBUG off.
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+
+# Auth TTL / throttle / registration defaults live in
+# flow_engine.control_plane.user_auth (single source of truth).
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",

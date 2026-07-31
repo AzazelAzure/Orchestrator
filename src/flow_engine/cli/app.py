@@ -32,6 +32,7 @@ from flow_engine.application import (
     submit_work,
     waive_gate,
 )
+from flow_engine.cli.auth_cmds import add_auth_parser, run_auth_command
 from flow_engine.cli.capability_cmds import add_capability_parser, run_capability_command
 from flow_engine.cli.context import db_session, require_initialized, resolve_db_path
 from flow_engine.cli.org_cmds import (
@@ -175,6 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_runtime_parser(sub)
     add_org_parser(sub)
     add_delegation_parser(sub)
+    add_auth_parser(sub)
 
     return parser
 
@@ -189,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_init(args, db_path)
         if args.command == "cap":
             return run_capability_command(args, db_path)
+        if args.command == "auth":
+            return run_auth_command(args)
         with db_session(db_path) as conn:
             require_initialized(conn)
             if args.command == "status":

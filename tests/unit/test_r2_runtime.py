@@ -168,7 +168,7 @@ def test_migration_preserves_legacy_pending_claim(tmp_path) -> None:
 
     upgraded = open_connection(db_path, initialize=True)
     try:
-        assert current_version(upgraded) == 7
+        assert current_version(upgraded) == 8
         assert set(KERNEL_TABLES).issubset(set(list_tables(upgraded)))
         row = upgraded.execute(
             "SELECT status FROM work_items WHERE id = ?",
@@ -684,8 +684,7 @@ def test_provider_delivery_exception_becomes_audited_unknown(engine: Kernel) -> 
     assert credit_usage(conn, run_id)["totals"]["consumed"] == 1
     events = list_audit_events(conn)
     assert any(
-        event["event_type"] == "runtime.provider_delivery_unknown"
-        and event["anomaly_code"] == "A1"
+        event["event_type"] == "runtime.provider_delivery_unknown" and event["anomaly_code"] == "A1"
         for event in events
     )
 
@@ -904,7 +903,7 @@ def test_legacy_work_path_still_works(engine: Kernel) -> None:
 
 
 def test_schema_version_is_current(engine: Kernel) -> None:
-    assert engine.schema_version == 7
+    assert engine.schema_version == 8
     assert engine.has_kernel_tables()
 
 

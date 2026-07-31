@@ -69,6 +69,7 @@ FRESH_OBSERVATION_COMMANDS = frozenset(
         "schedule.list_templates",
         "schedule.status",
         "control_plane.resolve_token",
+        "auth.throttle_check",
         "org.get_profile",
         "org.list_profiles",
         "org.list_members",
@@ -80,6 +81,19 @@ FRESH_OBSERVATION_COMMANDS = frozenset(
         "delegation.get_request",
         "delegation.get_pin",
         "ops.dashboard_read",
+    }
+)
+
+# Auth mutations must not collapse under empty-key idempotency: the same refresh
+# token payload must re-enter dispatch so reuse detection can revoke the family.
+AUTH_UNCACHEABLE_COMMANDS = frozenset(
+    {
+        "auth.login",
+        "auth.register_user",
+        "auth.refresh",
+        "auth.logout",
+        "auth.issue_pat",
+        "auth.revoke_credential",
     }
 )
 
@@ -122,10 +136,12 @@ class StateCoordinator:
         scope = command.idempotency_scope
         digest = command.request_digest
         # No-key observations are distinct audited reads, not cached snapshots.
+        # Auth mutations without an explicit key must also stay uncached so
+        # refresh-token replay can hit reuse revocation instead of from_cache.
         if (
             command.command_type in FRESH_OBSERVATION_COMMANDS
-            and command.idempotency_key is None
-        ):
+            or command.command_type in AUTH_UNCACHEABLE_COMMANDS
+        ) and command.idempotency_key is None:
             scope = f"{scope}|observation|{operation_id}"
 
         existing = self._conn.execute(
@@ -137,9 +153,7 @@ class StateCoordinator:
         ).fetchone()
         if existing is not None:
             if existing["request_digest"] != digest:
-                raise IdempotencyReplayError(
-                    "idempotency scope reused with conflicting digest"
-                )
+                raise IdempotencyReplayError("idempotency scope reused with conflicting digest")
             prior = json.loads(existing["result_json"] or "{}")
             return {
                 **prior,
@@ -175,6 +189,9 @@ class StateCoordinator:
         try:
             assert_mcp_coordinator_context(self._conn, command)
             kind, caps = self._lookup_principal_kind(command.context.principal_id)
+            # Grant capabilities are the ceiling (PAT scopes live on human grants).
+            if command.context.grant is not None:
+                caps = tuple(command.context.grant.capabilities)
             authorize_command(command, principal_kind=kind, capabilities=caps)
             result = self._dispatch(command)
             error_code = result.get("error_code")
@@ -236,9 +253,7 @@ class StateCoordinator:
                 "command_type": command.command_type,
                 "status": "rejected",
                 "from_cache": False,
-                "anomalies": (
-                    [{"code": str(anomaly), "detail": str(exc)}] if anomaly else []
-                ),
+                "anomalies": ([{"code": str(anomaly), "detail": str(exc)}] if anomaly else []),
                 "result": None,
                 "error_code": error_code,
                 "error": str(exc),
@@ -270,9 +285,7 @@ class StateCoordinator:
             raise AuthzDeniedError("grant required")
         return command.context.grant
 
-    def _lookup_principal_kind(
-        self, principal_id: str
-    ) -> tuple[str | None, tuple[str, ...]]:
+    def _lookup_principal_kind(self, principal_id: str) -> tuple[str | None, tuple[str, ...]]:
         """Resolve registry kind/capabilities when principal is registered (R4)."""
         import json
 
@@ -315,6 +328,9 @@ class StateCoordinator:
             from flow_engine.control_plane.ops_dashboard import read_ops_dashboard
 
             return read_ops_dashboard(self._conn)
+
+        if ctype.startswith("auth."):
+            return self._dispatch_auth(command)
 
         # --- R3 organization / delegation ---
         org_result = self._dispatch_org(command)
@@ -386,7 +402,11 @@ class StateCoordinator:
             )
             run_id = created["run"]["id"]
             claim_attempt(self._conn, run_id=run_id, actor=actor)
-            delivery_mode = "async" if payload.get("async_dispatch") or payload.get("delivery_mode") == "async" else "inline"
+            delivery_mode = (
+                "async"
+                if payload.get("async_dispatch") or payload.get("delivery_mode") == "async"
+                else "inline"
+            )
             dispatched = dispatch_provider_call(
                 self._conn,
                 attempt_id=created["attempt"]["id"],
@@ -414,9 +434,7 @@ class StateCoordinator:
                 anomalies=payload.get("anomalies"),
             )
         if ctype == "runtime.pause":
-            return pause_run(
-                self._conn, run_id=command.target_id or payload["run_id"], actor=actor
-            )
+            return pause_run(self._conn, run_id=command.target_id or payload["run_id"], actor=actor)
         if ctype == "runtime.resume":
             return resume_run(
                 self._conn, run_id=command.target_id or payload["run_id"], actor=actor
@@ -885,6 +903,70 @@ class StateCoordinator:
             }
         raise ValidationFailedError(f"unknown command_type: {ctype}")
 
+    def _dispatch_auth(self, command: RuntimeCommand) -> dict[str, Any]:
+        from flow_engine.control_plane import user_auth as auth
+
+        ctype = command.command_type
+        payload = command.payload
+        if ctype == "auth.register_user":
+            # Registration bypass is role-derived only — never payload-controlled.
+            founder = command.context.role == PrincipalRole.FOUNDER
+            return auth.register_user(
+                self._conn,
+                username=payload["username"],
+                password=payload["password"],
+                display_name=payload.get("display_name"),
+                actor_id=payload.get("actor_id"),
+                founder_authorized=founder,
+                capabilities=tuple(payload.get("capabilities") or ()),
+            )
+        if ctype == "auth.login":
+            return auth.login_user(
+                self._conn,
+                username=payload["username"],
+                password=payload["password"],
+                client_ip=payload.get("client_ip"),
+            )
+        if ctype == "auth.refresh":
+            return auth.refresh_session(
+                self._conn,
+                refresh_token=payload["refresh_token"],
+            )
+        if ctype == "auth.logout":
+            return auth.logout_with_token(
+                self._conn,
+                raw_token=payload["raw_token"],
+            )
+        if ctype == "auth.issue_pat":
+            _kind, principal_caps = self._lookup_principal_kind(command.context.principal_id)
+            # Grant capabilities are the mint ceiling (narrow PAT scopes on human grants).
+            if command.context.grant is not None:
+                principal_caps = tuple(command.context.grant.capabilities)
+            return auth.issue_pat(
+                self._conn,
+                principal_id=command.context.principal_id,
+                label=payload["label"],
+                scopes=tuple(payload.get("scopes") or ()),
+                principal_capabilities=principal_caps,
+            )
+        if ctype == "auth.revoke_credential":
+            founder = command.context.role == PrincipalRole.FOUNDER
+            return auth.revoke_credential(
+                self._conn,
+                credential_id=payload["credential_id"],
+                actor_principal_id=command.context.principal_id,
+                founder=founder,
+            )
+        if ctype == "auth.throttle_check":
+            return auth.throttle_check_and_bump(
+                self._conn,
+                action=payload["action"],
+                subject_key=payload["subject_key"],
+                max_hits=payload.get("max_hits"),
+                window_sec=payload.get("window_sec"),
+            )
+        raise ValidationFailedError(f"unknown command_type: {ctype}")
+
     def _dispatch_org(self, command: RuntimeCommand) -> dict[str, Any] | None:
         from flow_engine.application import organization_service as org
         from flow_engine.domain.states import PrincipalRole
@@ -935,9 +1017,7 @@ class StateCoordinator:
                 )
             }
         if ctype == "org.list_members":
-            return org.list_members(
-                self._conn, command.target_id or payload["organization_id"]
-            )
+            return org.list_members(self._conn, command.target_id or payload["organization_id"])
         if ctype == "org.find_position":
             return {
                 "position": org.find_position(
@@ -1092,9 +1172,7 @@ class StateCoordinator:
                 organization_id=payload["organization_id"],
                 principal_id=payload.get("principal_id") or actor,
                 role=PrincipalRole(payload.get("role", "worker")),
-                surfaces=tuple(
-                    Surface(s) for s in payload.get("surfaces", ["cli", "test"])
-                ),
+                surfaces=tuple(Surface(s) for s in payload.get("surfaces", ["cli", "test"])),
                 providers=tuple(payload.get("providers") or ["codex", "cursor", "claude"]),
                 budget_scope_id=payload["budget_scope_id"],
                 assignment_id=payload["assignment_id"],
@@ -1117,8 +1195,6 @@ class StateCoordinator:
             }
         if ctype == "delegation.get_pin":
             return {
-                "pin": dele.get_dispatch_pin(
-                    self._conn, command.target_id or payload["pin_id"]
-                )
+                "pin": dele.get_dispatch_pin(self._conn, command.target_id or payload["pin_id"])
             }
         raise ValidationFailedError(f"unknown command_type: {ctype}")

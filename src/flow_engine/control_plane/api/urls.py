@@ -2,6 +2,15 @@
 
 from django.urls import path
 
+from flow_engine.control_plane.api.views_auth import (
+    AuthLoginView,
+    AuthLogoutView,
+    AuthMeView,
+    AuthRefreshView,
+    AuthRegisterView,
+    AuthTokenRevokeView,
+    AuthTokenView,
+)
 from flow_engine.control_plane.api.views_mcp import (
     McpDepartmentProfilesView,
     McpLaneInvokeView,
@@ -33,6 +42,17 @@ from flow_engine.control_plane.api.views_scripts import (
 )
 
 urlpatterns = [
+    path("auth/register", AuthRegisterView.as_view(), name="auth-register"),
+    path("auth/login", AuthLoginView.as_view(), name="auth-login"),
+    path("auth/refresh", AuthRefreshView.as_view(), name="auth-refresh"),
+    path("auth/logout", AuthLogoutView.as_view(), name="auth-logout"),
+    path("auth/me", AuthMeView.as_view(), name="auth-me"),
+    path("auth/token", AuthTokenView.as_view(), name="auth-token"),
+    path(
+        "auth/token/<str:credential_id>/revoke",
+        AuthTokenRevokeView.as_view(),
+        name="auth-token-revoke",
+    ),
     path("runtime/preview", RuntimePreviewView.as_view(), name="runtime-preview"),
     path("runtime/run", RuntimeRunView.as_view(), name="runtime-run"),
     path("runtime/runs/<str:run_id>", RuntimeShowView.as_view(), name="runtime-show"),

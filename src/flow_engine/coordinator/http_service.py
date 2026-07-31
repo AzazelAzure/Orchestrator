@@ -59,7 +59,9 @@ def reset_coordinator() -> None:
 
 def _json_response(start_response: Callable, status: str, body: dict[str, Any]) -> list[bytes]:
     payload = json.dumps(body, default=str).encode("utf-8")
-    start_response(status, [("Content-Type", "application/json"), ("Content-Length", str(len(payload)))])
+    start_response(
+        status, [("Content-Type", "application/json"), ("Content-Length", str(len(payload)))]
+    )
     return [payload]
 
 
@@ -115,11 +117,7 @@ def _resolve_server_context(
         raise AuthzDeniedError("principal revoked")
     grant = principals.load_grant_for_principal(coord.connection, principal)
     hierarchy_without_grant = bool(
-        command_type
-        and (
-            command_type.startswith("delegation.")
-            or command_type.startswith("org.")
-        )
+        command_type and (command_type.startswith("delegation.") or command_type.startswith("org."))
     )
     if hierarchy_without_grant and not isinstance(grant, ResolvedTaskGrant):
         grant = None
@@ -186,6 +184,8 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
                 "step_up",
                 "capabilities",
                 "worker_principal_id",
+                "founder_authorized",
+                "allow_registration",
             ):
                 payload.pop(banned, None)
 
@@ -204,9 +204,19 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
             command = command_from_dict(data)
             coord = get_coordinator()
 
-            if command.command_type == "control_plane.resolve_token":
+            PUBLIC_AUTH_COMMANDS = frozenset(
+                {
+                    "control_plane.resolve_token",
+                    "auth.login",
+                    "auth.register_user",
+                    "auth.refresh",
+                    "auth.throttle_check",
+                    "auth.logout",
+                }
+            )
+            if command.command_type in PUBLIC_AUTH_COMMANDS:
                 if caller.kind != ServiceCallerKind.API:
-                    raise AuthzDeniedError("token resolve requires API service credential")
+                    raise AuthzDeniedError("auth/token commands require API service credential")
                 command = RuntimeCommand(
                     command_type=command.command_type,
                     target_id=command.target_id,
@@ -241,17 +251,13 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
                     from flow_engine.application.worker_delivery import accept_worker_deliver
 
                     if caller.kind != ServiceCallerKind.WORKER:
-                        raise AuthzDeniedError(
-                            "worker_deliver requires worker service credential"
-                        )
+                        raise AuthzDeniedError("worker_deliver requires worker service credential")
                     envelope = accept_worker_deliver(coord, command)
                 elif command.command_type == "script.execute":
                     from flow_engine.application.script_delivery import accept_script_execute
 
                     if caller.kind != ServiceCallerKind.WORKER:
-                        raise AuthzDeniedError(
-                            "script.execute requires worker service credential"
-                        )
+                        raise AuthzDeniedError("script.execute requires worker service credential")
                     envelope = accept_script_execute(coord, command)
                 else:
                     with transaction(coord.connection):
