@@ -39,8 +39,15 @@ def load_manifest(root: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def check_ops_summary(url: str) -> dict[str, Any]:
-    with urllib.request.urlopen(url, timeout=15) as resp:
+def check_ops_summary(url: str, *, founder_token: str) -> dict[str, Any]:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {founder_token}",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
         body = json.loads(resp.read().decode("utf-8"))
     ok = body.get("status") in {"ok", "degraded"}
     return {"passed": ok, "status": body.get("status"), "url": url}
@@ -83,9 +90,13 @@ def main() -> int:
     os.environ.setdefault("ORCH_R4D_API_BASE", api_base)
     os.environ.setdefault("ORCH_R4D_WORK_ITEM_ID", manifest["work_item_id"])
 
+    env = _load_env(env_file)
     rows: list[dict[str, Any]] = []
 
-    ops = check_ops_summary(manifest["ops_summary_url"])
+    ops = check_ops_summary(
+        manifest["ops_summary_url"],
+        founder_token=env["ORCH_TOKEN_FOUNDER"],
+    )
     rows.append({"step": "ops_summary", **ops})
     write_json(evidence_dir / "ops_summary.json", ops)
 
@@ -107,7 +118,6 @@ def main() -> int:
         }
     )
 
-    env = _load_env(env_file)
     api = ApiClient(api_base, env)
 
     auth_register = check_auth_founder_register(api, env, evidence_dir=evidence_dir)
