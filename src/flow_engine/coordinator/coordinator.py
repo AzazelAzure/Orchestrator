@@ -189,6 +189,9 @@ class StateCoordinator:
         try:
             assert_mcp_coordinator_context(self._conn, command)
             kind, caps = self._lookup_principal_kind(command.context.principal_id)
+            # Grant capabilities are the ceiling (PAT scopes live on human grants).
+            if command.context.grant is not None:
+                caps = tuple(command.context.grant.capabilities)
             authorize_command(command, principal_kind=kind, capabilities=caps)
             result = self._dispatch(command)
             error_code = result.get("error_code")
@@ -906,6 +909,7 @@ class StateCoordinator:
         ctype = command.command_type
         payload = command.payload
         if ctype == "auth.register_user":
+            # Registration bypass is role-derived only — never payload-controlled.
             founder = command.context.role == PrincipalRole.FOUNDER
             return auth.register_user(
                 self._conn,
@@ -913,8 +917,7 @@ class StateCoordinator:
                 password=payload["password"],
                 display_name=payload.get("display_name"),
                 actor_id=payload.get("actor_id"),
-                allow_registration=payload.get("allow_registration"),
-                founder_authorized=bool(payload.get("founder_authorized")) or founder,
+                founder_authorized=founder,
                 capabilities=tuple(payload.get("capabilities") or ()),
             )
         if ctype == "auth.login":
@@ -935,11 +938,16 @@ class StateCoordinator:
                 raw_token=payload["raw_token"],
             )
         if ctype == "auth.issue_pat":
+            _kind, principal_caps = self._lookup_principal_kind(command.context.principal_id)
+            # Grant capabilities are the mint ceiling (narrow PAT scopes on human grants).
+            if command.context.grant is not None:
+                principal_caps = tuple(command.context.grant.capabilities)
             return auth.issue_pat(
                 self._conn,
                 principal_id=command.context.principal_id,
                 label=payload["label"],
                 scopes=tuple(payload.get("scopes") or ()),
+                principal_capabilities=principal_caps,
             )
         if ctype == "auth.revoke_credential":
             founder = command.context.role == PrincipalRole.FOUNDER

@@ -184,6 +184,8 @@ def application(environ: dict[str, Any], start_response: Callable) -> list[bytes
                 "step_up",
                 "capabilities",
                 "worker_principal_id",
+                "founder_authorized",
+                "allow_registration",
             ):
                 payload.pop(banned, None)
 

@@ -44,13 +44,8 @@ SECRET_KEY, ALLOWED_HOSTS = validate_runtime_settings(
 # Default DEBUG off.
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
-# Fail-closed registration: opt in explicitly via environment (local or VPS).
-ORCH_ALLOW_USER_REGISTRATION = os.environ.get("ORCH_ALLOW_USER_REGISTRATION", "0") == "1"
-ORCH_ACCESS_TOKEN_TTL_SEC = int(os.environ.get("ORCH_ACCESS_TOKEN_TTL_SEC", "1800"))
-ORCH_REFRESH_TOKEN_TTL_SEC = int(os.environ.get("ORCH_REFRESH_TOKEN_TTL_SEC", "1209600"))
-ORCH_PAT_TTL_SEC = int(os.environ.get("ORCH_PAT_TTL_SEC", "31536000"))
-ORCH_AUTH_THROTTLE_WINDOW_SEC = int(os.environ.get("ORCH_AUTH_THROTTLE_WINDOW_SEC", "900"))
-ORCH_AUTH_THROTTLE_MAX = int(os.environ.get("ORCH_AUTH_THROTTLE_MAX", "10"))
+# Auth TTL / throttle / registration defaults live in
+# flow_engine.control_plane.user_auth (single source of truth).
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",

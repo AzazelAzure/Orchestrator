@@ -61,11 +61,7 @@ def build_context(
     user: OrchestratorUser = request.user  # type: ignore[assignment]
     grant = None
     hierarchy_without_grant = bool(
-        command_type
-        and (
-            command_type.startswith("delegation.")
-            or command_type.startswith("org.")
-        )
+        command_type and (command_type.startswith("delegation.") or command_type.startswith("org."))
     )
     if user.grant:
         if user.grant.get("compatibility_mode") == "r3_resolved":
@@ -131,6 +127,17 @@ def build_context(
             policy_revision="r4-local",
             capabilities=user.capabilities,
         )
+    elif user.kind == "human":
+        grant = SystemTestGrant(
+            grant_id=f"api-grant-{user.principal_key}",
+            principal_id=user.principal_id,
+            role=user.role,
+            surfaces=user.surfaces,
+            providers=(),
+            budget_scope_id=_local_budget_scope(),
+            policy_revision="r4-local",
+            capabilities=user.capabilities,
+        )
     if hierarchy_without_grant and not (
         user.grant and user.grant.get("compatibility_mode") == "r3_resolved"
     ):
@@ -169,6 +176,8 @@ def submit_command(
         "step_up",
         "capabilities",
         "worker_principal_id",
+        "founder_authorized",
+        "allow_registration",
         # R4C: never accept caller-controlled script path/test hooks via any surface.
         "workspace_root",
         "simulate_network",

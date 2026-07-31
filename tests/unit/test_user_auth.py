@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,23 +26,28 @@ from flow_engine.application.clock import clear_clock, utc_now_iso
 from flow_engine.cli import auth_cmds
 from flow_engine.control_plane.api.views_helpers import set_inprocess_client
 from flow_engine.control_plane.authz_matrix import (
+    FOUNDER_OPS_CAPABILITY,
     OPS_READ_CAPABILITY,
     assert_command_allowed_for_kind,
 )
 from flow_engine.control_plane.bootstrap import bootstrap_test_principals, bootstrap_test_token_for
 from flow_engine.control_plane.coordinator_client import CoordinatorClient
+from flow_engine.control_plane.password import verify_password
 from flow_engine.control_plane.principal_registry import (
     register_principal,
     resolve_by_token,
     token_digest,
 )
 from flow_engine.control_plane.user_auth import (
+    issue_pat,
     login_user,
     refresh_session,
     register_user,
     throttle_check_and_bump,
 )
-from flow_engine.domain.errors import AuthRequiredError, AuthzDeniedError
+from flow_engine.coordinator.commands import CommandContext, RuntimeCommand
+from flow_engine.coordinator.coordinator import StateCoordinator
+from flow_engine.domain.errors import AuthRequiredError, AuthzDeniedError, ValidationFailedError
 from flow_engine.domain.states import PrincipalRole, Surface
 from flow_engine.persistence import Kernel
 from flow_engine.persistence.connection import open_connection
@@ -240,6 +246,38 @@ def test_founder_can_register_when_flag_off(auth_api) -> None:
     assert resp.json()["status"] == "applied"
 
 
+def test_payload_founder_authorized_ignored_without_founder_role(auth_api) -> None:
+    """Payload founder_authorized / allow_registration must not bypass fail-closed."""
+    _, kernel = auth_api
+    coord = StateCoordinator(kernel.connection)
+    with transaction(kernel.connection):
+        envelope = coord.accept(
+            RuntimeCommand(
+                command_type="auth.register_user",
+                target_id=None,
+                payload={
+                    "username": "smuggled",
+                    "password": "password123",
+                    "founder_authorized": True,
+                    "allow_registration": True,
+                },
+                context=CommandContext(
+                    principal_id="auth-resolver",
+                    role=PrincipalRole.SYSTEM,
+                    surface=Surface.REST,
+                ),
+            )
+        )
+    assert envelope["status"] == "rejected"
+    assert envelope["error_code"] == "AUTHZ_DENIED"
+    assert (
+        kernel.connection.execute(
+            "SELECT 1 FROM control_plane_user_accounts WHERE username = 'smuggled'"
+        ).fetchone()
+        is None
+    )
+
+
 def test_legacy_service_token_still_resolves(auth_api) -> None:
     api, kernel = auth_api
     principal = resolve_by_token(kernel.connection, bootstrap_test_token_for("worker"))
@@ -319,6 +357,111 @@ def test_pat_issue_and_resolve(auth_api, monkeypatch) -> None:
     pat = resp.json()["result"]["pat"]["token"]
     principal = resolve_by_token(kernel.connection, pat)
     assert principal.principal_key == "human.dave"
+    assert principal.capabilities == ()
+
+
+def test_pat_scopes_subset_enforced(auth_api, monkeypatch) -> None:
+    api, kernel = auth_api
+    monkeypatch.setenv("ORCH_ALLOW_USER_REGISTRATION", "1")
+    with transaction(kernel.connection):
+        register_user(
+            kernel.connection,
+            username="patuser",
+            password="password123",
+            allow_registration=True,
+            capabilities=(OPS_READ_CAPABILITY,),
+        )
+        login = login_user(kernel.connection, username="patuser", password="password123")
+        with pytest.raises(ValidationFailedError, match="subset"):
+            issue_pat(
+                kernel.connection,
+                principal_id=login["account"]["principal_id"],
+                label="bad",
+                scopes=("founder.ops",),
+                principal_capabilities=(OPS_READ_CAPABILITY,),
+            )
+        scoped = issue_pat(
+            kernel.connection,
+            principal_id=login["account"]["principal_id"],
+            label="ops-only",
+            scopes=(OPS_READ_CAPABILITY,),
+            principal_capabilities=(OPS_READ_CAPABILITY,),
+        )
+        empty = issue_pat(
+            kernel.connection,
+            principal_id=login["account"]["principal_id"],
+            label="no-caps",
+            scopes=(),
+            principal_capabilities=(OPS_READ_CAPABILITY,),
+        )
+    scoped_principal = resolve_by_token(kernel.connection, scoped["pat"]["token"])
+    assert OPS_READ_CAPABILITY in scoped_principal.capabilities
+    empty_principal = resolve_by_token(kernel.connection, empty["pat"]["token"])
+    assert empty_principal.capabilities == ()
+
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {empty['pat']['token']}")
+    denied = api.get("/ops/summary/")
+    assert denied.status_code == 403
+
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {scoped['pat']['token']}")
+    ok = api.get("/ops/summary/")
+    assert ok.status_code == 200
+
+
+def test_narrow_pat_cannot_mint_broader_pat(auth_api, monkeypatch) -> None:
+    """Grant-scoped PAT must not mint scopes outside its own effective grant."""
+    api, kernel = auth_api
+    monkeypatch.setenv("ORCH_ALLOW_USER_REGISTRATION", "1")
+    broad = (OPS_READ_CAPABILITY, FOUNDER_OPS_CAPABILITY)
+    with transaction(kernel.connection):
+        register_user(
+            kernel.connection,
+            username="patnarrow",
+            password="password123",
+            allow_registration=True,
+            capabilities=broad,
+        )
+        login = login_user(kernel.connection, username="patnarrow", password="password123")
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {login['access']['token']}")
+    narrow_resp = api.post(
+        "/api/v1/auth/token",
+        {"label": "narrow", "scopes": [OPS_READ_CAPABILITY]},
+        format="json",
+    )
+    assert narrow_resp.status_code in {200, 202}
+    narrow_pat = narrow_resp.json()["result"]["pat"]["token"]
+    narrow_principal = resolve_by_token(kernel.connection, narrow_pat)
+    assert narrow_principal.capabilities == (OPS_READ_CAPABILITY,)
+
+    api.credentials(HTTP_AUTHORIZATION=f"Bearer {narrow_pat}")
+    broader = api.post(
+        "/api/v1/auth/token",
+        {"label": "escalate", "scopes": list(broad)},
+        format="json",
+    )
+    assert broader.status_code in {400, 409, 422}
+    assert broader.json().get("status") == "rejected"
+    assert "subset" in (broader.json().get("error") or "").lower()
+
+    equal = api.post(
+        "/api/v1/auth/token",
+        {"label": "equal-scope", "scopes": [OPS_READ_CAPABILITY]},
+        format="json",
+    )
+    assert equal.status_code in {200, 202}
+    equal_pat = equal.json()["result"]["pat"]["token"]
+    assert resolve_by_token(kernel.connection, equal_pat).capabilities == (OPS_READ_CAPABILITY,)
+
+    empty = api.post(
+        "/api/v1/auth/token",
+        {"label": "empty-scope", "scopes": []},
+        format="json",
+    )
+    assert empty.status_code in {200, 202}
+    assert (
+        resolve_by_token(kernel.connection, empty.json()["result"]["pat"]["token"]).capabilities
+        == ()
+    )
 
 
 def test_refresh_reuse_revokes_family(tmp_path) -> None:
@@ -372,6 +515,119 @@ def test_throttle_durable_across_connections(tmp_path) -> None:
         assert blocked["allowed"] is False
     finally:
         k2.close()
+
+
+def test_throttle_concurrent_first_hit_and_bumps(tmp_path) -> None:
+    db = tmp_path / "throttle-concurrent.db"
+    Kernel.init(db).close()
+    barrier = threading.Barrier(8)
+    results: list[dict] = []
+    lock = threading.Lock()
+    errors: list[BaseException] = []
+
+    def worker() -> None:
+        conn = open_connection(db)
+        try:
+            barrier.wait(timeout=5)
+            with transaction(conn):
+                result = throttle_check_and_bump(
+                    conn,
+                    action="auth.login",
+                    subject_key="ip:concurrent",
+                    max_hits=3,
+                    window_sec=900,
+                )
+            with lock:
+                results.append(result)
+        except BaseException as exc:  # noqa: BLE001 — collect for assertion
+            with lock:
+                errors.append(exc)
+        finally:
+            conn.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+    assert not errors
+    assert len(results) == 8
+    hits = sorted(r["hit_count"] for r in results)
+    assert hits == list(range(1, 9))
+    assert sum(1 for r in results if r["allowed"]) == 3
+    assert sum(1 for r in results if not r["allowed"]) == 5
+    conn = open_connection(db)
+    try:
+        row = conn.execute(
+            """
+            SELECT hit_count FROM control_plane_auth_throttle
+            WHERE action = ? AND subject_key = ?
+            """,
+            ("auth.login", "ip:concurrent"),
+        ).fetchone()
+        assert row is not None
+        assert int(row["hit_count"]) == 8
+    finally:
+        conn.close()
+
+
+def test_login_missing_user_still_verifies_password(tmp_path) -> None:
+    kernel = Kernel.init(tmp_path / "timing.db")
+    try:
+        seen: list[str] = []
+
+        def _spy(raw: str, encoded: str) -> bool:
+            seen.append(encoded)
+            return verify_password(raw, encoded)
+
+        with (
+            transaction(kernel.connection),
+            patch("flow_engine.control_plane.user_auth.verify_password", side_effect=_spy),
+        ):
+            with pytest.raises(AuthRequiredError, match="invalid username or password"):
+                login_user(kernel.connection, username="missing", password="password123")
+        assert len(seen) == 1
+        assert seen[0].startswith("pbkdf2_")
+    finally:
+        kernel.close()
+
+
+def test_login_inactive_still_verifies_password(tmp_path) -> None:
+    kernel = Kernel.init(tmp_path / "inactive.db")
+    try:
+        with transaction(kernel.connection):
+            register_user(
+                kernel.connection,
+                username="inactive",
+                password="password123",
+                allow_registration=True,
+            )
+            kernel.connection.execute(
+                "UPDATE control_plane_user_accounts SET status = 'disabled' WHERE username = ?",
+                ("inactive",),
+            )
+        seen: list[str] = []
+
+        def _spy(raw: str, encoded: str) -> bool:
+            seen.append(encoded)
+            return verify_password(raw, encoded)
+
+        with (
+            transaction(kernel.connection),
+            patch("flow_engine.control_plane.user_auth.verify_password", side_effect=_spy),
+        ):
+            with pytest.raises(AuthRequiredError, match="disabled|revoked"):
+                login_user(kernel.connection, username="inactive", password="password123")
+        assert len(seen) == 1
+        assert seen[0].startswith("pbkdf2_")
+        # Must not use the real account hash (would leak via early verify-only-if-active).
+        real = kernel.connection.execute(
+            "SELECT password_hash FROM control_plane_user_accounts WHERE username = ?",
+            ("inactive",),
+        ).fetchone()["password_hash"]
+        assert seen[0] != real
+    finally:
+        kernel.close()
 
 
 def test_human_denied_founder_matrix() -> None:

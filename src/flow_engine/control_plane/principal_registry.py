@@ -276,8 +276,17 @@ def load_grant_for_principal(
         return None
     if principal.kind == "mcp_service":
         return None
-    if principal.kind == "provider_invocation":
-        return None
+    if principal.kind == "human":
+        return SystemTestGrant(
+            grant_id=f"human-grant-{principal.principal_key}",
+            principal_id=principal.principal_id,
+            role=principal.role,
+            surfaces=principal.surfaces,
+            providers=(),
+            budget_scope_id=local_budget_scope_id(),
+            capabilities=principal.capabilities,
+            policy_revision="r4-local",
+        )
     return None
 
 

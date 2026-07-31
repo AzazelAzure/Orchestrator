@@ -6,7 +6,8 @@ import json
 import os
 import secrets
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flow_engine.application.clock import is_expired, utc_after_seconds, utc_now_iso
@@ -27,11 +28,15 @@ from flow_engine.domain.errors import (
 from flow_engine.domain.models import new_id
 from flow_engine.domain.states import PrincipalRole, Surface
 
+# Single source of truth for auth timing / throttle defaults (settings re-exports).
 DEFAULT_ACCESS_TTL_SEC = 1800  # 30 minutes
 DEFAULT_REFRESH_TTL_SEC = 1_209_600  # 14 days
 DEFAULT_PAT_TTL_SEC = 31_536_000  # 365 days
 DEFAULT_THROTTLE_WINDOW_SEC = 900  # 15 minutes
 DEFAULT_THROTTLE_MAX_HITS = 10
+
+# Valid PBKDF2 hash used only to equalize verify cost when no active account hash exists.
+_DUMMY_PASSWORD_HASH: str | None = None
 
 
 def _access_ttl() -> int:
@@ -60,6 +65,22 @@ def registration_allowed() -> bool:
 
 def _mint_raw_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def _dummy_password_hash() -> str:
+    """Return a real encoded hash so missing/inactive logins still pay verify cost."""
+    global _DUMMY_PASSWORD_HASH
+    if _DUMMY_PASSWORD_HASH is None:
+        _DUMMY_PASSWORD_HASH = hash_password("orchestrator-timing-equalization-dummy")
+    return _DUMMY_PASSWORD_HASH
+
+
+def _throttle_reset_threshold(now: str, window_sec: int) -> str:
+    """ISO timestamp: windows started at-or-before this value are expired."""
+    now_dt = datetime.fromisoformat(now)
+    if now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=UTC)
+    return (now_dt - timedelta(seconds=window_sec)).replace(microsecond=0).isoformat()
 
 
 @dataclass(frozen=True)
@@ -122,62 +143,40 @@ def throttle_check_and_bump(
     max_hits: int | None = None,
     window_sec: int | None = None,
 ) -> dict[str, Any]:
-    """Fixed-window counter shared across gunicorn workers via coordinator SQLite."""
+    """Fixed-window counter shared across gunicorn workers via coordinator SQLite.
+
+    Uses a single UPSERT … RETURNING so concurrent connections cannot both
+    observe a missing row and insert (UNIQUE conflict) or lose increments.
+    """
     limit = max_hits if max_hits is not None else _throttle_max()
     window = window_sec if window_sec is not None else _throttle_window()
     now = utc_now_iso()
+    threshold = _throttle_reset_threshold(now, window)
     row = conn.execute(
         """
-        SELECT * FROM control_plane_auth_throttle
-        WHERE action = ? AND subject_key = ?
+        INSERT INTO control_plane_auth_throttle (
+            id, action, subject_key, window_started_at, hit_count
+        ) VALUES (?, ?, ?, ?, 1)
+        ON CONFLICT(action, subject_key) DO UPDATE SET
+            window_started_at = CASE
+                WHEN control_plane_auth_throttle.window_started_at <= ?
+                    THEN excluded.window_started_at
+                ELSE control_plane_auth_throttle.window_started_at
+            END,
+            hit_count = CASE
+                WHEN control_plane_auth_throttle.window_started_at <= ?
+                    THEN 1
+                ELSE control_plane_auth_throttle.hit_count + 1
+            END
+        RETURNING hit_count, window_started_at
         """,
-        (action, subject_key),
+        (new_id(), action, subject_key, now, threshold, threshold),
     ).fetchone()
-    if row is None:
-        conn.execute(
-            """
-            INSERT INTO control_plane_auth_throttle (
-                id, action, subject_key, window_started_at, hit_count
-            ) VALUES (?, ?, ?, ?, 1)
-            """,
-            (new_id(), action, subject_key, now),
-        )
-        return {"allowed": True, "hit_count": 1, "limit": limit, "window_started_at": now}
-
+    assert row is not None
+    hits = int(row["hit_count"])
     started = row["window_started_at"]
-    if is_expired(utc_after_seconds(window, from_iso=started), now_iso=now):
-        conn.execute(
-            """
-            UPDATE control_plane_auth_throttle
-            SET window_started_at = ?, hit_count = 1
-            WHERE id = ?
-            """,
-            (now, row["id"]),
-        )
-        return {"allowed": True, "hit_count": 1, "limit": limit, "window_started_at": now}
-
-    hits = int(row["hit_count"]) + 1
-    if hits > limit:
-        conn.execute(
-            """
-            UPDATE control_plane_auth_throttle SET hit_count = ? WHERE id = ?
-            """,
-            (hits, row["id"]),
-        )
-        return {
-            "allowed": False,
-            "hit_count": hits,
-            "limit": limit,
-            "window_started_at": started,
-        }
-    conn.execute(
-        """
-        UPDATE control_plane_auth_throttle SET hit_count = ? WHERE id = ?
-        """,
-        (hits, row["id"]),
-    )
     return {
-        "allowed": True,
+        "allowed": hits <= limit,
         "hit_count": hits,
         "limit": limit,
         "window_started_at": started,
@@ -195,7 +194,11 @@ def register_user(
     founder_authorized: bool = False,
     capabilities: tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Create human principal + account. Least-privilege capabilities by default."""
+    """Create human principal + account. Least-privilege capabilities by default.
+
+    ``founder_authorized`` must be derived by the coordinator from
+    ``command.context.role == FOUNDER`` — never from request payload.
+    """
     uname = (username or "").strip()
     if not uname:
         raise ValidationFailedError("username is required")
@@ -250,26 +253,6 @@ def register_user(
         ).fetchone()
     )
     return {"account": account.to_dict(), "principal": principal.to_dict()}
-
-
-def _load_active_account(conn: sqlite3.Connection, username: str) -> sqlite3.Row:
-    row = conn.execute(
-        """
-        SELECT a.*, p.status AS principal_status, p.principal_key, p.kind, p.role,
-               p.display_name, p.capabilities_json, p.surfaces_json, p.organization_id,
-               p.provider_seat_id, p.grant_id, p.created_at AS principal_created_at,
-               p.revoked_at AS principal_revoked_at, p.id AS pid
-        FROM control_plane_user_accounts a
-        JOIN control_plane_principals p ON p.id = a.principal_id
-        WHERE a.username = ?
-        """,
-        (username,),
-    ).fetchone()
-    if row is None:
-        raise AuthRequiredError("invalid username or password")
-    if row["status"] != "active" or row["principal_status"] != "active":
-        raise AuthRequiredError("account disabled or principal revoked")
-    return row
 
 
 def _insert_credential(
@@ -365,8 +348,27 @@ def login_user(
             raise AuthzDeniedError("login rate limit exceeded")
 
     uname = (username or "").strip()
-    row = _load_active_account(conn, uname)
-    if not verify_password(password, row["password_hash"]):
+    row = conn.execute(
+        """
+        SELECT a.*, p.status AS principal_status, p.principal_key, p.kind, p.role,
+               p.display_name, p.capabilities_json, p.surfaces_json, p.organization_id,
+               p.provider_seat_id, p.grant_id, p.created_at AS principal_created_at,
+               p.revoked_at AS principal_revoked_at, p.id AS pid
+        FROM control_plane_user_accounts a
+        JOIN control_plane_principals p ON p.id = a.principal_id
+        WHERE a.username = ?
+        """,
+        (uname,),
+    ).fetchone()
+    active = row is not None and row["status"] == "active" and row["principal_status"] == "active"
+    # Always verify against a real hash so missing/inactive paths share verify cost.
+    encoded = row["password_hash"] if active else _dummy_password_hash()
+    password_ok = verify_password(password, encoded)
+    if row is None:
+        raise AuthRequiredError("invalid username or password")
+    if row["status"] != "active" or row["principal_status"] != "active":
+        raise AuthRequiredError("account disabled or principal revoked")
+    if not password_ok:
         raise AuthRequiredError("invalid username or password")
 
     session = issue_session_pair(conn, principal_id=row["principal_id"])
@@ -491,10 +493,19 @@ def issue_pat(
     principal_id: str,
     label: str,
     scopes: tuple[str, ...] = (),
+    principal_capabilities: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     label_clean = (label or "").strip()
     if not label_clean:
         raise ValidationFailedError("PAT label is required")
+    clean_scopes = tuple(s for s in scopes if str(s).strip())
+    if principal_capabilities is not None:
+        allowed = set(principal_capabilities)
+        extra = [s for s in clean_scopes if s not in allowed]
+        if extra:
+            raise ValidationFailedError(
+                "PAT scopes must be a subset of principal capabilities: " + ", ".join(extra)
+            )
     now = utc_now_iso()
     family_id = new_id()
     issued = _insert_credential(
@@ -505,9 +516,18 @@ def issue_pat(
         expires_at=utc_after_seconds(_pat_ttl(), from_iso=now),
         family_id=family_id,
         label=label_clean,
-        scopes=scopes,
+        scopes=clean_scopes,
     )
     return {"pat": issued.public_dict()}
+
+
+def _effective_pat_capabilities(
+    principal_capabilities: tuple[str, ...],
+    scopes: tuple[str, ...],
+) -> tuple[str, ...]:
+    """PAT scopes are a capability ceiling; omitted capabilities are denied."""
+    allowed = set(principal_capabilities)
+    return tuple(s for s in scopes if s in allowed)
 
 
 def resolve_by_token(conn: sqlite3.Connection, raw_token: str) -> ResolvedPrincipal:
@@ -532,6 +552,13 @@ def resolve_by_token(conn: sqlite3.Connection, raw_token: str) -> ResolvedPrinci
             raise AuthRequiredError("invalid or expired principal token")
         from flow_engine.control_plane.principal_registry import _row_to_principal
 
-        return _row_to_principal(row)
+        principal = _row_to_principal(row)
+        if cred["credential_kind"] == "pat":
+            scopes = tuple(json.loads(cred["scopes_json"] or "[]"))
+            return replace(
+                principal,
+                capabilities=_effective_pat_capabilities(principal.capabilities, scopes),
+            )
+        return principal
 
     return resolve_legacy_principal_token(conn, raw_token)

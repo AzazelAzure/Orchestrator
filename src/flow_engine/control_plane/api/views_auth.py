@@ -50,8 +50,13 @@ class AuthRegisterView(APIView):
 
     def post(self, request: Request) -> Response:
         body = request.data if isinstance(request.data, dict) else {}
-        founder_auth = False
-        # Optional founder-authorized create when registration flag is off.
+        payload = {
+            "username": body.get("username", ""),
+            "password": body.get("password", ""),
+            "display_name": body.get("display_name"),
+        }
+        # Optional founder-authenticated create when registration flag is off.
+        # Bypass is carried only via CommandContext.role=FOUNDER — never payload.
         auth_header = request.META.get("HTTP_AUTHORIZATION", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:].strip()
@@ -70,8 +75,20 @@ class AuthRegisterView(APIView):
                 )
                 principal = ((probe.get("result") or {}).get("principal")) or {}
                 if probe.get("status") == "applied" and principal.get("kind") == "founder":
-                    founder_auth = True
-        if not registration_allowed() and not founder_auth:
+                    envelope = get_client().accept(
+                        RuntimeCommand(
+                            command_type="auth.register_user",
+                            target_id=None,
+                            payload=payload,
+                            context=CommandContext(
+                                principal_id=principal["principal_id"],
+                                role=PrincipalRole.FOUNDER,
+                                surface=Surface.REST,
+                            ),
+                        )
+                    )
+                    return Response(envelope, status=http_status_for_envelope(envelope))
+        if not registration_allowed():
             return Response(
                 {
                     "status": "rejected",
@@ -80,16 +97,7 @@ class AuthRegisterView(APIView):
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
-        return _system_auth_command(
-            "auth.register_user",
-            {
-                "username": body.get("username", ""),
-                "password": body.get("password", ""),
-                "display_name": body.get("display_name"),
-                "founder_authorized": founder_auth,
-                "allow_registration": registration_allowed() or founder_auth,
-            },
-        )
+        return _system_auth_command("auth.register_user", payload)
 
 
 class AuthLoginView(APIView):
