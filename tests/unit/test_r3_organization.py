@@ -220,10 +220,7 @@ def test_twelve_loadouts_resolve_and_pin(engine: Kernel) -> None:
         for lane_id in item["mcp_lane_refs"]:
             assert item["member_asset_hashes"][lane_id] == lanes[lane_id]["content_sha256"]
         for script_id in item["script_refs"]:
-            assert (
-                item["member_asset_hashes"][script_id]
-                == scripts[script_id]["content_sha256"]
-            )
+            assert item["member_asset_hashes"][script_id] == scripts[script_id]["content_sha256"]
         assert "upward_authority" in item["authority"]["denials"]
         with transaction(conn):
             snap = materialize_snapshot(
@@ -737,13 +734,13 @@ def test_additive_upgrade_from_r2(tmp_path) -> None:
     # Initialize fully (applies all migrations including 004).
     kernel = Kernel.init(db_path)
     try:
-        assert current_version(kernel.connection) == 7
+        assert current_version(kernel.connection) == 8
         assert "immutable_dispatch_pins" in list_tables(kernel.connection)
     finally:
         kernel.close()
     # Re-open preserves version.
     conn = open_connection(db_path, initialize=True)
     try:
-        assert current_version(conn) == 7
+        assert current_version(conn) == 8
     finally:
         conn.close()

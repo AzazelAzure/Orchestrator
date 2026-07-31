@@ -37,9 +37,7 @@ def r4_api(tmp_path):
 
     os.environ["ORCH_TESTING"] = "1"
     if not settings.configured:
-        os.environ.setdefault(
-            "DJANGO_SETTINGS_MODULE", "flow_engine.control_plane.settings"
-        )
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "flow_engine.control_plane.settings")
     if not apps.ready:
         django.setup()
 
@@ -146,12 +144,22 @@ def test_founder_runtime_control_not_denied(r4_api) -> None:
 def test_ops_summary_unauthenticated(r4_api) -> None:
     api, _ = r4_api
     resp = api.get("/ops/summary/")
+    assert resp.status_code in {401, 403}
+
+
+def test_ops_summary_founder_authenticated(r4_api) -> None:
+    api, _ = r4_api
+    _auth(api, "founder")
+    resp = api.get("/ops/summary/")
     assert resp.status_code == 200
     body = resp.json()
     assert body.get("status") in {"ok", "degraded"}
     assert "open_gates" in body
     assert "hierarchy" in body
     assert "delegations" in body
+
+
+def test_worker_delivery_list_allowed(r4_api) -> None:
     api, _ = r4_api
     _auth(api, "worker")
     resp = api.get("/api/v1/delivery/jobs")

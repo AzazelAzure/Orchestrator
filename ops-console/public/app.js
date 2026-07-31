@@ -1,7 +1,8 @@
 const API = "";
+const TOKEN_KEY = "orch_api_token";
 
 function token() {
-  return sessionStorage.getItem("orch_founder_token") || "";
+  return sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem("orch_founder_token") || "";
 }
 
 async function apiFetch(path, options = {}) {
@@ -37,8 +38,16 @@ function renderGates(gates) {
 
 async function loadSummary() {
   try {
-    const res = await fetch(`${API}/ops/summary/`);
-    const data = await res.json();
+    const { ok, status, body: data } = await apiFetch("/ops/summary/");
+    if (!ok) {
+      setBadge(status === 401 || status === 403 ? "auth" : "error");
+      document.getElementById("stack-json").textContent = JSON.stringify(
+        data,
+        null,
+        2
+      );
+      return;
+    }
     setBadge(data.status || "unknown");
     document.getElementById("stack-json").textContent = JSON.stringify(
       { stack_health: data.stack_health, credit_envelope: data.credit_envelope },
@@ -100,11 +109,14 @@ function setupTabs() {
 }
 
 function setupToken() {
-  const input = document.getElementById("founder-token");
-  const saved = sessionStorage.getItem("orch_founder_token");
+  const input = document.getElementById("api-token");
+  const saved = token();
   if (saved) input.value = saved;
   document.getElementById("save-token").addEventListener("click", () => {
-    sessionStorage.setItem("orch_founder_token", input.value.trim());
+    const value = input.value.trim();
+    sessionStorage.setItem(TOKEN_KEY, value);
+    sessionStorage.removeItem("orch_founder_token");
+    loadSummary();
   });
 }
 

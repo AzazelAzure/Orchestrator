@@ -83,6 +83,50 @@ Authenticate API callers with `Authorization: Bearer <token>` or `X-Orchestrator
 Coordinator transport requires distinct `ORCH_API_SERVICE_TOKEN` /
 `ORCH_WORKER_SERVICE_TOKEN` headers.
 
+## User authentication (human accounts)
+
+Human end-user identity is separate from founder/service/MCP/worker bootstrap
+tokens:
+
+- Accounts live in coordinator SQLite (`control_plane_user_accounts`) mapped to
+  `kind=human` principals. Passwords use Django `make_password` /
+  `check_password` only; password digests are never stored on
+  `control_plane_principals.token_digest`.
+- Issued credentials are opaque secrets (`access` / `refresh` / `pat`) with
+  SHA-256 digests at rest, short-lived access, rotating refresh with
+  replay-safe family revocation, and independently revocable PATs. No JWT
+  package is required.
+- Registration is fail-closed: `ORCH_ALLOW_USER_REGISTRATION` defaults to `0`
+  in every environment. Enable explicitly in `.env` for local self-signup, or
+  create accounts with a founder bearer. New humans get least-privilege
+  capabilities (no `ops.read` until granted).
+- Login throttling uses coordinator-durable counters
+  (`control_plane_auth_throttle`) so limits hold under gunicorn `--workers 2`.
+- JSON endpoints: `POST /api/v1/auth/register|login|refresh|logout`,
+  `GET /api/v1/auth/me`, `POST /api/v1/auth/token`,
+  `POST /api/v1/auth/token/<id>/revoke`.
+- Anonymous allowlist is `/health/` only. `/ops/summary/` requires founder or
+  capability `ops.read`. Ops-console uses a generic API bearer field and sends
+  `Authorization` on summary fetch.
+- CLI: `flowctl auth login|logout|status|token` talks to `ORCH_API_URL`, stores
+  credentials under `~/.config/orchestrator/credentials.json` at mode `0600`,
+  supports `ORCH_USER_TOKEN` / `--token-file`, and never prints secrets unless
+  `--show-token` is set. Local SQLite `flowctl` DB commands remain unchanged.
+
+### Migration `008_user_auth.sql` and rollback
+
+SQLite cannot alter CHECK constraints in place. Migration 008 rebuilds
+`control_plane_principals` (copy → drop → rename → recreate active digest
+index), then creates accounts/credentials/throttle tables. The migration runner
+is forward-only. **Before applying on a durable DB, take a SQLite backup.**
+Rollback is restore-from-backup (HitM/ops-approved), not an automatic down
+migration — a silent CHECK reverse would orphan `human` rows.
+
+Deploy note (no VPS mutation in this slice): keep registration off, migrate,
+provision the first human via founder-authorized register or flag-gated local
+signup, and update any summary consumers to send a bearer (founder or
+`ops.read` human/PAT).
+
 ## Install
 
 ```bash

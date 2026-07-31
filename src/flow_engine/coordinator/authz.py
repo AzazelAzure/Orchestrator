@@ -62,9 +62,9 @@ def authorize_command(
         raise AuthRequiredError("principal_id is required")
 
     grant = ctx.grant
-    hierarchy_bootstrap = command.command_type.startswith("org.") or command.command_type.startswith(
-        "delegation."
-    )
+    hierarchy_bootstrap = command.command_type.startswith(
+        "org."
+    ) or command.command_type.startswith("delegation.")
     if (
         hierarchy_bootstrap
         and isinstance(grant, SystemTestGrant)
@@ -86,18 +86,13 @@ def authorize_command(
         assert_command_allowed_for_kind(
             command_type=command.command_type,
             principal_kind=principal_kind,
-            capabilities=capabilities
-            or (grant.capabilities if grant is not None else ()),
+            capabilities=capabilities or (grant.capabilities if grant is not None else ()),
         )
 
     if command.command_type in MCP_FORBIDDEN_COMMANDS and ctx.surface == Surface.MCP:
-        raise UnsupportedSurfaceError(
-            f"{command.command_type} is forbidden on MCP surface"
-        )
+        raise UnsupportedSurfaceError(f"{command.command_type} is forbidden on MCP surface")
     if command.command_type in FOUNDER_ONLY_COMMANDS and ctx.surface == Surface.SCHEDULE:
-        raise UnsupportedSurfaceError(
-            f"{command.command_type} is forbidden on schedule surface"
-        )
+        raise UnsupportedSurfaceError(f"{command.command_type} is forbidden on schedule surface")
 
     if command.command_type in FOUNDER_ONLY_COMMANDS:
         if ctx.role != PrincipalRole.FOUNDER:
@@ -141,10 +136,7 @@ def authorize_command(
         # Schedule verbs rely on kind matrix + template constraints; grant optional.
         if command.command_type in FOUNDER_ONLY_COMMANDS:
             pass
-        elif (
-            command.command_type == "schedule.run_on_demand"
-            and ctx.role != PrincipalRole.FOUNDER
-        ):
+        elif command.command_type == "schedule.run_on_demand" and ctx.role != PrincipalRole.FOUNDER:
             raise AuthzDeniedError("schedule on-demand run requires founder")
 
     if grant is None and command.command_type.startswith("control_plane."):
@@ -152,6 +144,27 @@ def authorize_command(
             pass  # token resolve is authenticated at the HTTP/service layer
         elif ctx.role not in {PrincipalRole.FOUNDER, PrincipalRole.SYSTEM}:
             raise AuthzDeniedError("control_plane admin commands require founder/system role")
+    if grant is None and command.command_type.startswith("auth."):
+        # Unauthenticated login/register/refresh use SYSTEM; logout may be SYSTEM
+        # (token in payload) or an authenticated human/founder.
+        if command.command_type in {
+            "auth.login",
+            "auth.register_user",
+            "auth.refresh",
+            "auth.throttle_check",
+        }:
+            if ctx.role not in {PrincipalRole.SYSTEM, PrincipalRole.FOUNDER}:
+                raise AuthzDeniedError("auth bootstrap commands require system/founder role")
+        elif command.command_type in {"auth.logout", "auth.issue_pat", "auth.revoke_credential"}:
+            if ctx.role not in {
+                PrincipalRole.SYSTEM,
+                PrincipalRole.FOUNDER,
+                PrincipalRole.MANAGER,
+                PrincipalRole.EXECUTIVE,
+            }:
+                raise AuthzDeniedError("auth credential commands require authenticated principal")
+        else:
+            raise AuthzDeniedError(f"unknown auth command {command.command_type}")
     # Org/delegation bootstrap may proceed for authorized hierarchy roles without a
     # resolved grant (chicken-and-egg: profiles must exist before R3 grants).
     if grant is None and hierarchy_bootstrap:

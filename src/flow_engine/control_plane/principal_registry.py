@@ -67,13 +67,16 @@ DEFAULT_SURFACES: dict[str, tuple[Surface, ...]] = {
     "mcp_service": (Surface.MCP, Surface.REST),
     "worker": (Surface.WORKER, Surface.REST),
     "provider_invocation": (Surface.WORKER,),
+    "human": (Surface.REST, Surface.CLI),
 }
 
 
 def _row_to_principal(row: sqlite3.Row) -> ResolvedPrincipal:
     surfaces_raw = json.loads(row["surfaces_json"] or "[]")
-    surfaces = tuple(Surface(s) for s in surfaces_raw) if surfaces_raw else DEFAULT_SURFACES.get(
-        row["kind"], (Surface.REST,)
+    surfaces = (
+        tuple(Surface(s) for s in surfaces_raw)
+        if surfaces_raw
+        else DEFAULT_SURFACES.get(row["kind"], (Surface.REST,))
     )
     caps = tuple(json.loads(row["capabilities_json"] or "[]"))
     return ResolvedPrincipal(
@@ -135,14 +138,19 @@ def register_principal(
             now,
         ),
     )
-    row = conn.execute(
-        "SELECT * FROM control_plane_principals WHERE id = ?", (pid,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM control_plane_principals WHERE id = ?", (pid,)).fetchone()
     assert row is not None
     return _row_to_principal(row)
 
 
 def resolve_by_token(conn: sqlite3.Connection, raw_token: str) -> ResolvedPrincipal:
+    """Resolve opaque user credentials first, then legacy principal-row tokens."""
+    from flow_engine.control_plane.user_auth import resolve_by_token as resolve_user_or_legacy
+
+    return resolve_user_or_legacy(conn, raw_token)
+
+
+def resolve_legacy_principal_token(conn: sqlite3.Connection, raw_token: str) -> ResolvedPrincipal:
     if not raw_token.strip():
         raise AuthRequiredError("authentication token required")
     digest = token_digest(raw_token)
@@ -200,7 +208,9 @@ def revoke_principal(
     return _row_to_principal(updated)
 
 
-def load_grant_for_principal(conn: sqlite3.Connection, principal: ResolvedPrincipal) -> Grant | None:
+def load_grant_for_principal(
+    conn: sqlite3.Connection, principal: ResolvedPrincipal
+) -> Grant | None:
     """Resolve server-side grant binding for a principal."""
     if principal.grant_id:
         row = conn.execute(
@@ -273,4 +283,6 @@ def load_grant_for_principal(conn: sqlite3.Connection, principal: ResolvedPrinci
 
 def assert_surface_allowed(principal: ResolvedPrincipal, surface: Surface) -> None:
     if surface not in principal.surfaces:
-        raise AuthzDeniedError(f"surface {surface} not permitted for principal kind {principal.kind}")
+        raise AuthzDeniedError(
+            f"surface {surface} not permitted for principal kind {principal.kind}"
+        )

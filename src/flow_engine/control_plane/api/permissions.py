@@ -5,7 +5,10 @@ from __future__ import annotations
 from rest_framework.permissions import BasePermission
 
 from flow_engine.control_plane.api.authentication import OrchestratorUser
-from flow_engine.control_plane.authz_matrix import assert_command_allowed_for_kind
+from flow_engine.control_plane.authz_matrix import (
+    OPS_READ_CAPABILITY,
+    assert_command_allowed_for_kind,
+)
 from flow_engine.domain.errors import AuthzDeniedError
 from flow_engine.domain.states import PrincipalRole, Surface
 
@@ -27,6 +30,21 @@ class RequireFounder(BasePermission):
         return isinstance(user, OrchestratorUser) and user.role == PrincipalRole.FOUNDER
 
 
+class RequireOpsReadOrFounder(BasePermission):
+    """Founder always; humans (and others) need explicit ops.read capability."""
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+        if not isinstance(user, OrchestratorUser):
+            return False
+        if user.kind == "founder":
+            return True
+        caps = set(user.capabilities or ())
+        if user.grant and user.grant.get("capabilities"):
+            caps.update(user.grant.get("capabilities") or [])
+        return OPS_READ_CAPABILITY in caps
+
+
 class RequireEndpointCapability(BasePermission):
     """Enforce exact endpoint → principal-kind matrix (deny by default)."""
 
@@ -41,7 +59,9 @@ class RequireEndpointCapability(BasePermission):
             assert_command_allowed_for_kind(
                 command_type=command_type,
                 principal_kind=user.kind,
-                capabilities=user.grant.get("capabilities", []) if user.grant else (),
+                capabilities=user.grant.get("capabilities", [])
+                if user.grant
+                else user.capabilities,
             )
         except AuthzDeniedError:
             return False
@@ -56,7 +76,7 @@ class RequireEndpointCapability(BasePermission):
                 caps = (
                     set(user.grant.get("capabilities") or [])
                     if user.grant
-                    else set()
+                    else set(user.capabilities or ())
                 )
                 if user.kind == "mcp_service" and "recovery.control_plane" not in caps:
                     return False

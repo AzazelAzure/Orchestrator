@@ -51,9 +51,15 @@ pytest
 
 ```bash
 flowctl --help
+flowctl auth login --api-url http://127.0.0.1:8000
+flowctl auth status
+flowctl auth logout
 ```
 
 Database path defaults are resolved by the CLI; override with `FLOW_DB_PATH` when needed.
+`flowctl auth` is a remote control-plane client (`ORCH_API_URL`); local DB
+commands remain separate and unauthenticated. See `docs/r4-control-plane.md`
+(User authentication).
 
 ## Read-only MCP (optional)
 

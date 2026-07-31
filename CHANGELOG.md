@@ -7,6 +7,17 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **User authentication + CLI login** — human accounts mapped to `human` principals;
+  Django password hashes; opaque digest-only access/refresh/PAT credentials with
+  rotating refresh and replay-safe family revocation; coordinator-durable login
+  throttle (gunicorn multi-worker safe); JSON `/api/v1/auth/*`; gated `/ops/summary/`
+  (founder or `ops.read`); ops-console generic bearer token field; `flowctl auth
+  login|logout|status|token` with `0600` credential store and `ORCH_USER_TOKEN`
+  support (no secret echo by default). Migration `008_user_auth.sql` rebuilds the
+  principals CHECK constraint (forward-only; rollback = restore SQLite backup).
+  Registration defaults **off** via `ORCH_ALLOW_USER_REGISTRATION=0`. No JWT
+  dependency.
+
 - **skills-scripts MCP lane** — sixth product MCP lane for publication-neutral skill/script catalog reads (`list_skills`, `get_skill`, `list_scripts`, `describe_script`) and `request_script_run` → coordinator `script.register` under initiating-principal dual-auth (never MCP-side shell or direct `script.execute`). Catalog, Compose service, bootstrap token env, and unit coverage included (`agentic/catalogs/mcp_lanes.json`, `src/flow_engine/mcp_lanes/`, `tests/unit/test_skills_scripts_mcp_lane.py`).
 
 ### Changed

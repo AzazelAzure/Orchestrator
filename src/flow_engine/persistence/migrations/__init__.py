@@ -49,6 +49,9 @@ KERNEL_TABLES = (
     "child_closure_evidence",
     "control_plane_principals",
     "control_plane_delivery_jobs",
+    "control_plane_user_accounts",
+    "control_plane_credentials",
+    "control_plane_auth_throttle",
     "script_executions",
     "schedule_runs",
 )
@@ -77,9 +80,7 @@ def current_version(conn: sqlite3.Connection) -> int:
     ).fetchone()
     if exists is None:
         return 0
-    row = conn.execute(
-        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
-    ).fetchone()
+    row = conn.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").fetchone()
     return int(row[0])
 
 

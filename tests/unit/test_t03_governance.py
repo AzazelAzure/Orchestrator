@@ -131,7 +131,7 @@ def test_migration_from_populated_v001_to_v002(tmp_path: Path) -> None:
 
     upgraded = open_connection(db_path, initialize=True)
     try:
-        assert current_version(upgraded) == 7
+        assert current_version(upgraded) == 8
         assert set(KERNEL_TABLES).issubset(set(list_tables(upgraded)))
         gate = upgraded.execute(
             "SELECT requirement, revision, created_at FROM gates LIMIT 1"
@@ -149,7 +149,7 @@ def test_migration_from_populated_v001_to_v002(tmp_path: Path) -> None:
 
     fresh = Kernel.init(tmp_path / "fresh.db")
     try:
-        assert fresh.schema_version == 7
+        assert fresh.schema_version == 8
         assert set(KERNEL_TABLES).issubset(set(fresh.tables))
     finally:
         fresh.close()
@@ -315,9 +315,7 @@ def test_stale_lease_revision_rejected_after_expiry(engine: Kernel) -> None:
                 expected_lease_revision=stale_revision,
             )
 
-    expired = conn.execute(
-        "SELECT revision FROM leases WHERE holder = 'agent-1'"
-    ).fetchone()
+    expired = conn.execute("SELECT revision FROM leases WHERE holder = 'agent-1'").fetchone()
     assert expired["revision"] == stale_revision + 1
 
 
@@ -359,7 +357,9 @@ def test_renew_extends_lease_with_cas(engine: Kernel) -> None:
             lease_duration_sec=60,
         )
         old_expiry = claimed["lease"]["expires_at"]
-        renewed = renew_resource(conn, resource_id="shared", holder="agent-1", lease_duration_sec=120)
+        renewed = renew_resource(
+            conn, resource_id="shared", holder="agent-1", lease_duration_sec=120
+        )
         assert renewed["lease"]["expires_at"] > old_expiry
 
 
@@ -560,9 +560,7 @@ def test_pass_and_fail_gate_record_gate_actions(engine: Kernel) -> None:
         pass_gate_obj = create_gate(
             conn, work_item_id=pass_gate_work["id"], gate_type="review", actor="a"
         )
-        fail_gate_obj = create_gate(
-            conn, work_item_id=work["id"], gate_type="review", actor="a"
-        )
+        fail_gate_obj = create_gate(conn, work_item_id=work["id"], gate_type="review", actor="a")
         passed = pass_gate(conn, gate_id=pass_gate_obj["id"], actor="a")
         failed = fail_gate(conn, gate_id=fail_gate_obj["id"], actor="a")
         assert passed["status"] == GateStatus.PASSED
@@ -658,14 +656,15 @@ def test_backup_restore_preserves_governed_records(engine: Kernel, tmp_path: Pat
     shutil.copyfile(backup_path, restored_path)
     restored = open_connection(restored_path)
     try:
-        assert current_version(restored) == 7
+        assert current_version(restored) == 8
         assert restored.execute("SELECT COUNT(*) FROM gate_actions").fetchone()[0] == 1
         assert restored.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0] == 1
         assert restored.execute("SELECT COUNT(*) FROM policy_versions").fetchone()[0] == 1
         assert restored.execute("SELECT COUNT(*) FROM findings").fetchone()[0] == 1
-        assert restored.execute(
-            "SELECT COUNT(*) FROM leases WHERE released_at IS NULL"
-        ).fetchone()[0] == 1
+        assert (
+            restored.execute("SELECT COUNT(*) FROM leases WHERE released_at IS NULL").fetchone()[0]
+            == 1
+        )
         assert restored.execute("SELECT COUNT(*) FROM idempotency_results").fetchone()[0] >= 0
     finally:
         restored.close()

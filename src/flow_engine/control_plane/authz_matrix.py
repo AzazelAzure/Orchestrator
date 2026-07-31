@@ -59,7 +59,15 @@ COMMAND_KIND_MATRIX: dict[str, frozenset[str]] = {
     "control_plane.register_principal": frozenset({"founder"}),
     "control_plane.revoke": frozenset({"founder"}),
     "control_plane.resolve_token": frozenset(
-        {"founder", "scheduler", "mcp_service", "worker", "provider_invocation", "system"}
+        {
+            "founder",
+            "scheduler",
+            "mcp_service",
+            "worker",
+            "provider_invocation",
+            "system",
+            "human",
+        }
     ),
     # R4B MCP lane gateway (initiating principal; service principal checked separately)
     "mcp.snapshot.get": frozenset({"founder", "worker", "scheduler"}),
@@ -75,11 +83,19 @@ COMMAND_KIND_MATRIX: dict[str, frozenset[str]] = {
     "script.cancel": frozenset({"founder", "worker"}),
     "script.show": frozenset({"founder", "scheduler", "worker", "mcp_service"}),
     "schedule.list_templates": frozenset({"founder", "scheduler", "worker", "mcp_service"}),
-    "schedule.status": frozenset({"founder", "scheduler", "worker", "mcp_service"}),
+    "schedule.status": frozenset({"founder", "scheduler", "worker", "mcp_service", "human"}),
     "schedule.tick": frozenset({"founder", "scheduler"}),
     "schedule.complete": frozenset({"founder", "scheduler"}),
     "schedule.run_on_demand": frozenset({"founder"}),
-    "ops.dashboard_read": frozenset({"founder", "system", "scheduler", "mcp_service"}),
+    "ops.dashboard_read": frozenset({"founder", "system", "scheduler", "mcp_service", "human"}),
+    # User auth (coordinator sole-writer). Unauthenticated API paths use system.
+    "auth.register_user": frozenset({"system", "founder"}),
+    "auth.login": frozenset({"system"}),
+    "auth.refresh": frozenset({"system"}),
+    "auth.logout": frozenset({"system", "founder", "human"}),
+    "auth.issue_pat": frozenset({"founder", "human"}),
+    "auth.revoke_credential": frozenset({"founder", "human"}),
+    "auth.throttle_check": frozenset({"system", "founder"}),
     "delegation.request": frozenset({"founder", "executive", "manager"}),
     "delegation.accept": frozenset({"founder", "executive", "manager"}),
     "delegation.decline": frozenset({"founder", "executive", "manager"}),
@@ -92,6 +108,7 @@ COMMAND_KIND_MATRIX: dict[str, frozenset[str]] = {
 # Explicit capability keys that can widen recovery for non-founder kinds.
 RECOVERY_CAPABILITY = "recovery.control_plane"
 FOUNDER_OPS_CAPABILITY = "founder.ops"
+OPS_READ_CAPABILITY = "ops.read"
 
 RECOVERY_COMMANDS = frozenset(
     {
@@ -111,6 +128,8 @@ FOUNDER_OPS_COMMANDS = frozenset(
         "runtime.hitm_exception",
     }
 )
+
+OPS_READ_COMMANDS = frozenset({"ops.dashboard_read"})
 
 # REST path -> command_type mapping for DRF enforcement
 REST_ENDPOINT_COMMANDS: dict[tuple[str, str], str] = {
@@ -150,14 +169,20 @@ def assert_command_allowed_for_kind(
     if command_type in FOUNDER_OPS_COMMANDS:
         if principal_kind == "founder" or FOUNDER_OPS_CAPABILITY in caps:
             return
-        raise AuthzDeniedError(
-            f"command {command_type} denied for principal kind {principal_kind}"
-        )
+        raise AuthzDeniedError(f"command {command_type} denied for principal kind {principal_kind}")
     if command_type in RECOVERY_COMMANDS:
         if principal_kind == "founder" or RECOVERY_CAPABILITY in caps:
             return
         raise AuthzDeniedError(
             f"recovery command {command_type} denied for principal kind {principal_kind}"
+        )
+    if command_type in OPS_READ_COMMANDS:
+        if principal_kind in {"founder", "system", "scheduler", "mcp_service"}:
+            return
+        if OPS_READ_CAPABILITY in caps:
+            return
+        raise AuthzDeniedError(
+            f"ops read denied for principal kind {principal_kind} without {OPS_READ_CAPABILITY}"
         )
 
     allowed = COMMAND_KIND_MATRIX.get(command_type)
@@ -169,6 +194,4 @@ def assert_command_allowed_for_kind(
     if principal_kind == "system" and command_type == "control_plane.resolve_token":
         return
     if principal_kind not in allowed:
-        raise AuthzDeniedError(
-            f"command {command_type} denied for principal kind {principal_kind}"
-        )
+        raise AuthzDeniedError(f"command {command_type} denied for principal kind {principal_kind}")
