@@ -8,8 +8,11 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 ### Added
 
 - **skills-scripts MCP lane** — sixth product MCP lane for publication-neutral skill/script catalog reads (`list_skills`, `get_skill`, `list_scripts`, `describe_script`) and `request_script_run` → coordinator `script.register` under initiating-principal dual-auth (never MCP-side shell or direct `script.execute`). Catalog, Compose service, bootstrap token env, and unit coverage included (`agentic/catalogs/mcp_lanes.json`, `src/flow_engine/mcp_lanes/`, `tests/unit/test_skills_scripts_mcp_lane.py`).
+- **`scripts/lib/http_wait.sh`** — sourceable HTTP readiness helper (`wait_http` returns nonzero on timeout; `fail` remains the fatal abort path). Optional `ORCH_HTTP_PROBE_SLEEP` (default `2`) for deterministic probes. Covered by `tests/unit/test_local_stack_up.py`.
 
 ### Changed
+
+- **`scripts/local_stack_up.sh`** — existing-stack health probe is non-fatal so a stale manifest with an unhealthy API reaches the rebuild path; post-Compose readiness still fails fatally via `wait_http … || fail "…"`. Env/token reuse and Compose semantics unchanged.
 
 - **R1 catalogs** — agentic catalog generation/validation, loadout bundles, and baseline activation assets (`agentic/`, `docs/r1-assets.md`).
 - **R2 runtime** — persistent worker delivery, credit reservations, recovery paths, and migration `003_r2_runtime.sql` (`docs/r2-runtime.md`).
