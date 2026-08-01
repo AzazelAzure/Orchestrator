@@ -3,7 +3,7 @@
 
 Uses HostRunner acceptance_mode (isolated empty read-only workspace, no tools).
 Writes redacted evidence under .tmp/provider-acceptance/<run_id>/.
-No automatic retry. Codex excluded.
+No automatic retry.
 """
 
 from __future__ import annotations
@@ -33,8 +33,9 @@ from flow_engine.providers.host_runner import (  # noqa: E402
 )
 
 ACCEPTANCE_TOKEN = "ACCEPTANCE_OK"
-DEFAULT_PROVIDERS = ("cursor", "claude")
+DEFAULT_PROVIDERS = ("codex", "cursor", "claude")
 PROVIDER_EXECUTABLES = {
+    "codex": "codex",
     "cursor": "cursor-agent",
     "claude": "claude",
 }
@@ -283,7 +284,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--provider",
         choices=[*DEFAULT_PROVIDERS, "all"],
         default="all",
-        help="Provider to exercise (default: all except codex)",
+        help="Provider to exercise (default: all)",
     )
     return parser.parse_args(argv)
 
