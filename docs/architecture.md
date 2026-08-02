@@ -117,4 +117,13 @@ backend network.
 Local `pytest` coverage exercises kernel concurrency, governance invariants,
 CLI, capabilities, MCP transport, R2 runtime controls, R3
 organization/delegation, and R4A control-plane boundaries. Passing tests does
-not by itself assert production readiness or close Headquarters gates.
+not by itself assert production readiness or close external governance gates.
+
+## Deep documentation
+
+Source-grounded guides and references live under `docs/guides/` and
+`docs/reference/`. Start from [`read-the-docs.md`](read-the-docs.md).
+
+- [Domain and lifecycle](guides/domain-and-lifecycle.md)
+- [Architecture and execution paths](guides/architecture-and-execution.md)
+- [Auth and security](guides/auth-and-security.md)

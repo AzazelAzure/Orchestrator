@@ -3,7 +3,7 @@
 R4A adds a Django REST Framework API, sole-writer coordinator HTTP service,
 Redis/Celery mock provider delivery, and Docker Compose for local active testing.
 
-R4B adds five capability-scoped MCP lane services with distinct identities.
+R4B adds six capability-scoped MCP lane services with distinct identities.
 Every lane tool calls DRF with both initiating-principal and MCP service-principal
 identity, enforces exact catalog tool snapshots, and denies cross-lane crafted
 calls. MCP containers never open SQLite or call providers.
@@ -117,7 +117,12 @@ tokens:
 - JSON endpoints: `POST /api/v1/auth/register|login|refresh|logout`,
   `GET /api/v1/auth/me`, `POST /api/v1/auth/token`,
   `POST /api/v1/auth/token/<id>/revoke`.
-- Anonymous allowlist is `/health/` only. `/ops/summary/` requires founder or
+- Anonymous routes today: `/health/`, `/api/schema/` (anonymous **200**), and
+  `/api/docs/` (OpenAPI uses drf-spectacular `SERVE_PERMISSIONS` default `AllowAny`
+  — follow-up risk for both). `/api/docs/` Swagger UI also needs Django `TEMPLATES`
+  APP_DIRS (not configured today — may **500** after auth passes; separate runtime
+  hardening/packaging work item).
+  `/ops/summary/` requires founder or
   capability `ops.read`. Ops-console uses a generic API bearer field and sends
   `Authorization` on summary fetch.
 - CLI: `flowctl auth login|logout|status|token` talks to `ORCH_API_URL`, stores
@@ -130,7 +135,9 @@ tokens:
 SQLite cannot alter CHECK constraints in place. Migration 008 rebuilds
 `control_plane_principals` (copy → drop → rename → recreate active digest
 index), then creates accounts/credentials/throttle tables. The migration runner
-is forward-only. **Before applying on a durable DB, take a SQLite backup.**
+is forward-only. **Before applying on a durable DB, take a verified backup** per
+[`docs/guides/operator-runbook.md`](guides/operator-runbook.md) (not raw `cp` of
+WAL-mode files while writers are active).
 Rollback is restore-from-backup (HitM/ops-approved), not an automatic down
 migration — a silent CHECK reverse would orphan `human` rows.
 
@@ -319,3 +326,11 @@ immutable exact identity would be learned only after dispatch.
   the mock provider), hosting, merge/deploy, publication
 - Closing `G-ORCH-SCRIPT-SANDBOX`, `G-ORCH-SCHEDULED-MAINTENANCE`, or
   `G-ORCH-LOCAL-CONTROL-PLANE` (R4D evidence does not close gates)
+
+## Deep documentation
+
+- [Domain and lifecycle](guides/domain-and-lifecycle.md)
+- [Auth and security](guides/auth-and-security.md) — principal kinds and delegation authz
+- [Architecture and execution paths](guides/architecture-and-execution.md) — MCP lane path
+- [Operator runbook](guides/operator-runbook.md) — `local_delegation_stress.py`
+- [Surface reference](reference/surfaces.md) — `flowctl org` / `delegation`

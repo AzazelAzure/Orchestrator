@@ -45,3 +45,9 @@ Do not hard-code machine-specific absolute paths in tracked docs or configs.
 ```bash
 pytest tests/unit/test_publication_candidate.py
 ```
+
+## Deep documentation
+
+- [Developer guide](guides/developer-guide.md) — extension points and test taxonomy
+- [Surface reference](reference/surfaces.md) — MCP tools and R4 lane catalog
+- [`read-the-docs.md`](read-the-docs.md) — agent routing cheat sheet
