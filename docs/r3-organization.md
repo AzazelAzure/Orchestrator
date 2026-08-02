@@ -63,3 +63,9 @@ discoverable via `agentic/catalogs/` and `skills/bundles/positional.json`.
 Catalog JSON stays an inert design contract for schema/hash discovery; runtime
 enforcement is the R3 services above. Scripts and MCP lane containers stay
 non-executable / inactive.
+
+## Deep documentation
+
+- [Domain and lifecycle](guides/domain-and-lifecycle.md) — dispatch pins and gates
+- [Auth and security](guides/auth-and-security.md) — delegation command matrix
+- [Surface reference](reference/surfaces.md) — `flowctl org` / `delegation` commands

@@ -67,3 +67,10 @@ before any new paid attempt.
 flowctl runtime preview|create|run|step|claim|pause|resume|cancel|result|heartbeat
 flowctl runtime reconcile|provider-limit|new-attempt|show|recover
 ```
+
+## Deep documentation
+
+- [Domain and lifecycle](guides/domain-and-lifecycle.md) — work/run transitions, credits
+- [Architecture and execution paths](guides/architecture-and-execution.md) — coordinator path
+- [Providers](guides/providers.md) — host runner and acceptance
+- [Surface reference](reference/surfaces.md) — full `flowctl runtime` tree

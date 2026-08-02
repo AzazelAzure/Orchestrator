@@ -1,322 +1,178 @@
-# Read the docs — Orchestrator onboarding
+# Read the docs — Orchestrator
 
-**Start here** if you are a human operator or an agent new to this repository.
-This guide orients you to purpose, architecture, surfaces, local setup, and
-boundaries before you touch code or claim verification.
+**Mandatory entrypoint.** Start here whether you are a new operator, contributor, or
+agent. This page routes you through a learning path and points to source-grounded
+deep guides — not a substitute for reading them when your task touches auth,
+providers, or the control plane.
 
-**Status:** Generic AGPL candidate — local control-plane active-test only. Passing
-tests and local evidence runs do **not** close Headquarters gates or assert
-production readiness.
-
----
-
-## What Orchestrator is
-
-- A **generic SQLite-backed workflow orchestrator core** (`flow_engine` import
-  package; distribution name `orchestrator`).
-- **Work items, queues, resources/leases, gates/waivers, findings, artifacts,**
-  and policy metadata with auditable history.
-- **CLI** (`flowctl`) for kernel and runtime operations.
-- **Layered runtime:** R1 inert catalogs → R2 governed runtime → R3
-  organization/delegation → R4 local control plane (DRF API, coordinator,
-  Redis/Celery mock delivery, MCP lanes, script sandbox, schedules).
-- **Optional read-only MCP** (`flowctl-mcp`) over approved project capabilities.
-- **Portable repo-local skills** under `skills/` (core, extended, positional bundles).
-
-## What Orchestrator is not
-
-- **Not** a product adapter for any specific business application.
-- **Not** Headquarters governance, installation policy, or private product trees.
-- **Not** a deployed SaaS or production-hosted control plane (R4 Compose is
-  **local active-test only**).
-- **Not** production-hardened by publication of this candidate alone.
-- **Not** authorized to close governance gates (`G-ORCH-LOCAL-CONTROL-PLANE`,
-  MVP/hosted gates, etc.) without independent review and operator evidence.
-- **Real provider adapters** (Codex/Cursor/Claude production bindings) are out
-  of scope unless separately authorized.
+**Status:** Generic AGPL **local candidate** — active-test and `pytest` evidence
+only. Passing tests or local acceptance does **not** assert production readiness or
+close external governance gates.
 
 ---
 
-## Architecture
+## What Orchestrator is (30 seconds)
 
-```mermaid
-flowchart TB
-  subgraph clients [Agent and operator surfaces]
-    CLI[flowctl CLI]
-    MCP[flowctl-mcp read-only]
-    REST[DRF REST API]
-    MCP5[R4 MCP lane containers x5]
-    SCHED[Scheduler / Celery Beat]
-    WORKER[Celery worker]
-    SCR[script-worker / script-runner]
-    OPS[ops-console / GET ops/summary]
-  end
+- SQLite-backed workflow kernel (`flow_engine` package; distribution `orchestrator`)
+- Work items, queues, leases, gates, findings, R2 runtime, R3 org/delegation
+- CLI (`flowctl`), optional read-only stdio MCP (`flowctl-mcp`)
+- R4 **local** control plane: DRF API, coordinator sole-writer, Redis/Celery mock
+  delivery, six MCP lanes, script sandbox, schedules, Compose harness
 
-  subgraph control [R4 control plane — local only]
-    API[DRF API :8000]
-    COORD[state-coordinator sole SQLite writer :9001 internal]
-  end
-
-  subgraph app [Application layer]
-    RT[R2 runtime service]
-    ORG[R3 org / delegation]
-    CAP[Read-only capabilities]
-  end
-
-  subgraph data [Persistence]
-    SQL[(SQLite WAL)]
-    REDIS[(Redis broker — non-authoritative)]
-  end
-
-  CLI --> COORD
-  MCP --> CAP
-  REST --> API
-  MCP5 --> API
-  SCHED --> API
-  WORKER --> COORD
-  SCR --> COORD
-  OPS --> API
-  API --> COORD
-  WORKER --> REDIS
-  SCHED --> REDIS
-  COORD --> RT
-  COORD --> ORG
-  RT --> SQL
-  ORG --> SQL
-  CAP --> SQL
-```
-
-**Sole-writer rule:** All authoritative mutations enter through
-`StateCoordinator.accept`. The DRF API, MCP lanes, and workers call the
-coordinator over authenticated HTTP; they do not open SQLite for writes.
-
-See [`architecture.md`](architecture.md) for the compact layer diagram and
-security posture summary.
+**Not:** a product adapter, hosted SaaS, or production-hardened deployment by
+publication alone.
 
 ---
 
-## R1–R4 layer map
+## Learning paths
 
-| Layer | Scope | Doc | In-tree today |
-|-------|--------|-----|----------------|
-| **R1** | Inert versioned catalogs (assets, MCP lanes, loadouts, scripts, policy) — discovery only, not runtime activation | [`r1-assets.md`](r1-assets.md) | `agentic/catalogs/` |
-| **R2** | Governed runs, attempts, credits, mock providers, recovery; `SystemTestGrant` compatibility path | [`r2-runtime.md`](r2-runtime.md) | Coordinator + `flowctl runtime …` |
-| **R3** | Organization profiles, assignments, scoped delegation, resolved loadouts, dispatch pins | [`r3-organization.md`](r3-organization.md) | `flowctl org …`, `flowctl delegation …` |
-| **R4** | Local control plane: DRF API (R4A), six MCP lanes (R4B), script sandbox + schedules (R4C), Compose active-test harness (R4D) | [`r4-control-plane.md`](r4-control-plane.md) | `docker/podman compose`, `scripts/r4d_active_test.sh` |
+Choose one path, then cross-link as needed.
 
-Read layer docs in order when implementing or reviewing a slice. Higher layers
-assume lower-layer invariants (sole writer, fail-closed authz, no silent gate bypass).
+### Path A — Operator (run something today)
 
----
+1. [Operator runbook](guides/operator-runbook.md) — minimal kernel → persistent Compose → acceptance ladder
+2. [Auth and security](guides/auth-and-security.md) — login, tokens, ops summary auth
+3. [Troubleshooting](guides/troubleshooting.md) — symptom index
 
-## How agents operate
+### Path B — Contributor (change code safely)
 
-Agents interact with Orchestrator through **three primary channels**. Choose by
-task mutability and surface policy.
+1. [`AGENTS.md`](../AGENTS.md) — non-negotiables
+2. [Developer guide](guides/developer-guide.md) — repo map, tests, migrations, CPPRD
+3. [Architecture and execution paths](guides/architecture-and-execution.md) — coordinator, DRF, workers
+4. [Domain and lifecycle](guides/domain-and-lifecycle.md) — states, gates, credits
 
-### `flowctl` (CLI)
+### Path C — Agent (observe vs mutate)
 
-- **Use for:** Direct kernel operations, R2 runtime lifecycle, R3 org/delegation,
-  recovery, founder step-up commands, local verification.
-- **Writes through:** Coordinator (direct adapter or via local coordinator URL in
-  control-plane mode).
-- **Surface:** `cli` (and `test` in fixtures).
-- **Examples:** `flowctl runtime create`, `flowctl org assign`, `flowctl runtime recover`.
-
-### MCP (read-only stdio + R4 lane MCP)
-
-- **Use for:** **Read-only** project context — repo health, open PRs, CI status,
-  work lookup, session brief (`flowctl-mcp` / five R4 lane containers).
-- **Default:** Read-only; no founder step-up or paid retry surfaces.
-- **R4 lanes:** Call DRF with dual identity (initiating principal + MCP service
-  principal); never touch SQLite or providers directly.
-- **Install:** `pip install -e '.[mcp]'` then `flowctl-mcp`.
-
-### DRF REST API
-
-- **Use for:** Service-bound mutations in the local control plane — runtime dispatch,
-  delivery jobs, MCP lane invoke, script execute, schedule tick/complete.
-- **Auth:** Bearer / `X-Orchestrator-Token`; server resolves principal, role, grant.
-- **Surface:** `rest` (plus `worker`, `schedule` for Celery services).
-- **Ops read:** `GET /ops/summary/` (merged observability for local ops console).
-
-### Routing cheat sheet for agents
-
-| Intent | Prefer | Avoid |
-|--------|--------|-------|
-| Status / work lookup / CI / PRs | MCP read tools or `GET /ops/summary/` | Mutating MCP for dispatch |
-| Create run, org assign, recover | `flowctl` or authenticated DRF when in Compose stack | Direct SQLite |
-| Mock provider delivery | DRF + worker path | Bypassing coordinator |
-| Governance claims | Verify live gate/register in HQ, not chat memory | Claiming gate closure from pytest alone |
-
-Headquarters installation routing (when present): prefer MCP read tools and
-`/ops/summary/` for observation; use DRF/`flowctl` for runtime ops; never direct
-SQLite from HQ hooks or product code.
+| Intent | Use | Avoid |
+|--------|-----|-------|
+| Repo / work / CI status | `flowctl-mcp` or `flowctl cap` | Mutating MCP for dispatch |
+| Runtime / org / recovery | `flowctl runtime` / `org` / `delegation` or authenticated DRF | Direct SQLite while Compose is up |
+| Ops dashboard data | `GET /ops/summary/` **with bearer** | Anonymous ops summary (403 when auth on) |
+| Governance claims | Verify live gate register in **your** installation policy repo | Claiming gate closure from `pytest` alone |
 
 ---
 
-## Surfaces cheat sheet
+## Deep guide index
 
-| Surface | Enum | Typical actor | Mutates authoritative state? |
-|---------|------|---------------|------------------------------|
-| CLI | `cli` | Operator, agent with grant | Yes (via coordinator) |
-| REST API | `rest` | API clients, MCP lanes (via DRF) | Yes (via coordinator) |
-| MCP stdio / lanes | `mcp` | IDE agents | Read-only (stdio); R4 lanes invoke DRF only |
-| Worker | `worker` | Celery mock delivery | Yes (heartbeat, result, delivery) |
-| Schedule | `schedule` | Celery Beat / scheduler token | Effects-only schedule completion |
-| Test | `test` | pytest fixtures | Yes in test DB only |
-
-Founder step-up operations (e.g. `runtime new-attempt`) require founder role +
-evidence on **CLI**; MCP and schedule surfaces cannot issue them.
-
-Principal bootstrap is **off by default** (`ORCH_BOOTSTRAP_PRINCIPALS=0`).
-Compose injects ephemeral tokens when enabled — never commit secrets.
+| # | Topic | Document |
+|---|--------|----------|
+| 1 | Domain, lifecycle, gates, credits, fail-closed invariants | [guides/domain-and-lifecycle.md](guides/domain-and-lifecycle.md) |
+| 2 | Architecture, coordinator, DRF, workers, trust boundaries | [guides/architecture-and-execution.md](guides/architecture-and-execution.md) |
+| 3 | Human auth, principals, anonymous allowlist, threat model | [guides/auth-and-security.md](guides/auth-and-security.md) |
+| 4 | Providers, host runner, acceptance, credit settlement | [guides/providers.md](guides/providers.md) |
+| 5 | Operator runbook (kernel, Compose, acceptance, shutdown) | [guides/operator-runbook.md](guides/operator-runbook.md) |
+| 6 | Developer guide (extensions, tests, CI, debugging) | [guides/developer-guide.md](guides/developer-guide.md) |
+| 7 | Troubleshooting by symptom | [guides/troubleshooting.md](guides/troubleshooting.md) |
+| 8 | API / CLI / MCP reference + glossary | [reference/surfaces.md](reference/surfaces.md), [reference/glossary.md](reference/glossary.md) |
 
 ---
 
-## Local quickstart
+## Layer docs (R1–R4)
 
-### Minimal (kernel + CLI)
+Read in order when implementing a slice. Higher layers assume lower invariants.
+
+| Layer | Document | In-tree |
+|-------|----------|---------|
+| R1 | [r1-assets.md](r1-assets.md) | `agentic/catalogs/` (inert) |
+| R2 | [r2-runtime.md](r2-runtime.md) | Coordinator + `flowctl runtime` |
+| R3 | [r3-organization.md](r3-organization.md) | `flowctl org` / `delegation` |
+| R4 | [r4-control-plane.md](r4-control-plane.md) | Compose, DRF, MCP lanes |
+
+Compact diagram: [architecture.md](architecture.md).
+
+---
+
+## Five-minute local start
+
+### Minimal kernel
 
 ```bash
 cd /path/to/Orchestrator
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
-pytest                    # verify before claims
-flowctl --help
+pytest -q
+flowctl init
+flowctl status
 ```
 
-Override DB path when needed: `FLOW_DB_PATH`.
-
-### Optional read-only MCP
-
-```bash
-pip install -e '.[mcp]'
-export FLOW_PROJECTS_CONFIG=/path/to/projects.json   # optional; see architecture.md
-flowctl-mcp
-```
-
-### R4 local control plane (active-test)
+### Persistent control plane (daily use)
 
 ```bash
 pip install -e '.[control-plane,dev]'
-bash scripts/r4d_active_test.sh    # one-shot evidence harness (tears down by default)
+bash scripts/local_stack_up.sh
+python3 scripts/local_stack_sync_tokens.py
+flowctl auth login --api-url http://127.0.0.1:8000
+python3 scripts/orchestrator_live_acceptance.py
 ```
 
-### Persistent local stack (daily agent use)
+| Endpoint | URL | Auth |
+|----------|-----|------|
+| API | `http://127.0.0.1:8000` | Bearer for mutations |
+| Health | `http://127.0.0.1:8000/health/` | None |
+| Ops summary | `http://127.0.0.1:8000/ops/summary/` | Founder or `ops.read` |
+| Coordinator | internal `:9001` | Not on host network |
+
+**Concurrent slices:** set distinct `ORCH_LOCAL_STACK_MANIFEST` per parallel process;
+default `.tmp/local-stack/manifest.json` is single-operator sequential only.
+
+**Work-item creation:** interim path is coordinator seed (`scripts/r4d_seed_work.py`
+via `local_stack_helpers.refresh_work_item`); authenticated work-submit API is deferred.
+
+---
+
+## Sole-writer rule (non-negotiable)
+
+All authoritative mutations → `StateCoordinator.accept`. API, MCP lanes, and workers
+call coordinator over authenticated HTTP. They do not open SQLite for writes.
+
+```mermaid
+flowchart LR
+  CLI[flowctl] --> COORD[state-coordinator]
+  API[DRF API] --> COORD
+  WORKER[Celery worker] --> COORD
+  COORD --> SQL[(SQLite WAL)]
+```
+
+Details: [architecture-and-execution.md](guides/architecture-and-execution.md).
+
+---
+
+## Installation boundary
+
+| This repository | External (installation-local) |
+|-----------------|------------------------------|
+| Product runtime, Compose, `flow_engine`, public docs | Governance registers, private hooks, product adapters |
+
+Coupling is via **installation-local** bridge tools and env configuration only.
+Do not hardwire private paths or branding into `src/flow_engine/`.
+
+---
+
+## Skills and agentic catalogs
+
+- [skills.md](skills.md) — repo-local skill bundles
+- [`skills/`](../skills/) — packages
+- [`agentic/manifest.json`](../agentic/manifest.json) — catalog index
+
+---
+
+## Verification and docs hygiene
 
 ```bash
-bash scripts/local_stack_up.sh              # keeps running; writes .tmp/local-stack/manifest.json
-python3 scripts/local_stack_sync_tokens.py  # if env rotated but coordinator volume retained
-python3 scripts/orchestrator_live_acceptance.py   # full live API acceptance
-python3 scripts/local_delegation_stress.py  # org seed + MCP delegation lifecycle
-python3 scripts/local_stress_test.py        # L1/L2 + live acceptance + delegation + HQ bridge
+pytest                                          # before verification claims
+python3 docs/_audit/check_links.py              # relative link check
+flowctl --help                                  # CLI drift check
 ```
 
-Set `ORCH_HQ_ROOT` to your local Headquarters checkout when it is not a sibling of the Orchestrator repo.
-
-**Concurrent governed slices (`ORCH_LOCAL_STACK_MANIFEST`):** the default
-manifest path (`.tmp/local-stack/manifest.json`) is safe for sequential,
-single-operator use only. `refresh_work_item()` persists to one explicit
-path — the same path its caller loaded the manifest from — so it never
-diverges from a stale ambient env var while mutating an unrelated in-memory
-manifest. Any concurrent governed dispatch (more than one lifecycle helper
-invocation against this host at once) **must** set a distinct
-`ORCH_LOCAL_STACK_MANIFEST` value per slice; the manifest is a local cache
-seeded by the coordinator, not the cross-slice source of truth — the
-Orchestrator work record's `work_item_id` is authoritative. No file locking
-is required or added: mandatory distinct paths close the evidenced
-collision (concurrent slices previously overwriting each other's
-`work_item_id` / `budget_scope_id` on one shared file).
-
-**Interim work-item creation:** authenticated work-item creation has no
-dedicated API surface yet. The supported interim path remains the
-coordinator sole-writer adapter (`r4d_seed_work.py`, invoked through
-`refresh_work_item`); an authenticated/idempotent work-submit surface is a
-separate, deferred product design item.
-
-`scripts/local_delegation_stress.py` and `scripts/local_stress_test.py` send
-`Authorization: Bearer <ORCH_TOKEN_FOUNDER>` (sourced from the stack env file
-already referenced by the manifest) on their ops-summary check, mirroring
-`scripts/orchestrator_live_acceptance.py`. Neither script retries
-anonymously or treats an HTTP 403 as a healthy/reachable result; a missing
-token is reported as an explicit failure.
-
-After Compose is up:
-
-- API: `http://127.0.0.1:8000`
-- Ops summary: `http://127.0.0.1:8000/ops/summary/` (`ORCH_SUMMARY_URL`)
-- Coordinator: internal network only (port 9001 not published)
-
-Run `pytest` before claiming verification. Label partial runs explicitly.
+Label partial test runs explicitly. Changelog: [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
-## Governance model
+## Suggested reading order (full)
 
-Orchestrator embeds **generic governance mechanics**; Headquarters owns
-installation gates and reconciliation.
-
-### In-engine controls
-
-- **Gates and waivers** on work items — required gates block completion; waivers
-  are auditable, not silent bypass.
-- **Findings** with amendment history for material defects.
-- **R2 credits and concurrency envelopes** — budget scopes shared across campaigns;
-  no automatic paid retry without policy path.
-- **R3 precedence and dispatch pins** — deny-wins, fail-closed hash mismatch,
-  independent review separation.
-- **R4 authz** — principal/role/grant resolved server-side; surface allowlists per
-  principal kind.
-
-### Agent non-negotiables (this repo)
-
-See [`AGENTS.md`](../AGENTS.md): no secrets, no private absolute paths in tracked
-files, no product adapter creep, trust-but-verify before merge/release claims,
-tests before verification claims, CPPRD for material changes.
-
-### Gates (Headquarters — verify live)
-
-Do **not** treat local pytest or R4D evidence as gate closure. Verify live state in
-Headquarters `gate-register.md` and reconciled docket before claiming dependent
-work is authorized. Silence and agent consensus never close a required gate.
-
----
-
-## Installation boundary (Headquarters ↔ Orchestrator)
-
-| Repo | Owns | Does not own |
-|------|------|--------------|
-| **Orchestrator** (this repo) | Product runtime, Compose stack, flow_engine, generic docs/skills | HQ governance docs, installation hooks, private product adapters |
-| **Headquarters** | Governance, programs, ops, `bin/hq-*`, Cursor hooks | Orchestrator SQLite, product runtime internals |
-
-**Coupling rule:** HQ ↔ Orchestrator via **installation-local hooks and bin tools
-only** (`hq-orch-bridge`, `hq-delegate`, session hooks). **Do not** hardwire
-Headquarters tools or private paths into public Orchestrator product code.
-
-Hooks are installation-local; they are not imported into the Orchestrator package.
-Product code stays generic and portable.
-
----
-
-## Further reading index
-
-| Topic | Location |
-|-------|----------|
-| Repository rules for agents | [`AGENTS.md`](../AGENTS.md) |
-| Layer diagram and core concepts | [`architecture.md`](architecture.md) |
-| R1 inert catalogs | [`r1-assets.md`](r1-assets.md) |
-| R2 runtime / coordinator | [`r2-runtime.md`](r2-runtime.md) |
-| R3 org / delegation | [`r3-organization.md`](r3-organization.md) |
-| R4 control plane / Compose / API | [`r4-control-plane.md`](r4-control-plane.md) |
-| Skills discovery and bundles | [`skills.md`](skills.md) |
-| Repo-local skill packages | [`../skills/`](../skills/) |
-| Agentic manifest / catalogs | [`../agentic/manifest.json`](../agentic/manifest.json) |
-| R4D active-test script | [`../scripts/r4d_active_test.sh`](../scripts/r4d_active_test.sh) |
-| Headquarters bootstrap (installation) | `~/Headquarters/AGENTS.md` (when working across repos) |
-| HQ Orchestrator program / gates | `~/Headquarters/programs/orchestrator-platform/` |
-
-**Suggested reading order:** this file → [`AGENTS.md`](../AGENTS.md) →
-[`architecture.md`](architecture.md) → relevant `r*.md` for your slice →
-task-specific `skills/*/SKILL.md`.
+1. This file
+2. [`AGENTS.md`](../AGENTS.md)
+3. [architecture.md](architecture.md)
+4. Relevant **deep guide** from the index above for your task
+5. Matching `r*.md` layer doc
+6. Task-specific `skills/*/SKILL.md`

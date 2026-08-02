@@ -13,6 +13,24 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   (`gpt-5.6-sol`). Acceptance mode, read-only isolation, one call per script, no
   automatic retry (live runs require `.local/provider/codex.pins.env`).
 
+- **Deep documentation set (work item `01KZ08CDQ5KT9W1PTYMMJ0E9CV`)** — Replaced
+  surface-level onboarding with source-grounded guides under `docs/guides/` and
+  `docs/reference/`: domain/lifecycle, architecture/execution paths, auth/security,
+  providers, operator runbook, developer/test guide, troubleshooting playbook, and
+  API/CLI/MCP surface reference + glossary. `docs/read-the-docs.md` is now the
+  mandatory learning-path router. Layer docs (`architecture.md`, `r2`–`r4`,
+  `skills.md`) link into deep pages without contradicting sole-writer, fail-closed
+  auth, and local-candidate vs live-acceptance scope labels. Added
+  `docs/_audit/check_links.py` for relative link validation. Fresh-review fixes:
+  anonymous OpenAPI schema/docs behavior (drf-spectacular `SERVE_PERMISSIONS`),
+  `founder.ops` vs coordinator founder-role gate, `mcp/profiles` principal kinds,
+  migration `findings` attribution, `FLOW_DB_PATH` citation, six-lane wording in
+  `r4-control-plane.md`. Added `test_openapi_schema_anonymous` (anonymous schema **200**)
+  and `test_openapi_docs_serve_permissions_allow_any` (docs `AllowAny` at permission
+  layer only — no HTTP GET that tolerates template **500**). Anonymous `/api/docs/` may
+  still **500** locally when `drf_spectacular/swagger_ui.html` is missing; runtime
+  hardening/packaging tracked as a separate work item.
+
 ### Fixed
 
 - **Local-stack manifest isolation and stress-script founder auth (ORCH-LI)** —
