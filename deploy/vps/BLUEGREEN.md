@@ -13,13 +13,22 @@ Orchestrator owns **deploy tooling** and **per-app upstream selection** for its 
 - **Single SQLite writer:** only the coordinator mounts `orchestrator-data`.
 - **No per-color database duplication.**
 - Color API containers are stateless frontends (`COORDINATOR_URL` → singleton coordinator).
+- **Compose identity:** all VPS compose wrappers `cd "$ORCH_ROOT"` with `COMPOSE_PROJECT_NAME=orchestrator` (override via `ORCH_COMPOSE_PROJECT`).
 
-## Port matrix (loopback / host-gateway)
+## Port matrix (host-published; firewall-contained)
+
+Presentation API and console ports bind on all host interfaces so the rootless `fm-beta` proxy reaches them via `host.containers.internal`. **Only `:8443` is the intended public entry** — host firewall must block external access to `8000`, `8010`, `8081`, and `8091`. Redeploy grants require firewall capture and out-of-band negative probes before/after recreation.
 
 | Slot | Blue (live default) | Green (idle) |
 |------|---------------------|--------------|
-| API | `127.0.0.1:8000` | `127.0.0.1:8010` |
-| Ops console | `127.0.0.1:8081` | `127.0.0.1:8091` |
+| API | host `:8000` | host `:8010` |
+| Ops console | host `:8081` | host `:8091` |
+
+## Per-color isolated console networks
+
+`run_ops_console.sh` creates `orchestrator-console-{color}`, connects **exactly one** matching `api-{color}` container with alias `api`, and runs the console on that network. nginx upstream `api:8000` resolves deterministically — no shared `api` alias across both presentation services on `orchestrator_frontend`.
+
+Recreating an API container requires re-running `run_ops_console.sh` for that color to re-attach the alias.
 
 ## Installation edge selector (generic contract)
 
@@ -55,11 +64,14 @@ From the Orchestrator repo on the VPS (`~/orchestrator`):
 # Shared plane refresh (preserves orchestrator-data volume; never use down -v)
 bash deploy/vps/vps_bootstrap.sh orch-shared
 
-# Materialize idle green (public selector stays blue)
+# Materialize idle green first (repair grant; public selector stays blue)
 ORCH_COLOR_MATERIALIZE_ONLY=1 bash deploy/vps/orch_color.sh deploy --color green
 ORCH_COLOR_MATERIALIZE_ONLY=1 bash deploy/vps/orch_color.sh smoke --color green
 
-# Status and digests per slot
+# Refresh live blue presentation
+ORCH_COLOR_MATERIALIZE_ONLY=1 bash deploy/vps/orch_color.sh deploy --color blue
+
+# Status and digests per slot (exact-one discovery; fails on ambiguous containers)
 bash deploy/vps/orch_color.sh status
 ```
 
@@ -73,24 +85,26 @@ bash deploy/vps/orch_color.sh status
 
 ## Off-color smoke (no DNS/ZT mutation)
 
-Validate the idle slot on loopback before any public flip:
+Validate the idle slot on host-published ports before any public flip:
 
 ```bash
 curl -fsS http://127.0.0.1:8010/health/
 curl -fsS http://127.0.0.1:8091/
-# Bearer schema/docs against idle API (see orch_color.sh smoke)
+# Bearer schema/docs + console /ops/summary/ proxy (see orch_color.sh smoke)
 ```
 
 Origin Host-header curls through the edge proxy (`https://127.0.0.1:8443/...`) remain the pre-promotion bar for sibling products.
 
-## Console build-time API URL
-
-Each color console image is built with an explicit `VITE_API_BASE_URL`. Static console delivery on the idle port does **not** prove browser E2E routing to the idle API — test the idle API directly on loopback.
-
 ## Guards
 
 - **Inactive-color sibling restart:** presentation deploy uses `--no-deps` and aborts if shared-plane container IDs change.
-- **Per-slot identity:** `orch_color.sh status` reports per-color image digest (not checkout HEAD alone).
+- **Per-slot identity:** `orch_color.sh status` reports per-color image digest; zero or multiple matching containers fail closed.
+- **Script-runner:** `healthcheck.sh` requires `script-runner` running and `script-spool-init` successfully exited.
 - **Reboot:** disable legacy `ops-console.service`; shared plane systemd unit excludes presentation API.
+- **Build context:** `docker-compose.bluegreen.yml` uses `build.context: .` (repo root when CWD is `$ORCH_ROOT`).
 
-See [`README.md`](README.md) for full backup, disable, and evidence order.
+## Repair redeploy abort bars
+
+Abort on: selector ≠ blue; coordinator count ≠ 1; volume ≠ `orchestrator_orchestrator-data`; backup integrity failure; protected path deletion during sync; missing/duplicate service discovery; exited script-runner; console cross-color routing; external reachability of `8000/8010/8081/8091`; sibling HTTP regression.
+
+See [`README.md`](README.md) for full backup, sync contract, and evidence order.

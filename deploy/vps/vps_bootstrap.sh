@@ -10,9 +10,16 @@ COMPOSE="${COMPOSE:-podman-compose}"
 FM_PROJECT="${FM_PROJECT:-fm-beta}"
 
 SHARED_SERVICES=(redis coordinator worker scheduler script-spool-init script-runner script-worker)
+ORCH_COMPOSE_PROJECT="${ORCH_COMPOSE_PROJECT:-orchestrator}"
 
 orch_compose() {
-  ${COMPOSE} -f "$ORCH_ROOT/docker-compose.yml" -f "$ORCH_ROOT/deploy/vps/docker-compose.vps.yml" --env-file "$ORCH_ROOT/.env.vps" "$@"
+  (
+    cd "$ORCH_ROOT"
+    COMPOSE_PROJECT_NAME="$ORCH_COMPOSE_PROJECT" ${COMPOSE} \
+      -f docker-compose.yml \
+      -f deploy/vps/docker-compose.vps.yml \
+      --env-file .env.vps "$@"
+  )
 }
 
 log() { printf '[vps-bootstrap] %s\n' "$*"; }
@@ -43,6 +50,14 @@ ensure_attestation() {
   source "$ORCH_ROOT/.env.vps"
   set +a
   (cd "$ORCH_ROOT" && bash scripts/build_script_runner_attestation.sh)
+  local att_path="$ORCH_ROOT/deploy/attestations/script-runner.attestation.json"
+  if [[ ! -f "$att_path" ]]; then
+    att_path="$ORCH_ROOT/deploy/attestations/script-runner.testing.attestation.json"
+  fi
+  if [[ ! -f "$att_path" || -d "$att_path" ]]; then
+    log "ERROR: attestation path is not a regular JSON file: $att_path"
+    exit 1
+  fi
   python3 - <<'PY' "$ORCH_ROOT"
 import json, pathlib, re, sys
 root = pathlib.Path(sys.argv[1])
@@ -67,6 +82,7 @@ PY
 up_shared_plane() {
   log "starting singleton shared mutation plane (no presentation api)"
   bash "$ORCH_ROOT/deploy/vps/orch_color.sh" deploy shared
+  ORCH_HEALTH_COLOR=shared bash "$ORCH_ROOT/deploy/vps/healthcheck.sh"
 }
 
 materialize_presentation() {

@@ -98,6 +98,30 @@ def test_bluegreen_presentation_only() -> None:
     assert not (services & FORBIDDEN_IN_BLUEGREEN)
 
 
+def test_bluegreen_build_context_is_repo_root() -> None:
+    bg = _load(BLUEGREEN)
+    for name in PRESENTATION_API:
+        ctx = bg["services"][name]["build"]["context"]
+        assert ctx == ".", f"{name} build.context must be '.' not {ctx!r}"
+
+
+def test_bluegreen_no_shared_api_alias() -> None:
+    bg = _load(BLUEGREEN)
+    for name in PRESENTATION_API:
+        networks = bg["services"][name].get("networks", [])
+        assert networks == ["frontend", "backend"], f"{name} networks: {networks}"
+        aliases = bg["services"][name].get("network_aliases") or []
+        assert "api" not in aliases, f"{name} must not share network_aliases api"
+
+
+def test_bluegreen_host_published_ports() -> None:
+    bg = _load(BLUEGREEN)
+    blue_ports = [str(p) for p in bg["services"]["api-blue"]["ports"]]
+    green_ports = [str(p) for p in bg["services"]["api-green"]["ports"]]
+    assert blue_ports == ["8000:8000"]
+    assert green_ports == ["8010:8000"]
+
+
 def test_merged_vps_stack_has_one_coordinator_and_data_volume() -> None:
     merged = _merge_compose(BASE, VPS)
     coordinators = [n for n, s in merged["services"].items() if n == "coordinator"]

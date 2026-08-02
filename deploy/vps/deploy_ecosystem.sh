@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Local driver: rsync ecosystem artifacts to the HFM VPS and run vps_bootstrap.sh.
 #
+# Orchestrator sync contract (ORCH-VPS-REPAIR-01):
+#   - Default: rsync -az WITHOUT --delete (first repair sync and routine default).
+#   - Opt-in: pass --delete for Orchestrator tree only after pre-sync backup/integrity bars.
+#   - Never delete server-local: .env.vps, deploy/vps/.state/, deploy/attestations/, backups/.
+#   - Durable SQLite backups must live outside ~/orchestrator/ (e.g. ~/backups/orchestrator/).
+#
 # Usage:
-#   ./deploy/vps/deploy_ecosystem.sh [--dry-run] [--skip-hfm] [--skip-orch] [--skip-portfolio]
+#   ./deploy/vps/deploy_ecosystem.sh [--dry-run] [--delete] [--skip-hfm] [--skip-orch] [--skip-portfolio]
 #
 # Reads VPS SSH target from:
 #   VPS_SSH_TARGET, FM_SPRINT_SSH, or HFM repo .env VPS_ORIGIN_IP (dev@IP).
@@ -12,18 +18,27 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HFM_ROOT="${HFM_ROOT:-$HOME/Projects/HiveSolutions/Finance_Manager/HFM}"
 PORT_ROOT="${PORT_ROOT:-$HOME/Projects/Portfolio}"
 DRY_RUN=0
+ORCH_RSYNC_DELETE=0
 SKIP_HFM=0
 SKIP_ORCH=0
 SKIP_PORT=0
 
+ORCH_PROTECTED_EXCLUDES=(
+  --exclude '/.env.vps'
+  --exclude '/deploy/vps/.state/'
+  --exclude '/deploy/attestations/'
+  --exclude '/backups/'
+)
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --delete) ORCH_RSYNC_DELETE=1; shift ;;
     --skip-hfm) SKIP_HFM=1; shift ;;
     --skip-orch) SKIP_ORCH=1; shift ;;
     --skip-portfolio) SKIP_PORT=1; shift ;;
     -h|--help)
-      sed -n '1,20p' "$0"
+      sed -n '1,25p' "$0"
       exit 0
       ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -57,10 +72,21 @@ rsync_to() {
   run rsync -az --delete "${@}" "$src" "${VPS_SSH_TARGET}:$dest"
 }
 
+rsync_orchestrator() {
+  local delete_args=()
+  if [[ "$ORCH_RSYNC_DELETE" -eq 1 ]]; then
+    delete_args=(--delete)
+  fi
+  run rsync -az "${delete_args[@]}" \
+    --exclude '.git' --exclude '.venv' --exclude '.tmp' --exclude '__pycache__' --exclude '.pytest_cache' \
+    "${ORCH_PROTECTED_EXCLUDES[@]}" \
+    "$ROOT/" "${VPS_SSH_TARGET}:~/orchestrator/"
+}
+
 log() { printf '[deploy-ecosystem] %s\n' "$*"; }
 
 load_vps_ssh
-log "target=$VPS_SSH_TARGET"
+log "target=$VPS_SSH_TARGET orch_delete=${ORCH_RSYNC_DELETE}"
 
 run ssh -o BatchMode=yes "$VPS_SSH_TARGET" 'mkdir -p ~/orchestrator ~/portfolio ~/finance_manager/proxy/conf.d ~/finance_manager/proxy/certs'
 
@@ -74,9 +100,8 @@ if [[ "$SKIP_HFM" -eq 0 ]]; then
 fi
 
 if [[ "$SKIP_ORCH" -eq 0 ]]; then
-  log "sync Orchestrator"
-  rsync_to "$ROOT/" '~/orchestrator/' \
-    --exclude '.git' --exclude '.venv' --exclude '.tmp' --exclude '__pycache__' --exclude '.pytest_cache'
+  log "sync Orchestrator (protected excludes; delete=${ORCH_RSYNC_DELETE})"
+  rsync_orchestrator
 fi
 
 if [[ "$SKIP_PORT" -eq 0 ]]; then

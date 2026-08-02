@@ -7,6 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "deploy/vps/orch_color.sh"
 BOOTSTRAP = ROOT / "deploy/vps/vps_bootstrap.sh"
+CONSOLE = ROOT / "deploy/vps/run_ops_console.sh"
+HEALTH = ROOT / "deploy/vps/healthcheck.sh"
+ECOSYSTEM = ROOT / "deploy/vps/deploy_ecosystem.sh"
 ECOSYSTEM_UNIT = ROOT / "deploy/vps/systemd/orchestrator-ecosystem.service"
 
 
@@ -32,6 +35,10 @@ def test_orch_color_script_exists_and_is_executable_contract() -> None:
         "api-green",
         "write_selector_map",
         "reload_edge_proxy",
+        'cd "$ORCH_ROOT"',
+        "COMPOSE_PROJECT_NAME",
+        "ambiguous container count",
+        "/ops/summary/",
     ):
         assert needle in text, f"missing {needle!r} in orch_color.sh"
 
@@ -52,10 +59,18 @@ def test_orch_color_materialize_blocks_switch() -> None:
 def test_bootstrap_drops_tracked_sed_and_singleton_console_enable() -> None:
     text = _read(BOOTSTRAP)
     assert "patch_orch_base_ports" not in text
-    assert "sed -i" not in text or "thedirectorate" in text  # hostname patch only
+    assert "sed -i" not in text or "thedirectorate" in text
     assert "ops-console.service portfolio-stub" not in text
     assert "disable-singleton-console" in text
     assert "down -v" not in text
+
+
+def test_bootstrap_pins_compose_and_requires_attestation_file() -> None:
+    text = _read(BOOTSTRAP)
+    assert 'cd "$ORCH_ROOT"' in text
+    assert "COMPOSE_PROJECT_NAME" in text
+    assert "attestation path is not a regular JSON file" in text
+    assert "ORCH_HEALTH_COLOR=shared" in text
 
 
 def test_ecosystem_unit_shared_plane_only_no_api() -> None:
@@ -74,9 +89,36 @@ def test_ecosystem_unit_shared_plane_only_no_api() -> None:
         assert svc in text
 
 
-def test_ops_console_script_color_ports_and_build_arg() -> None:
-    text = _read(ROOT / "deploy/vps/run_ops_console.sh")
+def test_ops_console_isolated_per_color_network() -> None:
+    text = _read(CONSOLE)
     assert "--color" in text
-    assert "VITE_API_BASE_URL" in text
+    assert "orchestrator-console-" in text
+    assert "network connect --alias api" in text
+    assert "ambiguous API container count" in text
+    assert "VITE_API_BASE_URL" not in text
     assert "8081" in text and "8091" in text
-    assert "idle API routing" in text or "does not prove" in text
+    assert "COMPOSE_PROJECT_NAME" in text
+
+
+def test_healthcheck_strict_script_runner_semantics() -> None:
+    text = _read(HEALTH)
+    assert 'cd "$ORCH_ROOT"' in text
+    assert "script-spool-init" in text
+    assert "script-runner" in text
+    assert "ambiguous container count" in text
+    assert "healthy" in text
+
+
+def test_deploy_ecosystem_orchestrator_sync_contract() -> None:
+    text = _read(ECOSYSTEM)
+    assert "ORCH_PROTECTED_EXCLUDES" in text
+    for exclude in (
+        "--exclude '/.env.vps'",
+        "--exclude '/deploy/vps/.state/'",
+        "--exclude '/deploy/attestations/'",
+        "--exclude '/backups/'",
+    ):
+        assert exclude in text, f"missing protected exclude {exclude}"
+    assert "ORCH_RSYNC_DELETE=0" in text
+    assert "--delete) ORCH_RSYNC_DELETE=1" in text
+    assert "rsync_orchestrator" in text

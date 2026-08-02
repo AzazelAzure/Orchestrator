@@ -7,6 +7,23 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-VPS-REPAIR-01** — VPS materialization repair: Orchestrator rsync defaults to
+  **no-delete** with anchored protected excludes (`.env.vps`, `deploy/vps/.state/`,
+  attestations, backups); opt-in `--delete` for Orchestrator only. Pinned Compose
+  project/CWD (`ORCH_COMPOSE_PROJECT`, `cd "$ORCH_ROOT"`) in `orch_color.sh`,
+  `healthcheck.sh`, and `vps_bootstrap.sh`; exact-one container discovery; blue/green
+  `build.context: .`; per-color isolated console networks (`orchestrator-console-{color}`)
+  with single `api` alias; strict script-runner/spool-init health semantics; guarded
+  fake-binary deploy script tests. Does **not** claim redeploy acceptance or gate closure.
+
+### Changed
+
+- **VPS deploy scripts** — `run_ops_console.sh` drops unused `VITE_API_BASE_URL` build-arg
+  (ops-console image is static nginx); `orch_color.sh` smoke adds authenticated console
+  `/ops/summary/` proxy check; shared-plane bootstrap runs `healthcheck.sh shared` after up.
+
+### Added
+
 - **ORCH-DOCS-VPS-BG-01** — Authenticated OpenAPI schema/docs (`TEMPLATES` +
   `SERVE_PERMISSIONS`); VPS blue/green presentation tier (`api-blue`/`api-green`,
   per-color ops-console, `orch_color.sh`, `healthcheck.sh`, systemd shared-plane-only
