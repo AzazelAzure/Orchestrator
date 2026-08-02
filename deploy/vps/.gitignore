@@ -1,0 +1,2 @@
+# Orchestrator-owned VPS runtime state (selector rollback, deploy fingerprints).
+.state/

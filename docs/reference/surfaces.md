@@ -207,19 +207,16 @@ Base URL (local stack): `http://127.0.0.1:8000`.
 |--------|------|------|
 | GET | `/health/` | — |
 | GET | `/ops/summary/` | Ops |
-| GET | `/api/schema/` | — (`drf-spectacular` `SERVE_PERMISSIONS` default `AllowAny`; anonymous **200**) |
-| GET | `/api/docs/` | — (same `AllowAny` permission; UI may **500** locally) |
+| GET | `/api/schema/` | Bearer required (anonymous **401/403**) |
+| GET | `/api/docs/` | Bearer required; Swagger HTML **200** when authenticated |
 
-OpenAPI schema served by `drf-spectacular` (`control_plane/urls.py`). These views
-use class-level `SERVE_PERMISSIONS`, not `REST_FRAMEWORK.DEFAULT_PERMISSION_CLASSES`.
-Anonymous requests receive **200** on `/api/schema/` (`test_openapi_schema_anonymous`).
-`/api/docs/` allows anonymous access at the permission layer
-(`test_openapi_docs_serve_permissions_allow_any`); Swagger UI HTML needs Django
-`TEMPLATES` APP_DIRS (not configured in `control_plane/settings.py` today — may
-**500** locally when `drf_spectacular/swagger_ui.html` is missing).
-Document anonymous schema exposure and docs UI packaging as **follow-up risks** for a
-separate runtime hardening/packaging work item — full API surface visible without
-authentication once schema is reachable.
+OpenAPI schema served by `drf-spectacular` (`control_plane/urls.py`). Schema and
+Swagger UI require authentication (`SPECTACULAR_SETTINGS["SERVE_PERMISSIONS"]`).
+Anonymous requests receive **401/403** (`test_openapi_schema_anonymous_denied`,
+`test_openapi_docs_anonymous_denied`). Authenticated bearer requests receive schema
+**200** and rendered Swagger HTML **200** (`test_openapi_docs_authenticated_html`).
+Only `GET /health/` is anonymously reachable among Django HTML/JSON surfaces besides
+the auth registration/login endpoints.
 
 ---
 

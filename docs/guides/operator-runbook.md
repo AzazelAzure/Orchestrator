@@ -81,8 +81,8 @@ If you customized `ORCH_LOCAL_STACK_DIR`, read `compose_project` and `env_file` 
 | DRF API | `http://127.0.0.1:8000` | Bearer for authenticated routes |
 | Health | `http://127.0.0.1:8000/health/` | No auth |
 | Ops summary | `http://127.0.0.1:8000/ops/summary/` | **Auth required** (founder or `ops.read`) |
-| OpenAPI schema | `http://127.0.0.1:8000/api/schema/` | **No auth today** (drf-spectacular `AllowAny`; anonymous **200** — follow-up risk) |
-| OpenAPI UI | `http://127.0.0.1:8000/api/docs/` | **No auth today** (same `AllowAny` permission); needs Django `TEMPLATES` APP_DIRS — may **500** locally until packaging fix (separate work item) |
+| OpenAPI schema | `http://127.0.0.1:8000/api/schema/` | **Bearer required** (anonymous **401/403**) |
+| OpenAPI UI | `http://127.0.0.1:8000/api/docs/` | **Bearer required**; Swagger HTML **200** when authenticated |
 | Coordinator | `http://coordinator:9001` (internal) | **Not published** to host |
 
 Human login:

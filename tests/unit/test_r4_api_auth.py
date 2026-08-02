@@ -14,10 +14,7 @@ os.environ.setdefault("DJANGO_DEBUG", "0")
 pytest.importorskip("django")
 pytest.importorskip("rest_framework")
 
-from django.conf import settings
-from django.urls import resolve
-from rest_framework.permissions import AllowAny
-from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework.test import APIClient
 
 from flow_engine.application import ensure_queue, init_project, submit_work
 from flow_engine.control_plane.api.views_helpers import set_inprocess_client
@@ -193,31 +190,25 @@ def test_openapi_schema_available(r4_api) -> None:
     assert resp.status_code == 200
 
 
-def test_openapi_schema_anonymous(r4_api) -> None:
-    """drf-spectacular SERVE_PERMISSIONS defaults to AllowAny — documents follow-up risk."""
+def test_openapi_schema_anonymous_denied(r4_api) -> None:
     api, _ = r4_api
     resp = api.get("/api/schema/")
+    assert resp.status_code in {401, 403}
+
+
+def test_openapi_docs_anonymous_denied(r4_api) -> None:
+    api, _ = r4_api
+    resp = api.get("/api/docs/")
+    assert resp.status_code in {401, 403}
+
+
+def test_openapi_docs_authenticated_html(r4_api) -> None:
+    api, _ = r4_api
+    _auth(api, "founder")
+    resp = api.get("/api/docs/")
     assert resp.status_code == 200
-
-
-def test_openapi_docs_serve_permissions_allow_any(r4_api) -> None:
-    """SpectacularSwaggerView SERVE_PERMISSIONS defaults to AllowAny — follow-up risk.
-
-    Authorization only: does not GET /api/docs/ because local template rendering may
-    500 when drf_spectacular/swagger_ui.html is unavailable (packaging defect).
-    """
-    _api, _ = r4_api
-    assert "SERVE_PERMISSIONS" not in settings.SPECTACULAR_SETTINGS
-
-    view_cls = resolve("/api/docs/").func.view_class
-    assert any(
-        perm is AllowAny or (isinstance(perm, type) and issubclass(perm, AllowAny))
-        for perm in view_cls.permission_classes
-    )
-
-    view = view_cls()
-    drf_request = view.initialize_request(APIRequestFactory().get("/api/docs/"))
-    view.check_permissions(drf_request)
+    assert "text/html" in (resp.get("Content-Type") or "")
+    assert b"swagger" in resp.content.lower() or b"openapi" in resp.content.lower()
 
 
 def test_async_run_returns_operation_id(r4_api) -> None:

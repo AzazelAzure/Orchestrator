@@ -128,17 +128,12 @@ Anonymous REST allowlist (no bearer required):
 | `POST /api/v1/auth/logout` | Session revoke (token in body) |
 | `POST /api/v1/auth/register` | **403** unless `ORCH_ALLOW_USER_REGISTRATION=1`; founder bearer can register under founder authority |
 
-`GET /api/schema/` is anonymously reachable and returns **200** today: drf-spectacular
-views set `permission_classes` from `SERVE_PERMISSIONS` (default `AllowAny`);
-`SPECTACULAR_SETTINGS` in `control_plane/settings.py` does not override it
-(`test_openapi_schema_anonymous`). `GET /api/docs/` shares the same `AllowAny`
-permission (`test_openapi_docs_serve_permissions_allow_any`) but Swagger UI HTML
-additionally requires Django `TEMPLATES` APP_DIRS (not configured in
-`control_plane/settings.py` today) — anonymous callers may **500** locally when
-`drf_spectacular/swagger_ui.html` is missing. Authenticated principals also receive
-**200** on schema (`test_openapi_schema_available`). Treat anonymous OpenAPI exposure
-and docs UI packaging as follow-up risks for a separate runtime hardening/packaging
-work item, not a closed boundary.
+`GET /api/schema/` and `GET /api/docs/` require bearer authentication
+(`SPECTACULAR_SETTINGS["SERVE_PERMISSIONS"]` = `IsAuthenticated`; anonymous
+**401/403**). Swagger UI HTML requires Django `TEMPLATES` APP_DIRS (configured in
+`control_plane/settings.py`). Authenticated principals receive **200** on schema and
+rendered docs (`test_openapi_docs_authenticated_html`). Only `GET /health/` and the
+explicit auth endpoints are anonymously reachable on the DRF surface.
 
 All other `/api/v1/*` routes require authentication except the explicitly listed
 AllowAny auth endpoints above; `POST /api/v1/auth/register` remains

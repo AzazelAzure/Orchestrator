@@ -1,12 +1,12 @@
 [Unit]
-Description=Orchestrator ops console (www.thedirectorate.app upstream)
+Description=DEPRECATED — singleton Orchestrator ops console (use deploy/vps/orch_color.sh)
 After=network-online.target orchestrator-ecosystem.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=%h/orchestrator/deploy/vps/run_ops_console.sh
-ExecStop=/bin/bash -lc 'podman rm -f orchestrator_ops-console_1'
+ExecStart=/bin/bash -lc 'echo deprecated singleton ops-console unit — use orch_color.sh deploy --color blue|green'
+ExecStop=/bin/bash -lc 'podman rm -f orchestrator_ops-console_1 orchestrator_ops-console_blue orchestrator_ops-console_green 2>/dev/null || true'
 TimeoutStartSec=300
 
 [Install]
