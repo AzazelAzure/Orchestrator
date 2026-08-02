@@ -5,6 +5,14 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **Codex AM-04 bounded acceptance** — `scripts/provider_live_acceptance.py` and
+  `scripts/provider_runtime_acceptance.py` now include `codex` with matrix row
+  AM-04; installation-local pin example `docs/provider-codex-pins.env.example`
+  (`gpt-5.6-sol`). Acceptance mode, read-only isolation, one call per script, no
+  automatic retry (live runs require `.local/provider/codex.pins.env`).
+
 ### Fixed
 
 - **Founder registration over coordinator HTTP** — `POST /api/v1/auth/register` with a

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Provider runtime acceptance — AM-05/06 through coordinator/worker_delivery path.
+"""Provider runtime acceptance — AM-04/05/06 through coordinator/worker_delivery path.
 
-Real Cursor + Claude calls via HostRunner socket bound into StateCoordinator
+Real Codex/Cursor/Claude calls via HostRunner socket bound into StateCoordinator
 commands (preflight → snapshot pin → prepare → invoke → settle) with credit
 reservation and settlement. Not host-runner-only direct invoke.
 """
@@ -59,8 +59,8 @@ from scripts.provider_live_acceptance import (  # noqa: E402
     redact_evidence,
 )
 
-DEFAULT_PROVIDERS = ("cursor", "claude")
-ACCEPTANCE_MATRIX = {"cursor": "AM-05", "claude": "AM-06"}
+DEFAULT_PROVIDERS = ("codex", "cursor", "claude")
+ACCEPTANCE_MATRIX = {"codex": "AM-04", "cursor": "AM-05", "claude": "AM-06"}
 
 
 def governed_acceptance_packet(provider: str) -> dict[str, Any]:
