@@ -7,6 +7,25 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-DOCS-VPS-BG-01** — Authenticated OpenAPI schema/docs (`TEMPLATES` +
+  `SERVE_PERMISSIONS`); VPS blue/green presentation tier (`api-blue`/`api-green`,
+  per-color ops-console, `orch_color.sh`, `healthcheck.sh`, systemd shared-plane-only
+  unit, healthcheck timer); `ORCH_API_BIND` single publish; pure-Python Compose contract
+  tests; [`deploy/vps/BLUEGREEN.md`](deploy/vps/BLUEGREEN.md) edge selector contract.
+  Materialization preserves public blue; `ORCH_COLOR_MATERIALIZE_ONLY=1` blocks
+  `switch`. Orchestrator rollback state under `deploy/vps/.state/`.
+
+### Changed
+
+- **OpenAPI auth** — `/api/schema/` and `/api/docs/` deny anonymous callers
+  (**401/403**); bearer receives schema and Swagger HTML **200**. `/health/` remains
+  the only anonymous non-auth Django surface.
+- **VPS bootstrap** — removed tracked-file `patch_orch_base_ports` sed; shared-plane
+  refresh separated from color presentation deploy; legacy `ops-console.service` disabled
+  on install.
+
+### Added
+
 - **Codex AM-04 bounded acceptance** — `scripts/provider_live_acceptance.py` and
   `scripts/provider_runtime_acceptance.py` now include `codex` with matrix row
   AM-04; installation-local pin example `docs/provider-codex-pins.env.example`

@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic Orchestrator VPS health probe (rootless Podman scheduling aid)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

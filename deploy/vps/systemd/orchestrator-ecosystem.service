@@ -1,5 +1,5 @@
 [Unit]
-Description=Orchestrator VPS ecosystem stack (api, worker, ops-console)
+Description=Orchestrator VPS shared mutation plane (redis, coordinator, workers, scheduler)
 After=network-online.target
 Wants=network-online.target
 
@@ -8,8 +8,8 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=%h/orchestrator
 Environment=COMPOSE=podman-compose
-ExecStart=/bin/bash -lc 'podman-compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps up -d redis coordinator api worker scheduler script-spool-init script-runner script-worker'
-ExecStop=/bin/bash -lc 'podman-compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps stop'
+ExecStart=/bin/bash -lc 'podman-compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps up -d redis coordinator worker scheduler script-spool-init script-runner script-worker'
+ExecStop=/bin/bash -lc 'podman-compose -f docker-compose.yml -f deploy/vps/docker-compose.vps.yml --env-file .env.vps stop redis coordinator worker scheduler script-spool-init script-runner script-worker'
 TimeoutStartSec=900
 
 [Install]

@@ -154,7 +154,7 @@ services:
       retries: 5
       start_period: 15s
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${ORCH_API_BIND:-127.0.0.1:8000:8000}"
     networks:
       - frontend
       - backend
@@ -397,8 +397,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:8081:8081"
     networks:
       - frontend
 

@@ -1,10 +1,9 @@
 # VPS deployment overlay — publish on all host interfaces so the fm-beta proxy container
 # can reach services via host.containers.internal (rootless Podman host-gateway).
 # Ensure host firewall blocks public access to :8000/:8081; only :8443 is public.
+# API host bind is owned by ORCH_API_BIND in .env.vps (see .env.vps.example).
 services:
   api:
-    ports:
-      - "8000:8000"
     environment:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-api.thedirectorate.app,127.0.0.1,localhost}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://www.thedirectorate.app}

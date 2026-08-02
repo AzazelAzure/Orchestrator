@@ -64,6 +64,18 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "flow_engine.control_plane.urls"
 
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+            ],
+        },
+    },
+]
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -90,6 +102,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Versioned REST adapter over the state coordinator command boundary.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
 }
 
 COORDINATOR_URL = os.environ.get("COORDINATOR_URL", "http://coordinator:9001")

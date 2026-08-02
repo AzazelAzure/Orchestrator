@@ -117,12 +117,10 @@ tokens:
 - JSON endpoints: `POST /api/v1/auth/register|login|refresh|logout`,
   `GET /api/v1/auth/me`, `POST /api/v1/auth/token`,
   `POST /api/v1/auth/token/<id>/revoke`.
-- Anonymous routes today: `/health/`, `/api/schema/` (anonymous **200**), and
-  `/api/docs/` (OpenAPI uses drf-spectacular `SERVE_PERMISSIONS` default `AllowAny`
-  — follow-up risk for both). `/api/docs/` Swagger UI also needs Django `TEMPLATES`
-  APP_DIRS (not configured today — may **500** after auth passes; separate runtime
-  hardening/packaging work item).
-  `/ops/summary/` requires founder or
+- Anonymous routes today: `/health/` and auth registration/login/refresh/logout
+  (register gated). `/api/schema/` and `/api/docs/` require bearer authentication
+  (`SPECTACULAR_SETTINGS["SERVE_PERMISSIONS"]` = `IsAuthenticated`; Django `TEMPLATES`
+  APP_DIRS enabled for Swagger render). `/ops/summary/` requires founder or
   capability `ops.read`. Ops-console uses a generic API bearer field and sends
   `Authorization` on summary fetch.
 - CLI: `flowctl auth login|logout|status|token` talks to `ORCH_API_URL`, stores

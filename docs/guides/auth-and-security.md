@@ -227,8 +227,8 @@ founder-only REST endpoints (`DenyMCPService`).
 |---------|-------------------|
 | `GET /health/` | Yes |
 | Auth register/login/refresh/logout | Yes (register gated) |
-| `GET /api/schema/` | **Yes** — `drf-spectacular` `SERVE_PERMISSIONS` defaults to `AllowAny` on `SpectacularAPIView` (`control_plane/urls.py`; `SPECTACULAR_SETTINGS` does not override). Anonymous callers receive **200** (`test_openapi_schema_anonymous`). **Follow-up risk:** full OpenAPI schema without bearer — separate runtime hardening/packaging work item. |
-| `GET /api/docs/` | **Yes (permission only)** — `SpectacularSwaggerView` uses the same `SERVE_PERMISSIONS` default (`test_openapi_docs_serve_permissions_allow_any`). Swagger UI HTML needs Django `TEMPLATES` APP_DIRS (not configured today); anonymous requests may **500** locally when `drf_spectacular/swagger_ui.html` is missing — packaging defect, same follow-up work item. |
+| `GET /api/schema/` | **No** — requires bearer (`SPECTACULAR_SETTINGS["SERVE_PERMISSIONS"]` = `IsAuthenticated`; anonymous **401/403**) |
+| `GET /api/docs/` | **No** — same authenticated permission; Swagger UI renders when Django `TEMPLATES` APP_DIRS is enabled |
 | All `/api/v1/*` | **No** |
 | `GET /ops/summary/` | **No** (requires auth + founder or `ops.read`) |
 | Coordinator HTTP | **No** (service tokens only) |
@@ -237,9 +237,9 @@ founder-only REST endpoints (`DenyMCPService`).
 | `flowctl-mcp` | Yes (read-only local DB; no network) |
 
 `REST_FRAMEWORK.DEFAULT_PERMISSION_CLASSES` (`IsAuthenticated`) applies to DRF
-`APIView` routes under `/api/v1/*` only. OpenAPI schema/docs bypass that default
-via drf-spectacular's class-level `SERVE_PERMISSIONS`. Treat anonymous schema
-exposure as a documented follow-up risk, not a closed security boundary.
+`APIView` routes under `/api/v1/*`. OpenAPI schema/docs use drf-spectacular
+`SERVE_PERMISSIONS` (`IsAuthenticated`) — same bearer requirement as mutations.
+Only `GET /health/` and the auth registration/login endpoints are anonymously reachable.
 
 ---
 

@@ -1,0 +1,8 @@
+[Unit]
+Description=Orchestrator VPS deterministic container health probe
+After=orchestrator-ecosystem.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/orchestrator
+ExecStart=%h/orchestrator/deploy/vps/healthcheck.sh all
