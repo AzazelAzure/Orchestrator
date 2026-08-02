@@ -124,6 +124,9 @@ def _write_sed_stub(bin_dir: Path) -> None:
             """
         ),
     )
+
+
+class TestDeployEcosystemHarness:
     def test_orchestrator_sync_no_delete_with_protected_excludes(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
@@ -134,7 +137,6 @@ def _write_sed_stub(bin_dir: Path) -> None:
             'if [[ " $* " == *" --delete "* ]]; then echo "unexpected --delete" >&2; exit 9; fi; exit 0',
         )
         _write_stub(bin_dir, "ssh", "exit 0")
-        _write_sed_stub(bin_dir)
 
         env = {
             "PATH": _exclusive_path(bin_dir),
@@ -170,7 +172,6 @@ def _write_sed_stub(bin_dir: Path) -> None:
             'if [[ " $* " != *" --delete "* ]]; then echo "expected --delete" >&2; exit 8; fi; exit 0',
         )
         _write_stub(bin_dir, "ssh", "exit 0")
-        _write_sed_stub(bin_dir)
 
         env = {
             "PATH": _exclusive_path(bin_dir),
