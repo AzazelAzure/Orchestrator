@@ -91,6 +91,16 @@ log "target=$VPS_SSH_TARGET orch_delete=${ORCH_RSYNC_DELETE}"
 run ssh -o BatchMode=yes "$VPS_SSH_TARGET" 'mkdir -p ~/orchestrator ~/portfolio ~/finance_manager/proxy/conf.d ~/finance_manager/proxy/certs'
 
 if [[ "$SKIP_HFM" -eq 0 ]]; then
+  log "render HFM ecosystem-hosts.conf from ORCH_PUBLISH_HOST"
+  if [[ -z "${ORCH_PUBLISH_HOST:-}" && -f "$HFM_ROOT/.env" ]]; then
+    ORCH_PUBLISH_HOST="$(grep -E '^ORCH_PUBLISH_HOST=' "$HFM_ROOT/.env" | tail -1 | cut -d= -f2- | tr -d "\"'" || true)"
+  fi
+  if [[ -z "${ORCH_PUBLISH_HOST:-}" ]]; then
+    log "ERROR: ORCH_PUBLISH_HOST required for ecosystem-hosts render (HFM .env or env)"
+    exit 1
+  fi
+  ORCH_PUBLISH_HOST="$ORCH_PUBLISH_HOST" bash "$HFM_ROOT/scripts/ops/render_ecosystem_hosts.sh" \
+    "$HFM_ROOT/proxy/conf.d/ecosystem-hosts.conf"
   log "sync HFM proxy ecosystem files"
   rsync_to "$HFM_ROOT/proxy/conf.d/ecosystem-hosts.conf" '~/finance_manager/proxy/conf.d/'
   rsync_to "$HFM_ROOT/proxy/nginx.bluegreen.conf" '~/finance_manager/proxy/'

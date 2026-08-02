@@ -70,6 +70,7 @@ def _fixture_orch_root(tmp_path: Path) -> Path:
         "deploy/vps/healthcheck.sh",
         "deploy/vps/run_ops_console.sh",
         "deploy/vps/vps_bootstrap.sh",
+        "deploy/vps/orch_publish_env.sh",
         "deploy/attestations/script-runner.attestation.json",
         "ops-console/Dockerfile",
     ):
@@ -78,7 +79,10 @@ def _fixture_orch_root(tmp_path: Path) -> Path:
         if rel.endswith(".yml"):
             path.write_text("services: {}\nvolumes: {}\nnetworks: {}\n", encoding="utf-8")
         elif rel.endswith(".env.vps"):
-            path.write_text("ORCH_TOKEN_FOUNDER=test-token\n", encoding="utf-8")
+            path.write_text(
+                "ORCH_TOKEN_FOUNDER=test-token\nORCH_PUBLISH_HOST=10.89.1.1\n",
+                encoding="utf-8",
+            )
         elif rel.endswith(".json"):
             path.write_text('{"image_digest":"sha256:deadbeef"}\n', encoding="utf-8")
         elif rel.endswith("Dockerfile"):

@@ -15,14 +15,16 @@ Orchestrator owns **deploy tooling** and **per-app upstream selection** for its 
 - Color API containers are stateless frontends (`COORDINATOR_URL` → singleton coordinator).
 - **Compose identity:** all VPS compose wrappers `cd "$ORCH_ROOT"` with `COMPOSE_PROJECT_NAME=orchestrator` (override via `ORCH_COMPOSE_PROJECT`).
 
-## Port matrix (host-published; firewall-contained)
+## Port matrix (`ORCH_PUBLISH_HOST` — not 0.0.0.0)
 
-Presentation API and console ports bind on all host interfaces so the rootless `fm-beta` proxy reaches them via `host.containers.internal`. **Only `:8443` is the intended public entry** — host firewall must block external access to `8000`, `8010`, `8081`, and `8091`. Redeploy grants require firewall capture and out-of-band negative probes before/after recreation.
+Presentation API and console ports bind to **`ORCH_PUBLISH_HOST`** in `.env.vps` (installation Podman bridge gateway — reachable from the `fm-beta` proxy container, not routable from the internet). **Only `:8443` is the public entry.** Example installation gateway: `10.89.1.1` (set per host; never commit installation-specific values as portable defaults).
 
 | Slot | Blue (live default) | Green (idle) |
 |------|---------------------|--------------|
-| API | host `:8000` | host `:8010` |
-| Ops console | host `:8081` | host `:8091` |
+| API | `${ORCH_PUBLISH_HOST}:8000` | `${ORCH_PUBLISH_HOST}:8010` |
+| Ops console | `${ORCH_PUBLISH_HOST}:8081` | `${ORCH_PUBLISH_HOST}:8091` |
+
+HFM ecosystem vhosts must use the same `ORCH_PUBLISH_HOST` (render via `scripts/ops/render_ecosystem_hosts.sh`) — do not point Orchestrator upstreams at `host.containers.internal` when it resolves to the public host address.
 
 ## Per-color isolated console networks
 
@@ -44,13 +46,13 @@ Orchestrator API and console vhosts use **Orchestrator-only** upstream maps keye
 
 ```nginx
 map $orch_active_color $orch_api_loopback {
-    blue   host.containers.internal:8000;
-    green  host.containers.internal:8010;
+    blue   10.89.1.1:8000;   # ORCH_PUBLISH_HOST — installation-specific
+    green  10.89.1.1:8010;
 }
 
 map $orch_active_color $orch_console_loopback {
-    blue   host.containers.internal:8081;
-    green  host.containers.internal:8091;
+    blue   10.89.1.1:8081;
+    green  10.89.1.1:8091;
 }
 ```
 

@@ -8,6 +8,9 @@ ORCH_ROOT="${ORCH_ROOT:-$HOME/orchestrator}"
 COMPOSE="${COMPOSE:-podman-compose}"
 ORCH_COMPOSE_PROJECT="${ORCH_COMPOSE_PROJECT:-orchestrator}"
 
+# shellcheck source=orch_publish_env.sh
+source "${ORCH_ROOT}/deploy/vps/orch_publish_env.sh"
+
 COLOR="${ORCH_CONSOLE_COLOR:-blue}"
 CONTAINER_NAME="${ORCH_CONSOLE_CONTAINER_NAME:-}"
 HOST_PORT="${ORCH_CONSOLE_PORT:-}"
@@ -52,6 +55,7 @@ case "$COLOR" in
 esac
 
 cd "$ORCH_ROOT"
+orch_publish_host_require
 
 resolve_api_cid_for_color() {
   local color="$1"
@@ -96,13 +100,14 @@ podman run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   --network "$CONSOLE_NETWORK" \
-  -p "${HOST_PORT}:8081" \
+  -p "${ORCH_PUBLISH_HOST}:${HOST_PORT}:8081" \
   --user 0:0 \
   "$IMAGE_TAG"
 
+probe_url="$(orch_publish_url "$HOST_PORT" /)"
 for _ in 1 2 3 4 5; do
-  if curl -fsS "http://127.0.0.1:${HOST_PORT}/" >/dev/null 2>&1; then
-    echo "ops-console ($COLOR) running on :${HOST_PORT} (image=${IMAGE_TAG}, network=${CONSOLE_NETWORK})"
+  if curl -fsS "$probe_url" >/dev/null 2>&1; then
+    echo "ops-console ($COLOR) running on ${ORCH_PUBLISH_HOST}:${HOST_PORT} (image=${IMAGE_TAG}, network=${CONSOLE_NETWORK})"
     exit 0
   fi
   sleep 1

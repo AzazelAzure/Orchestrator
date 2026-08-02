@@ -1,7 +1,6 @@
-# VPS deployment overlay — publish on all host interfaces so the fm-beta proxy container
-# can reach services via host.containers.internal (rootless Podman host-gateway).
-# Ensure host firewall blocks public access to :8000/:8081; only :8443 is public.
-# API host bind is owned by ORCH_API_BIND in .env.vps (see .env.vps.example).
+# VPS deployment overlay — presentation ports bind to ORCH_PUBLISH_HOST in .env.vps
+# (installation bridge/gateway reachable from fm-beta proxy, not 0.0.0.0).
+# Base compose api publish remains ORCH_API_BIND (loopback default for local dev).
 services:
   api:
     environment:
