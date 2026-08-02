@@ -26,11 +26,56 @@ from scripts.r4d_exercise import ApiClient, _load_env, _redact  # noqa: E402
 from scripts.verification_ladder import default_run_id, write_json  # noqa: E402
 
 
-def load_manifest(root: Path) -> dict[str, Any]:
+def load_manifest(root: Path) -> tuple[dict[str, Any], Path]:
+    """Load the manifest and return it alongside the exact path it was read from.
+
+    Callers MUST pass this same path into ``refresh_work_item`` so the helper
+    never persists to a different file than the one this manifest came from.
+    """
     path = Path(os.environ.get("ORCH_LOCAL_STACK_MANIFEST", root / ".tmp/local-stack/manifest.json"))
     if not path.is_file():
         raise FileNotFoundError(f"missing {path}; run bash scripts/local_stack_up.sh")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8")), path
+
+
+def check_ops_summary(manifest: dict[str, Any], env: dict[str, str]) -> dict[str, Any]:
+    """Founder-authenticated ops-summary fetch. Never retried anonymously.
+
+    Raises if the founder token is absent from the stack env or the request
+    fails; callers must not fall back to an anonymous request on either path.
+    """
+    founder_token = env.get("ORCH_TOKEN_FOUNDER")
+    if not founder_token:
+        raise RuntimeError(
+            "missing ORCH_TOKEN_FOUNDER in stack env; refusing anonymous ops_summary call"
+        )
+    req = urllib.request.Request(
+        manifest["ops_summary_url"],
+        headers={
+            "Authorization": f"Bearer {founder_token}",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _redact_known_secret(text: str, *secrets: str | None) -> str:
+    """Strip any literal occurrence of a known secret value from ``text``.
+
+    Pattern-based redaction (``_redact`` / ``redact_evidence``) only catches
+    keyword-prefixed shapes (``token=``, ``Authorization: ...``, ``Bearer
+    ...``); a bare secret value embedded in free-text exception messages with
+    no recognizable prefix (for example ``"... for token abc123"`` with a
+    space, not ``=``/``:``) would not match either pattern. Since the caller
+    already holds the exact secret value, replace it directly rather than
+    relying on heuristics — this is additive to, not a replacement for, the
+    existing pattern-based redaction applied by ``write_json``.
+    """
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text
 
 
 def seed_org(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -89,14 +134,14 @@ def main() -> int:
     out_dir = ROOT / ".tmp/local-delegation" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest = load_manifest(ROOT)
+    manifest, manifest_path = load_manifest(ROOT)
     env = _load_env(Path(manifest["env_file"]))
     api = ApiClient(manifest["api_base"], env)
 
     rows: list[dict[str, Any]] = []
 
     try:
-        refresh_work_item(manifest)
+        refresh_work_item(manifest, manifest_path=manifest_path)
         reset_local_acceptance_budget(manifest)
         seed = seed_org(manifest)
         rows.append(row("seed_org", True, seed))
@@ -243,30 +288,35 @@ def main() -> int:
     )
     write_json(out_dir / "runtime_run.json", _redact(run_body))
 
-    # Ops summary hierarchy visible
-    with urllib.request.urlopen(manifest["ops_summary_url"], timeout=15) as resp:
-        summary = json.loads(resp.read().decode("utf-8"))
-    profiles = ((summary.get("hierarchy") or {}).get("profiles")) or []
-    delegations = summary.get("delegations") or {}
-    pins = delegations.get("recent_pins") or []
-    open_delegations = delegations.get("open") or []
-    hierarchy_ok = (
-        len(profiles) >= 1
-        or len(pins) >= 1
-        or len(open_delegations) >= 1
-        or bool(seed.get("organization_id"))
-    )
-    rows.append(
-        row(
-            "ops_summary_hierarchy",
-            hierarchy_ok,
-            {
-                "profile_count": len(profiles),
-                "pin_count": len(pins),
-                "open_delegation_count": len(open_delegations),
-            },
+    # Ops summary hierarchy visible (founder-authenticated; never retried anonymously).
+    # Missing token or HTTP/auth failure must not crash the run: persist a failed
+    # row and terminal summary instead of an uncaught exception with no evidence.
+    try:
+        ops_summary_body = check_ops_summary(manifest, env)
+        profiles = ((ops_summary_body.get("hierarchy") or {}).get("profiles")) or []
+        delegations = ops_summary_body.get("delegations") or {}
+        pins = delegations.get("recent_pins") or []
+        open_delegations = delegations.get("open") or []
+        hierarchy_ok = (
+            len(profiles) >= 1
+            or len(pins) >= 1
+            or len(open_delegations) >= 1
+            or bool(seed.get("organization_id"))
         )
-    )
+        rows.append(
+            row(
+                "ops_summary_hierarchy",
+                hierarchy_ok,
+                {
+                    "profile_count": len(profiles),
+                    "pin_count": len(pins),
+                    "open_delegation_count": len(open_delegations),
+                },
+            )
+        )
+    except Exception as exc:
+        detail = _redact_known_secret(str(exc), env.get("ORCH_TOKEN_FOUNDER"))
+        rows.append(row("ops_summary_hierarchy", False, {"error": detail}))
 
     passed = all(r["passed"] for r in rows)
     summary = {

@@ -15,6 +15,20 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Fixed
 
+- **Local-stack manifest isolation and stress-script founder auth (ORCH-LI)** —
+  `scripts/local_stack_helpers.py::refresh_work_item` now persists to one
+  explicit manifest path (the same path its caller loaded from), instead of
+  re-resolving `ORCH_LOCAL_STACK_MANIFEST` independently of the in-memory
+  manifest; concurrent slices with distinct manifest paths no longer collide
+  on one file. `scripts/local_delegation_stress.py` and
+  `scripts/local_stress_test.py` now send an authenticated
+  `Authorization: Bearer <ORCH_TOKEN_FOUNDER>` request for their ops-summary
+  check (mirroring `orchestrator_live_acceptance.py`) instead of an anonymous
+  `urlopen`; a missing token or HTTP/auth failure is reported as an explicit
+  failed `ops_summary_hierarchy` row with a persisted terminal
+  `summary.json`, never as an uncaught exception or an anonymous retry.
+  Server-side founder-only enforcement is unchanged.
+
 - **Founder registration over coordinator HTTP** — `POST /api/v1/auth/register` with a
   founder bearer now forwards `principal_token` to the coordinator so
   `auth.register_user` resolves founder authority server-side instead of

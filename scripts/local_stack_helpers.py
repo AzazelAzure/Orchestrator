@@ -82,8 +82,30 @@ def _compose_exec_python(manifest: dict[str, Any], code: str) -> None:
         raise RuntimeError(f"coordinator exec failed: {(proc.stderr or proc.stdout)[:400]}")
 
 
-def refresh_work_item(manifest: dict[str, Any]) -> str:
-    """Seed a fresh work item and persist it to the stack manifest."""
+def _resolve_manifest_path(manifest_path: Path | None) -> Path:
+    """Resolve the single manifest path used for both read context and persistence.
+
+    Callers that already loaded ``manifest`` from a specific file MUST pass that
+    same path back in as ``manifest_path`` so this helper never persists to a
+    different file than the one the in-memory ``manifest`` dict was sourced
+    from. When omitted (unchanged default-manifest callers), falls back to the
+    same ``ORCH_LOCAL_STACK_MANIFEST`` / default rule used elsewhere.
+    """
+    if manifest_path is not None:
+        return Path(manifest_path)
+    return Path(os.environ.get("ORCH_LOCAL_STACK_MANIFEST", ROOT / ".tmp/local-stack/manifest.json"))
+
+
+def refresh_work_item(manifest: dict[str, Any], *, manifest_path: Path | None = None) -> str:
+    """Seed a fresh work item and persist it to the stack manifest.
+
+    ``manifest_path`` is the single explicit path used for persistence. It
+    MUST be the same path the caller loaded ``manifest`` from, so concurrent
+    callers holding distinct in-memory manifests but distinct
+    ``ORCH_LOCAL_STACK_MANIFEST`` values never collide on one file. When not
+    supplied, resolves via the existing env-var/default rule (unchanged
+    behavior for sequential single-slice callers).
+    """
     proc = subprocess.run(
         [
             "bash",
@@ -112,10 +134,8 @@ def refresh_work_item(manifest: dict[str, Any]) -> str:
     scope = f"local-stack-{work_item_id[-8:]}"
     manifest["work_item_id"] = work_item_id
     manifest["budget_scope_id"] = scope
-    manifest_path = Path(
-        os.environ.get("ORCH_LOCAL_STACK_MANIFEST", ROOT / ".tmp/local-stack/manifest.json")
-    )
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    resolved_manifest_path = _resolve_manifest_path(manifest_path)
+    resolved_manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     env_path = Path(manifest["env_file"])
     lines = []
