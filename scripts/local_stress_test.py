@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.r4d_exercise import _load_env  # noqa: E402
 from scripts.verification_ladder import default_run_id, run_l1, run_l2, write_json  # noqa: E402
 
 
@@ -56,17 +57,68 @@ def check_hq_bridge() -> tuple[bool, str]:
     return False, "missing .local/hq-orch-bridge/summary.json (run bin/hq-orch-bridge)"
 
 
+def _redact_known_secret(text: str, *secrets: str | None) -> str:
+    """Strip any literal occurrence of a known secret value from ``text``.
+
+    Pattern-based redaction (``redact_evidence`` / ``SECRET_PATTERN``) only
+    catches keyword-prefixed shapes (``token=``, ``Authorization: ...``,
+    ``Bearer ...``); a bare secret value embedded in free-text exception
+    messages with no recognizable prefix would not match either pattern.
+    Since the caller already holds the exact secret value, replace it
+    directly rather than relying on heuristics.
+    """
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text
+
+
 def check_ops_summary() -> tuple[bool, str]:
+    """Founder-authenticated ops-summary reachability check.
+
+    Never falls back to an anonymous request: a missing manifest, missing
+    env file, or missing ``ORCH_TOKEN_FOUNDER`` is a clear failure, and an
+    HTTP 403 from an unauthenticated call must never count as reachable.
+    """
     import urllib.request
 
-    url = os.environ.get("ORCH_SUMMARY_URL", "http://127.0.0.1:8000/ops/summary/")
+    manifest_path = Path(
+        os.environ.get("ORCH_LOCAL_STACK_MANIFEST", ROOT / ".tmp/local-stack/manifest.json")
+    )
+    if not manifest_path.is_file():
+        return False, f"missing {manifest_path} (run bash scripts/local_stack_up.sh)"
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return False, f"{manifest_path} ({exc})"
+
+    url = os.environ.get("ORCH_SUMMARY_URL") or manifest.get(
+        "ops_summary_url", "http://127.0.0.1:8000/ops/summary/"
+    )
+    try:
+        env = _load_env(Path(manifest["env_file"]))
+    except Exception as exc:
+        return False, f"{url} (env load failed: {exc})"
+
+    founder_token = env.get("ORCH_TOKEN_FOUNDER")
+    if not founder_token:
+        return False, f"{url} (missing ORCH_TOKEN_FOUNDER in stack env; refusing anonymous request)"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {founder_token}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         ok = body.get("status") in {"ok", "degraded"}
         return ok, url
     except Exception as exc:
-        return False, f"{url} ({exc})"
+        detail = _redact_known_secret(str(exc), founder_token)
+        return False, f"{url} ({detail})"
 
 
 def check_local_delegation() -> tuple[bool, str]:

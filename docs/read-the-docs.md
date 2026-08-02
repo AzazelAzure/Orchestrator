@@ -216,6 +216,33 @@ python3 scripts/local_stress_test.py        # L1/L2 + live acceptance + delegati
 
 Set `ORCH_HQ_ROOT` to your local Headquarters checkout when it is not a sibling of the Orchestrator repo.
 
+**Concurrent governed slices (`ORCH_LOCAL_STACK_MANIFEST`):** the default
+manifest path (`.tmp/local-stack/manifest.json`) is safe for sequential,
+single-operator use only. `refresh_work_item()` persists to one explicit
+path — the same path its caller loaded the manifest from — so it never
+diverges from a stale ambient env var while mutating an unrelated in-memory
+manifest. Any concurrent governed dispatch (more than one lifecycle helper
+invocation against this host at once) **must** set a distinct
+`ORCH_LOCAL_STACK_MANIFEST` value per slice; the manifest is a local cache
+seeded by the coordinator, not the cross-slice source of truth — the
+Orchestrator work record's `work_item_id` is authoritative. No file locking
+is required or added: mandatory distinct paths close the evidenced
+collision (concurrent slices previously overwriting each other's
+`work_item_id` / `budget_scope_id` on one shared file).
+
+**Interim work-item creation:** authenticated work-item creation has no
+dedicated API surface yet. The supported interim path remains the
+coordinator sole-writer adapter (`r4d_seed_work.py`, invoked through
+`refresh_work_item`); an authenticated/idempotent work-submit surface is a
+separate, deferred product design item.
+
+`scripts/local_delegation_stress.py` and `scripts/local_stress_test.py` send
+`Authorization: Bearer <ORCH_TOKEN_FOUNDER>` (sourced from the stack env file
+already referenced by the manifest) on their ops-summary check, mirroring
+`scripts/orchestrator_live_acceptance.py`. Neither script retries
+anonymously or treats an HTTP 403 as a healthy/reachable result; a missing
+token is reported as an explicit failure.
+
 After Compose is up:
 
 - API: `http://127.0.0.1:8000`
