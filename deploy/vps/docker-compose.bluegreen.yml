@@ -3,7 +3,7 @@
 services:
   api-blue:
     build:
-      context: ../..
+      context: .
       dockerfile: Dockerfile
       target: api
     read_only: true
@@ -50,7 +50,7 @@ services:
 
   api-green:
     build:
-      context: ../..
+      context: .
       dockerfile: Dockerfile
       target: api
     read_only: true

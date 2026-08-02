@@ -7,6 +7,7 @@ set -euo pipefail
 ORCH_ROOT="${ORCH_ROOT:-$HOME/orchestrator}"
 FM_ROOT="${FM_ROOT:-$HOME/finance_manager}"
 COMPOSE="${COMPOSE:-podman-compose}"
+ORCH_COMPOSE_PROJECT="${ORCH_COMPOSE_PROJECT:-orchestrator}"
 FM_PROJECT="${FM_PROJECT:-fm-beta}"
 STATE_DIR="$ORCH_ROOT/deploy/vps/.state"
 ROLLBACK_FILE="$STATE_DIR/orch_active_color.prev"
@@ -23,16 +24,49 @@ log() { printf '[orch-color] %s\n' "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
 orch_compose() {
-  ${COMPOSE} -f "$ORCH_ROOT/docker-compose.yml" \
-    -f "$ORCH_ROOT/deploy/vps/docker-compose.vps.yml" \
-    --env-file "$ORCH_ROOT/.env.vps" "$@"
+  (
+    cd "$ORCH_ROOT"
+    COMPOSE_PROJECT_NAME="$ORCH_COMPOSE_PROJECT" ${COMPOSE} \
+      -f docker-compose.yml \
+      -f deploy/vps/docker-compose.vps.yml \
+      --env-file .env.vps "$@"
+  )
 }
 
 orch_compose_bg() {
-  ${COMPOSE} -f "$ORCH_ROOT/docker-compose.yml" \
-    -f "$ORCH_ROOT/deploy/vps/docker-compose.vps.yml" \
-    -f "$ORCH_ROOT/deploy/vps/docker-compose.bluegreen.yml" \
-    --env-file "$ORCH_ROOT/.env.vps" "$@"
+  (
+    cd "$ORCH_ROOT"
+    COMPOSE_PROJECT_NAME="$ORCH_COMPOSE_PROJECT" ${COMPOSE} \
+      -f docker-compose.yml \
+      -f deploy/vps/docker-compose.vps.yml \
+      -f deploy/vps/docker-compose.bluegreen.yml \
+      --env-file .env.vps "$@"
+  )
+}
+
+compose_service_cids() {
+  local use_bg="$1"
+  local svc="$2"
+  if [[ "$use_bg" == "1" ]]; then
+    orch_compose_bg ps -q "$svc" 2>/dev/null | sed '/^$/d'
+  else
+    orch_compose ps -q "$svc" 2>/dev/null | sed '/^$/d'
+  fi
+}
+
+exact_one_compose_cid() {
+  local use_bg="$1"
+  local svc="$2"
+  local -a cids=()
+  mapfile -t cids < <(compose_service_cids "$use_bg" "$svc")
+  if [[ ${#cids[@]} -eq 0 ]]; then
+    return 1
+  fi
+  if [[ ${#cids[@]} -gt 1 ]]; then
+    echo "ambiguous container count (${#cids[@]}) for $svc" >&2
+    return 1
+  fi
+  echo "${cids[0]}"
 }
 
 selector_path() {
@@ -70,7 +104,7 @@ capture_shared_ids() {
   : >"$STATE_DIR/shared_ids.before"
   local svc cid
   for svc in "${SHARED_SERVICES[@]}"; do
-    cid="$(orch_compose ps -q "$svc" 2>/dev/null | head -n1 || true)"
+    cid="$(compose_service_cids 0 "$svc" | head -n1 || true)"
     if [[ -n "$cid" ]]; then
       echo "$svc $cid" >>"$STATE_DIR/shared_ids.before"
     fi
@@ -81,7 +115,7 @@ assert_shared_ids_unchanged() {
   local svc cid before after
   for svc in "${SHARED_SERVICES[@]}"; do
     before="$(awk -v s="$svc" '$1==s {print $2}' "$STATE_DIR/shared_ids.before" 2>/dev/null || true)"
-    cid="$(orch_compose ps -q "$svc" 2>/dev/null | head -n1 || true)"
+    cid="$(compose_service_cids 0 "$svc" | head -n1 || true)"
     after="${cid:-}"
     if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
       die "shared service $svc container ID changed ($before -> $after) — abort (shared-plane identity guard)"
@@ -136,12 +170,17 @@ console_loopback_port() {
 slot_image_digest() {
   local color="$1"
   local svc cid digest
+  local -a cids=()
   svc="$(api_service_for_color "$color")"
-  cid="$(orch_compose_bg ps -q "$svc" 2>/dev/null | head -n1 || true)"
-  if [[ -z "$cid" ]]; then
+  mapfile -t cids < <(compose_service_cids 1 "$svc")
+  if [[ ${#cids[@]} -eq 0 ]]; then
     echo "missing"
     return 0
   fi
+  if [[ ${#cids[@]} -gt 1 ]]; then
+    die "ambiguous container count (${#cids[@]}) for $svc"
+  fi
+  cid="${cids[0]}"
   digest="$(podman inspect --format '{{.ImageDigest}}' "$cid" 2>/dev/null || true)"
   if [[ -z "$digest" || "$digest" == "<no value>" ]]; then
     digest="$(podman inspect --format '{{.Image}}' "$cid" 2>/dev/null || echo unknown)"
@@ -208,7 +247,10 @@ smoke_color_cmd() {
       [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous schema on :${api_port} returned $code"
       code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${api_port}/api/docs/")"
       [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous docs on :${api_port} returned $code"
-      log "ok: bearer schema/docs and anonymous deny on :${api_port}"
+      code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
+        "http://127.0.0.1:${console_port}/ops/summary/")"
+      [[ "$code" == "200" ]] || die "authenticated console /ops/summary/ on :${console_port} returned $code"
+      log "ok: bearer schema/docs, console proxy, and anonymous deny on :${api_port}"
     else
       log "skip bearer schema/docs — no FOUNDER_API_TOKEN in .env.vps"
     fi
@@ -249,7 +291,6 @@ rollback_cmd() {
   fi
   [[ "$prior" == blue || "$prior" == green ]] || die "rollback requires prior color in $ROLLBACK_FILE or --color"
   if [[ "$ORCH_COLOR_MATERIALIZE_ONLY" == "1" ]]; then
-    # Rehearsal: restore staged selector without leaving green on public routes.
     log "rollback rehearsal (materialize-only): restoring selector to $prior"
   fi
   write_selector_map "$prior"
@@ -279,6 +320,7 @@ commands:
 
 environment:
   ORCH_COLOR_MATERIALIZE_ONLY=1  Default — blocks switch (initial materialization grant)
+  ORCH_COMPOSE_PROJECT=orchestrator  Compose project name (pinned CWD=$ORCH_ROOT)
 EOF
 }
 
