@@ -7,6 +7,21 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-VPS-PUBLISH-HOST-01** — `ORCH_PUBLISH_HOST` binds presentation ports
+  (`8000`/`8010`/`8081`/`8091`) to the installation Podman bridge gateway instead
+  of `0.0.0.0`; `orch_publish_env.sh` validation; VPS bootstrap and `generate_vps_env.sh`
+  fail closed without explicit publish host; `deploy_ecosystem.sh` renders edge-proxy
+  ecosystem hosts to a temp staging file (never the tracked sibling canonical) before
+  VPS rsync;
+  fixes `ORCH_SCRIPT_IMAGE_DIGEST` in `.env.vps.example`.
+
+### Changed
+
+- **VPS blue/green compose** — `api-blue`/`api-green` ports require
+  `${ORCH_PUBLISH_HOST}`; health/smoke scripts probe the configured bind address.
+
+### Added
+
 - **ORCH-VPS-REPAIR-01** — VPS materialization repair: Orchestrator rsync defaults to
   **no-delete** with anchored protected excludes (`.env.vps`, `deploy/vps/.state/`,
   attestations, backups); opt-in `--delete` for Orchestrator only. Pinned Compose

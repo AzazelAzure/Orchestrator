@@ -31,10 +31,11 @@ Durable SQLite backups must live **outside** `~/orchestrator/` (e.g. `~/backups/
 
 ## What deploy does
 
-1. Rsync edge-proxy ecosystem files (`ecosystem-hosts.conf`, nginx, compose, TLS script)
+1. Render + rsync edge-proxy ecosystem files (`ecosystem-hosts.conf` from `ORCH_PUBLISH_HOST`, nginx, compose, TLS script)
 2. Rsync Orchestrator → `~/orchestrator` (protected excludes; no-delete by default), sibling site tree → `~/portfolio`
 3. Remote [`vps_bootstrap.sh`](vps_bootstrap.sh):
-   - Generate `.env.vps` if missing (`ORCH_API_BIND=8000:8000` for proxy reachability)
+   - Generate `.env.vps` if missing (secrets only — **does not** set `ORCH_PUBLISH_HOST`)
+   - **Fail closed** unless `ORCH_PUBLISH_HOST` is configured in `.env.vps` (installation bridge gateway; see `.env.vps.example`)
    - Build script-runner attestation; require regular JSON attestation file
    - Start **singleton shared mutation plane** (pinned Compose project `orchestrator`, CWD `$ORCH_ROOT`)
    - Run `healthcheck.sh shared` (strict script-runner / spool-init semantics)

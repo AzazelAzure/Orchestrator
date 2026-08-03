@@ -43,7 +43,7 @@ services:
       retries: 5
       start_period: 15s
     ports:
-      - "8000:8000"
+      - "${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8000:8000"
     networks:
       - frontend
       - backend
@@ -90,7 +90,7 @@ services:
       retries: 5
       start_period: 15s
     ports:
-      - "8010:8000"
+      - "${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8010:8000"
     networks:
       - frontend
       - backend

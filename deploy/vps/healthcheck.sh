@@ -7,6 +7,9 @@ COMPOSE="${COMPOSE:-podman-compose}"
 ORCH_COMPOSE_PROJECT="${ORCH_COMPOSE_PROJECT:-orchestrator}"
 COLOR="${ORCH_HEALTH_COLOR:-all}"
 
+# shellcheck source=orch_publish_env.sh
+source "$ORCH_ROOT/deploy/vps/orch_publish_env.sh"
+
 SHARED_SERVICES=(redis coordinator worker scheduler script-spool-init script-runner script-worker)
 BLUE_API_SERVICE=api-blue
 GREEN_API_SERVICE=api-green
@@ -121,11 +124,11 @@ check_presentation_color() {
   cid="$(exact_one_compose_cid 1 "$api_svc")" || fail "presentation api $api_svc is not running"
   cname="$(podman inspect --format '{{.Name}}' "$cid" | sed 's#^/##')"
   service_health_ok "$cname" "$api_svc" || fail "presentation $api_svc ($cname) unhealthy"
-  curl -fsS "http://127.0.0.1:${api_port}/health/" >/dev/null || fail "host-published API :${api_port}/health/"
+  curl -fsS "$(orch_publish_url "$api_port" /health/)" >/dev/null || fail "host-published API :${api_port}/health/"
   log "ok: api-$color host-published :${api_port}/health/"
 
   if podman container exists "$console_name" 2>/dev/null; then
-    curl -fsS "http://127.0.0.1:${console_port}/" >/dev/null || fail "host-published console :${console_port}/"
+    curl -fsS "$(orch_publish_url "$console_port" /)" >/dev/null || fail "host-published console :${console_port}/"
     log "ok: console-$color host-published :${console_port}/"
   else
     log "skip: console container $console_name not present"

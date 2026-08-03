@@ -118,8 +118,8 @@ def test_bluegreen_host_published_ports() -> None:
     bg = _load(BLUEGREEN)
     blue_ports = [str(p) for p in bg["services"]["api-blue"]["ports"]]
     green_ports = [str(p) for p in bg["services"]["api-green"]["ports"]]
-    assert blue_ports == ["8000:8000"]
-    assert green_ports == ["8010:8000"]
+    assert blue_ports == ["${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8000:8000"]
+    assert green_ports == ["${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8010:8000"]
 
 
 def test_merged_vps_stack_has_one_coordinator_and_data_volume() -> None:

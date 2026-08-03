@@ -23,6 +23,9 @@ ORCH_COLOR_MATERIALIZE_ONLY="${ORCH_COLOR_MATERIALIZE_ONLY:-1}"
 log() { printf '[orch-color] %s\n' "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
+# shellcheck source=orch_publish_env.sh
+source "$ORCH_ROOT/deploy/vps/orch_publish_env.sh"
+
 orch_compose() {
   (
     cd "$ORCH_ROOT"
@@ -190,6 +193,7 @@ slot_image_digest() {
 
 deploy_shared_plane() {
   [[ -f "$ORCH_ROOT/.env.vps" ]] || die "missing $ORCH_ROOT/.env.vps"
+  orch_publish_host_require || die "ORCH_PUBLISH_HOST required in .env.vps"
   log "deploy shared mutation plane (no presentation api)"
   orch_compose up -d --build "${SHARED_SERVICES[@]}"
 }
@@ -224,11 +228,13 @@ status_cmd() {
 smoke_color_cmd() {
   local color="${1:-green}"
   [[ "$color" == blue || "$color" == green ]] || die "smoke requires --color blue|green"
-  local api_port console_port bearer
+  local api_port console_port bearer api_base console_base
   api_port="$(api_loopback_port "$color")"
   console_port="$(console_loopback_port "$color")"
-  curl -fsS "http://127.0.0.1:${api_port}/health/" >/dev/null || die "API health :${api_port}"
-  curl -fsS "http://127.0.0.1:${console_port}/" >/dev/null || die "console static :${console_port}"
+  api_base="$(orch_publish_url "$api_port")"
+  console_base="$(orch_publish_url "$console_port")"
+  curl -fsS "${api_base%/}/health/" >/dev/null || die "API health :${api_port}"
+  curl -fsS "$console_base" >/dev/null || die "console static :${console_port}"
   if [[ -f "$ORCH_ROOT/.env.vps" ]]; then
     set -a
     # shellcheck disable=SC1091
@@ -238,17 +244,17 @@ smoke_color_cmd() {
     if [[ -n "$bearer" ]]; then
       local code
       code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "http://127.0.0.1:${api_port}/api/schema/")"
+        "${api_base%/}/api/schema/")"
       [[ "$code" == "200" ]] || die "authenticated schema on :${api_port} returned $code"
       code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "http://127.0.0.1:${api_port}/api/docs/")"
+        "${api_base%/}/api/docs/")"
       [[ "$code" == "200" ]] || die "authenticated docs on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${api_port}/api/schema/")"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "${api_base%/}/api/schema/")"
       [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous schema on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${api_port}/api/docs/")"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "${api_base%/}/api/docs/")"
       [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous docs on :${api_port} returned $code"
       code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "http://127.0.0.1:${console_port}/ops/summary/")"
+        "${console_base%/}/ops/summary/")"
       [[ "$code" == "200" ]] || die "authenticated console /ops/summary/ on :${console_port} returned $code"
       log "ok: bearer schema/docs, console proxy, and anonymous deny on :${api_port}"
     else
