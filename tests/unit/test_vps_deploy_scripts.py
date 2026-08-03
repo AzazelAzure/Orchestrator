@@ -130,6 +130,14 @@ def _write_sed_stub(bin_dir: Path) -> None:
     )
 
 
+HFM_REF = Path(
+    os.environ.get(
+        "HFM_PUBLISH_HOST_TEST_REF",
+        "/home/pproctor/Projects/HiveSolutions/Finance_Manager/HFM-wt-publish-host",
+    )
+)
+
+
 class TestDeployEcosystemHarness:
     def test_orchestrator_sync_no_delete_with_protected_excludes(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
@@ -193,6 +201,62 @@ class TestDeployEcosystemHarness:
         assert result.returncode == 0, result.stderr
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
         assert "--delete" in log
+
+    def test_hfm_render_stages_without_dirtying_tracked_canonical(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        hfm = tmp_path / "hfm"
+        canonical = hfm / "proxy/conf.d/ecosystem-hosts.conf"
+        canonical.parent.mkdir(parents=True)
+        canonical.write_text("CANONICAL_LOCAL_DEV_MARKER\n", encoding="utf-8")
+        for rel in (
+            "proxy/conf.d/ecosystem-hosts.conf.template",
+            "scripts/ops/render_ecosystem_hosts.sh",
+        ):
+            src = HFM_REF / rel
+            assert src.is_file(), f"missing fixture source {src}"
+            dest = hfm / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            if dest.suffix == ".sh":
+                dest.chmod(dest.stat().st_mode | stat.S_IXUSR)
+
+        marker = tmp_path / "hfm-render.marker"
+        _write_stub(
+            bin_dir,
+            "rsync",
+            textwrap.dedent(
+                """
+                if [[ " $* " == *"ecosystem-hosts.conf"* ]]; then
+                  if [[ " $* " == *"CANONICAL_LOCAL_DEV_MARKER"* ]]; then
+                    echo "rsync must not use tracked canonical" >&2
+                    exit 11
+                  fi
+                fi
+                exit 0
+                """
+            ),
+        )
+        _write_stub(bin_dir, "ssh", "exit 0")
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(marker),
+            "VPS_SSH_TARGET": "test-invalid.invalid",
+            "HFM_ROOT": str(hfm),
+            "PORT_ROOT": str(tmp_path / "missing-port"),
+            "ORCH_PUBLISH_HOST": "10.89.1.1",
+        }
+        result = _run_script(
+            DEPLOY / "deploy_ecosystem.sh",
+            env=env,
+            args=["--skip-orch", "--skip-portfolio"],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode == 0, result.stderr
+        assert canonical.read_text(encoding="utf-8") == "CANONICAL_LOCAL_DEV_MARKER\n"
+        log = Path(f"{marker}.log").read_text(encoding="utf-8")
+        assert "ecosystem-hosts.conf" in log
 
 
 class TestRunOpsConsoleHarness:

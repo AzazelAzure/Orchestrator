@@ -11,7 +11,8 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   (`8000`/`8010`/`8081`/`8091`) to the installation Podman bridge gateway instead
   of `0.0.0.0`; `orch_publish_env.sh` validation; VPS bootstrap and `generate_vps_env.sh`
   fail closed without explicit publish host; `deploy_ecosystem.sh` renders HFM ecosystem
-  upstreams; fixes `ORCH_SCRIPT_IMAGE_DIGEST` in `.env.vps.example`.
+  hosts to a temp staging file (never the tracked HFM canonical) before VPS rsync;
+  fixes `ORCH_SCRIPT_IMAGE_DIGEST` in `.env.vps.example`.
 
 ### Changed
 
