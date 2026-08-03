@@ -1,5 +1,8 @@
 # Blue/green presentation tier — API slots only. No coordinator, worker, scheduler,
 # Redis, script-worker, or data volume. Shared mutation plane stays in the base compose.
+# Presentation services do not publish host ports by default; edge routing uses per-color
+# Podman networks (orchestrator-console-{color}) with stable DNS aliases. Optional
+# loopback diagnostics: ORCH_DIAG_BIND=127.0.0.1 + docker-compose.bluegreen.diag.yml.
 services:
   api-blue:
     build:
@@ -42,8 +45,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    ports:
-      - "${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8000:8000"
     networks:
       - frontend
       - backend
@@ -89,8 +90,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    ports:
-      - "${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8010:8000"
     networks:
       - frontend
       - backend

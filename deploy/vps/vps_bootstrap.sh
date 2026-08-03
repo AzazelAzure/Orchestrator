@@ -24,8 +24,8 @@ orch_compose() {
 
 log() { printf '[vps-bootstrap] %s\n' "$*"; }
 
-# shellcheck source=orch_publish_env.sh
-source "$ORCH_ROOT/deploy/vps/orch_publish_env.sh"
+# shellcheck source=orch_presentation_env.sh
+source "$ORCH_ROOT/deploy/vps/orch_presentation_env.sh"
 
 ensure_orch_env() {
   if [[ ! -f "$ORCH_ROOT/.env.vps" ]]; then
@@ -36,12 +36,12 @@ ensure_orch_env() {
     sed -i 's/thedirectorate\.dev/thedirectorate.app/g' "$ORCH_ROOT/.env.vps"
     log "patched .env.vps hostnames to thedirectorate.app"
   fi
-  if ! orch_publish_host_require; then
-    log "ERROR: configure ORCH_PUBLISH_HOST in $ORCH_ROOT/.env.vps before VPS deploy"
-    log "see deploy/vps/.env.vps.example (installation bridge/gateway — not 0.0.0.0)"
-    exit 1
+  if orch_diag_bind_load 2>/dev/null; then
+    orch_diag_bind_validate "${ORCH_DIAG_BIND:-}" || exit 1
+    log "ORCH_DIAG_BIND=${ORCH_DIAG_BIND:-} (loopback diagnostics enabled)"
+  else
+    log "presentation tier: no host port publish (edge routes via per-color Podman networks)"
   fi
-  log "ORCH_PUBLISH_HOST=$ORCH_PUBLISH_HOST"
 }
 
 ensure_attestation() {
@@ -145,7 +145,8 @@ install_systemd_user_units() {
   chmod +x "$ORCH_ROOT/deploy/vps/run_ops_console.sh" 2>/dev/null || true
   chmod +x "$ORCH_ROOT/deploy/vps/orch_color.sh" 2>/dev/null || true
   chmod +x "$ORCH_ROOT/deploy/vps/healthcheck.sh" 2>/dev/null || true
-  chmod +x "$ORCH_ROOT/deploy/vps/orch_publish_env.sh" 2>/dev/null || true
+  chmod +x "$ORCH_ROOT/deploy/vps/orch_presentation_env.sh" 2>/dev/null || true
+  chmod +x "$ORCH_ROOT/deploy/vps/ensure_presentation_networks.sh" 2>/dev/null || true
   systemctl --user daemon-reload
   bash "$ORCH_ROOT/deploy/vps/orch_color.sh" disable-singleton-console
   systemctl --user enable orchestrator-ecosystem.service portfolio-stub.service orchestrator-healthcheck.timer orchestrator-verification-ladder.timer 2>/dev/null || true
@@ -153,14 +154,11 @@ install_systemd_user_units() {
 }
 
 smoke_local() {
-  local probe_host api_url console_url
-  probe_host="$(orch_publish_probe_host)"
-  api_url="$(orch_publish_url 8000 /health/)"
-  console_url="$(orch_publish_url 8081 /)"
-  curl -fsS "$api_url" >/dev/null || { log "FAIL orchestrator api-blue on $probe_host:8000"; return 1; }
-  log "smoke ok: orchestrator api-blue on $probe_host:8000"
-  curl -fsS "$console_url" >/dev/null || { log "FAIL ops console on $probe_host:8081"; return 1; }
-  log "smoke ok: ops console on $probe_host:8081"
+  bash "$ORCH_ROOT/deploy/vps/orch_color.sh" smoke --color blue || {
+    log "FAIL orchestrator presentation in-network smoke (blue)"
+    return 1
+  }
+  log "smoke ok: orchestrator presentation in-network (blue)"
   curl -fsS "http://127.0.0.1:3000/health" >/dev/null || { log "FAIL portfolio loopback"; return 1; }
   log "smoke ok: portfolio loopback"
   curl -kfsS -H "Host: api.thedirectorate.app" "https://127.0.0.1:8443/health/" >/dev/null || { log "FAIL api via proxy"; return 1; }

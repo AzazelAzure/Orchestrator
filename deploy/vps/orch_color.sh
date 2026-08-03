@@ -23,8 +23,20 @@ ORCH_COLOR_MATERIALIZE_ONLY="${ORCH_COLOR_MATERIALIZE_ONLY:-1}"
 log() { printf '[orch-color] %s\n' "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
-# shellcheck source=orch_publish_env.sh
-source "$ORCH_ROOT/deploy/vps/orch_publish_env.sh"
+# shellcheck source=orch_presentation_env.sh
+source "$ORCH_ROOT/deploy/vps/orch_presentation_env.sh"
+
+orch_compose_files_bg() {
+  local -a files=(
+    docker-compose.yml
+    deploy/vps/docker-compose.vps.yml
+    deploy/vps/docker-compose.bluegreen.yml
+  )
+  if orch_diag_bind_enabled; then
+    files+=(deploy/vps/docker-compose.bluegreen.diag.yml)
+  fi
+  printf '%s\n' "${files[@]}"
+}
 
 orch_compose() {
   (
@@ -39,10 +51,13 @@ orch_compose() {
 orch_compose_bg() {
   (
     cd "$ORCH_ROOT"
+    local -a args=()
+    local file
+    while IFS= read -r file; do
+      args+=(-f "$file")
+    done < <(orch_compose_files_bg)
     COMPOSE_PROJECT_NAME="$ORCH_COMPOSE_PROJECT" ${COMPOSE} \
-      -f docker-compose.yml \
-      -f deploy/vps/docker-compose.vps.yml \
-      -f deploy/vps/docker-compose.bluegreen.yml \
+      "${args[@]}" \
       --env-file .env.vps "$@"
   )
 }
@@ -193,7 +208,6 @@ slot_image_digest() {
 
 deploy_shared_plane() {
   [[ -f "$ORCH_ROOT/.env.vps" ]] || die "missing $ORCH_ROOT/.env.vps"
-  orch_publish_host_require || die "ORCH_PUBLISH_HOST required in .env.vps"
   log "deploy shared mutation plane (no presentation api)"
   orch_compose up -d --build "${SHARED_SERVICES[@]}"
 }
@@ -202,6 +216,7 @@ deploy_color_cmd() {
   local color="${1:-}"
   [[ "$color" == blue || "$color" == green ]] || die "deploy requires --color blue|green"
   capture_shared_ids
+  bash "$ORCH_ROOT/deploy/vps/ensure_presentation_networks.sh" --color "$color"
   local svc
   svc="$(api_service_for_color "$color")"
   log "deploy presentation $svc (--no-deps)"
@@ -228,13 +243,22 @@ status_cmd() {
 smoke_color_cmd() {
   local color="${1:-green}"
   [[ "$color" == blue || "$color" == green ]] || die "smoke requires --color blue|green"
-  local api_port console_port bearer api_base console_base
-  api_port="$(api_loopback_port "$color")"
-  console_port="$(console_loopback_port "$color")"
-  api_base="$(orch_publish_url "$api_port")"
-  console_base="$(orch_publish_url "$console_port")"
-  curl -fsS "${api_base%/}/health/" >/dev/null || die "API health :${api_port}"
-  curl -fsS "$console_base" >/dev/null || die "console static :${console_port}"
+  local api_cid network api_url console_url bearer
+  api_cid="$(orch_resolve_api_cid_for_color "$color")" || die "API container missing for color=$color"
+  network="$(orch_presentation_network_for_color "$color")"
+  api_url="$(orch_presentation_api_url_in_network "$color" /health/)"
+  console_url="$(orch_presentation_console_url_in_network "$color" /)"
+  orch_presentation_probe_api "$color" "$api_cid" || die "in-container API health for color=$color"
+  orch_presentation_probe_console "$color" || die "in-container console static for color=$color"
+  orch_presentation_network_probe_api "$color" || die "in-network API probe on $network"
+  orch_presentation_network_probe_console "$color" || die "in-network console probe on $network"
+  if orch_diag_bind_enabled; then
+    local api_port console_port
+    api_port="$(api_loopback_port "$color")"
+    console_port="$(console_loopback_port "$color")"
+    curl -fsS "http://127.0.0.1:${api_port}/health/" >/dev/null || die "loopback diag API :${api_port}"
+    curl -fsS "http://127.0.0.1:${console_port}/" >/dev/null || die "loopback diag console :${console_port}"
+  fi
   if [[ -f "$ORCH_ROOT/.env.vps" ]]; then
     set -a
     # shellcheck disable=SC1091
@@ -243,20 +267,27 @@ smoke_color_cmd() {
     bearer="${FOUNDER_API_TOKEN:-${ORCH_TOKEN_FOUNDER:-}}"
     if [[ -n "$bearer" ]]; then
       local code
-      code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "${api_base%/}/api/schema/")"
-      [[ "$code" == "200" ]] || die "authenticated schema on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "${api_base%/}/api/docs/")"
-      [[ "$code" == "200" ]] || die "authenticated docs on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' "${api_base%/}/api/schema/")"
-      [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous schema on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' "${api_base%/}/api/docs/")"
-      [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous docs on :${api_port} returned $code"
-      code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
-        "${console_base%/}/ops/summary/")"
-      [[ "$code" == "200" ]] || die "authenticated console /ops/summary/ on :${console_port} returned $code"
-      log "ok: bearer schema/docs, console proxy, and anonymous deny on :${api_port}"
+      code="$(podman run --rm --network "$network" docker.io/curlimages/curl:8.5.0 \
+        -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
+        "$(orch_presentation_api_url_in_network "$color" /api/schema/)")"
+      [[ "$code" == "200" ]] || die "authenticated schema on $network returned $code"
+      code="$(podman run --rm --network "$network" docker.io/curlimages/curl:8.5.0 \
+        -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
+        "$(orch_presentation_api_url_in_network "$color" /api/docs/)")"
+      [[ "$code" == "200" ]] || die "authenticated docs on $network returned $code"
+      code="$(podman run --rm --network "$network" docker.io/curlimages/curl:8.5.0 \
+        -s -o /dev/null -w '%{http_code}' \
+        "$(orch_presentation_api_url_in_network "$color" /api/schema/)")"
+      [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous schema on $network returned $code"
+      code="$(podman run --rm --network "$network" docker.io/curlimages/curl:8.5.0 \
+        -s -o /dev/null -w '%{http_code}' \
+        "$(orch_presentation_api_url_in_network "$color" /api/docs/)")"
+      [[ "$code" == "401" || "$code" == "403" ]] || die "anonymous docs on $network returned $code"
+      code="$(podman run --rm --network "$network" docker.io/curlimages/curl:8.5.0 \
+        -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${bearer}" \
+        "$(orch_presentation_console_url_in_network "$color" /ops/summary/)")"
+      [[ "$code" == "200" ]] || die "authenticated console /ops/summary/ on $network returned $code"
+      log "ok: bearer schema/docs, console proxy, and anonymous deny on $network"
     else
       log "skip bearer schema/docs — no FOUNDER_API_TOKEN in .env.vps"
     fi
@@ -320,7 +351,7 @@ commands:
   deploy shared              Start singleton shared mutation plane only
   deploy --color blue|green  Start one presentation API slot + console (--no-deps)
   status                     Report selector color and per-slot image digests
-  smoke --color blue|green   Loopback health, console static, bearer schema/docs
+  smoke --color blue|green   In-network + in-container probes; optional loopback diag
   switch --color blue|green  Update edge selector + reload (blocked when materialize-only)
   rollback [--color blue|green]  Restore prior selector from .state rollback file
 
