@@ -1,0 +1,79 @@
+# Ecosystem hostnames — additive vhosts for Orchestrator, ops console, and external adapter stub.
+# Mounted separately for future extraction to standalone edge-proxy. Does not modify HFM blue/green maps.
+# Render via scripts/ops/render_ecosystem_hosts.sh → ecosystem-hosts.deploy.conf (not this tracked file).
+
+    map $orch_active_color $orch_api_loopback {
+        default @ORCH_PUBLISH_HOST@:8000;
+        blue    @ORCH_PUBLISH_HOST@:8000;
+        green   @ORCH_PUBLISH_HOST@:8010;
+    }
+
+    map $orch_active_color $orch_console_loopback {
+        default @ORCH_PUBLISH_HOST@:8081;
+        blue    @ORCH_PUBLISH_HOST@:8081;
+        green   @ORCH_PUBLISH_HOST@:8091;
+    }
+
+    upstream external_adapter_upstream {
+        server host.containers.internal:3000;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name api.thedirectorate.app;
+
+        ssl_certificate     /etc/nginx/certs/thedirectorate.app.pem;
+        ssl_certificate_key /etc/nginx/certs/thedirectorate.app-key.pem;
+
+        location / {
+            proxy_pass http://$orch_api_loopback;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port 443;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name www.thedirectorate.app;
+
+        ssl_certificate     /etc/nginx/certs/thedirectorate.app.pem;
+        ssl_certificate_key /etc/nginx/certs/thedirectorate.app-key.pem;
+
+        location / {
+            proxy_pass http://$orch_console_loopback;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port 443;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name www.pproctor.com;
+
+        ssl_certificate     /etc/nginx/certs/pproctor.com.pem;
+        ssl_certificate_key /etc/nginx/certs/pproctor.com-key.pem;
+
+        location / {
+            proxy_pass http://external_adapter_upstream;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port 443;
+        }
+    }
+
+    server {
+        listen 80;
+        server_name api.thedirectorate.app www.thedirectorate.app www.pproctor.com;
+        return 301 https://$host$request_uri;
+    }

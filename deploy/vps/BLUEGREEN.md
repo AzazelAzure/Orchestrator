@@ -24,7 +24,7 @@ Presentation API and console ports bind to **`ORCH_PUBLISH_HOST`** in `.env.vps`
 | API | `${ORCH_PUBLISH_HOST}:8000` | `${ORCH_PUBLISH_HOST}:8010` |
 | Ops console | `${ORCH_PUBLISH_HOST}:8081` | `${ORCH_PUBLISH_HOST}:8091` |
 
-HFM ecosystem vhosts must use the same `ORCH_PUBLISH_HOST` (render via `scripts/ops/render_ecosystem_hosts.sh`) — do not point Orchestrator upstreams at `host.containers.internal` when it resolves to the public host address.
+Installation edge proxy ecosystem vhosts must use the same `ORCH_PUBLISH_HOST` (render via sibling `scripts/ops/render_ecosystem_hosts.sh`) — do not point Orchestrator upstreams at `host.containers.internal` when it resolves to the public host address.
 
 ## Per-color isolated console networks
 

@@ -130,12 +130,7 @@ def _write_sed_stub(bin_dir: Path) -> None:
     )
 
 
-HFM_REF = Path(
-    os.environ.get(
-        "HFM_PUBLISH_HOST_TEST_REF",
-        "/home/pproctor/Projects/HiveSolutions/Finance_Manager/HFM-wt-publish-host",
-    )
-)
+ECOSYSTEM_RENDER_FIXTURE = ROOT / "tests/fixtures/ecosystem_proxy_render"
 
 
 class TestDeployEcosystemHarness:
@@ -213,7 +208,7 @@ class TestDeployEcosystemHarness:
             "proxy/conf.d/ecosystem-hosts.conf.template",
             "scripts/ops/render_ecosystem_hosts.sh",
         ):
-            src = HFM_REF / rel
+            src = ECOSYSTEM_RENDER_FIXTURE / rel
             assert src.is_file(), f"missing fixture source {src}"
             dest = hfm / rel
             dest.parent.mkdir(parents=True, exist_ok=True)

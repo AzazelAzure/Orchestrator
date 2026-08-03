@@ -10,8 +10,9 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - **ORCH-VPS-PUBLISH-HOST-01** — `ORCH_PUBLISH_HOST` binds presentation ports
   (`8000`/`8010`/`8081`/`8091`) to the installation Podman bridge gateway instead
   of `0.0.0.0`; `orch_publish_env.sh` validation; VPS bootstrap and `generate_vps_env.sh`
-  fail closed without explicit publish host; `deploy_ecosystem.sh` renders HFM ecosystem
-  hosts to a temp staging file (never the tracked HFM canonical) before VPS rsync;
+  fail closed without explicit publish host; `deploy_ecosystem.sh` renders edge-proxy
+  ecosystem hosts to a temp staging file (never the tracked sibling canonical) before
+  VPS rsync;
   fixes `ORCH_SCRIPT_IMAGE_DIGEST` in `.env.vps.example`.
 
 ### Changed
