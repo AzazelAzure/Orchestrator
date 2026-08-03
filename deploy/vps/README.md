@@ -31,7 +31,7 @@ Durable SQLite backups must live **outside** `~/orchestrator/` (e.g. `~/backups/
 
 ## What deploy does
 
-1. Rsync HFM edge-proxy tooling (ecosystem template, render/attach scripts, nginx, compose, TLS script) — **HFM-owned** render + proxy network attach on VPS
+1. Rsync installation edge-proxy tooling from the sibling ecosystem checkout (ecosystem template, render/attach scripts, nginx, compose, TLS script) — render + proxy network attach are owned by that checkout on VPS
 2. Rsync Orchestrator → `~/orchestrator` (protected excludes; no-delete by default), sibling site tree → `~/portfolio`
 3. Remote [`vps_bootstrap.sh`](vps_bootstrap.sh):
    - Generate `.env.vps` if missing (secrets only)
