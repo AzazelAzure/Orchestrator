@@ -342,6 +342,23 @@ def authorize_provider_packet(packet: dict[str, Any], provider: str) -> None:
         raise PermissionError("provider is not authorized for task packet")
 
 
+_PROVIDER_STREAM_IDENTITY_FIELDS = (
+    "provider_call_id",
+    "session_id",
+    "thread_id",
+    "request_id",
+)
+
+
+def provider_stream_identity(event: dict[str, Any]) -> str | None:
+    """Return the first present validated stream identity field from an event."""
+    for identity in _PROVIDER_STREAM_IDENTITY_FIELDS:
+        value = event.get(identity)
+        if isinstance(value, str) and value and len(value) <= 256:
+            return value
+    return None
+
+
 def is_terminal_provider_event(provider: str, event: dict[str, Any]) -> bool:
     """Return whether a validated stream event is terminal for outcome resolution."""
     event_type = event.get("type")
@@ -358,6 +375,8 @@ def is_terminal_provider_event(provider: str, event: dict[str, Any]) -> bool:
 class _StreamParseState:
     event_count: int = 0
     terminal_event: dict[str, Any] | None = None
+    stream_identity: str | None = None
+    terminal_in_evidence: bool = False
     evidence_parts: list[str] = field(default_factory=list)
     evidence_bytes: int = 0
     evidence_truncated: bool = False
@@ -376,7 +395,7 @@ def validate_provider_event(
     event_type = event.get("type")
     if not isinstance(event_type, str) or event_type not in EVENT_TYPES[provider]:
         raise ValueError("unsupported provider event type")
-    for identity in ("provider_call_id", "session_id", "thread_id"):
+    for identity in _PROVIDER_STREAM_IDENTITY_FIELDS:
         value = event.get(identity)
         if value is not None and (
             not isinstance(value, str) or not value or len(value) > 256
@@ -555,14 +574,11 @@ class HostRunner:
             stdout, evidence_truncated = self._finalize_redacted_output(parse_state, False)
             truncated = evidence_truncated or stderr_truncated
             terminal = parse_state.terminal_event
-            terminal_identity = None
-            if terminal is not None:
-                terminal_identity = (
-                    terminal.get("provider_call_id")
-                    or terminal.get("session_id")
-                    or terminal.get("thread_id")
-                    or terminal.get("request_id")
-                )
+            terminal_identity = (
+                provider_stream_identity(terminal) if terminal is not None else None
+            )
+            if terminal_identity is None:
+                terminal_identity = parse_state.stream_identity
             ambiguous = stderr_truncated or proc.returncode != 0 or not terminal_identity
             if (
                 terminal is not None
@@ -683,7 +699,11 @@ class HostRunner:
         state.event_count += 1
         if state.event_count > MAX_EVENTS:
             raise StreamParseFailure("provider event count exceeds cap")
-        if is_terminal_provider_event(self.binding.provider, event):
+        stream_identity = provider_stream_identity(event)
+        if stream_identity is not None and state.stream_identity is None:
+            state.stream_identity = stream_identity
+        terminal = is_terminal_provider_event(self.binding.provider, event)
+        if terminal:
             state.terminal_event = event
         redacted_line = redact(line)
         part = redacted_line + "\n"
@@ -693,6 +713,8 @@ class HostRunner:
             return
         state.evidence_parts.append(part)
         state.evidence_bytes += part_bytes
+        if terminal:
+            state.terminal_in_evidence = True
 
     def _finalize_redacted_output(
         self, state: _StreamParseState, truncated: bool
@@ -700,12 +722,12 @@ class HostRunner:
         truncated = truncated or state.evidence_truncated
         terminal_line = ""
         terminal_suffix = ""
-        if state.terminal_event is not None:
+        if state.terminal_event is not None and not state.terminal_in_evidence:
             terminal_line = redact(canonical_json(state.terminal_event))
             terminal_suffix = terminal_line + "\n"
         cap = self.binding.output_cap
         base = "".join(state.evidence_parts)
-        if terminal_suffix and terminal_line not in base:
+        if terminal_suffix:
             terminal_bytes = len(terminal_suffix.encode())
             available = max(0, cap - terminal_bytes)
             base_bytes = base.encode()

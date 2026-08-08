@@ -124,9 +124,11 @@ may exceed the evidence cap without terminating the provider; oversized single e
 unknown event types, and event-count overflow after subprocess dispatch terminate the
 provider when needed, persist durable `outcome_unknown` with an `A3` anomaly, and never
 automatically replay the invocation. Terminal stream events are retained in
-`redacted_output` even when earlier evidence is truncated. `truncated=true` records
-partial evidence; outcome stays `complete` when stderr is bounded and terminal identity
-is present.
+`redacted_output` even when earlier evidence is truncated (appended only when not
+already present in bounded evidence). `truncated=true` records partial evidence;
+outcome stays `complete` when stderr is bounded and terminal identity is present on
+the terminal event or retained from the first validated identity field earlier in the
+stream (`provider_call_id`, `session_id`, `thread_id`, `request_id`).
 
 Subprocess uses argv arrays only (no shell). Transport uses selector-driven incremental
 parse with bounded wall time.
@@ -220,9 +222,13 @@ env beyond explicit allowlist, or implement automatic paid retry.
   `error_max_structured_output_retries` — reconciliation required) |
 | Cursor | all | Observed `cursor-events-v1` types: `system`, `user`, `assistant`,
   `tool_call`, `result`, `error`, `thinking` |
-| Codex | all | `thread.started` / `turn.completed` event family |
+| Codex | all | `thread.started` / `turn.completed` event family; identity may arrive on
+  nonterminal events (e.g. `thread_id` on `thread.started`) before terminal
+  `turn.completed` |
 
-Terminal identity accepts `request_id` in stream parser (CHANGELOG 2026-07-28).
+Terminal identity fields: `provider_call_id`, `session_id`, `thread_id`, `request_id`.
+The parser retains the first validated identity across the bounded stream and uses it
+when the terminal event lacks identity (Codex 0.146.0 observed sequence).
 
 ---
 

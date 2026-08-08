@@ -7,6 +7,13 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Fixed
 
+- **Codex terminal identity fallback** — Codex 0.146.0 emits `thread_id` on
+  `thread.started` then `turn.completed` without identity fields; host runner
+  retains the first validated `provider_call_id` / `session_id` / `thread_id` /
+  `request_id` across the bounded stream and uses it when the terminal event lacks
+  identity so exit-0 token-bearing acceptance settles `complete` instead of
+  `outcome_unknown`. Bounded redacted evidence no longer appends a duplicate
+  terminal line when the terminal event is already present.
 - **Codex acceptance argv** — `acceptance` profile passes `--skip-git-repo-check` so
   Codex read-only acceptance can run in the host runner's isolated empty non-git
   workspace; `codex-admin-reconciliation` omits the flag.
