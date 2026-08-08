@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import stat
 from pathlib import Path
 
@@ -16,8 +17,12 @@ from flow_engine.application.runtime_service import (
 )
 from flow_engine.application.worker_delivery import (
     ADAPTER_SNAPSHOT_FIELDS,
+    LEGACY_ADAPTER_SNAPSHOT_FIELDS,
+    _legacy_invocation_binding_fields,
     persist_adapter_snapshot,
     preflight_worker_delivery,
+    prepare_worker_delivery,
+    settle_external_worker_delivery,
 )
 from flow_engine.control_plane.bootstrap import bootstrap_test_principals
 from flow_engine.coordinator import (
@@ -107,6 +112,87 @@ def _dispatch_invocation(kernel_db, provider: str) -> dict[str, str]:
 def _handshake_snapshot(tmp_path: Path, provider: str) -> dict[str, object]:
     runner = HostRunner(_binding(tmp_path, provider))
     return runner.handshake()
+
+
+def _legacy_snapshot(provider: str) -> dict[str, object]:
+    return {
+        "protocol_version": 1,
+        "provider": provider,
+        "adapter_version": "1",
+        "executable_name": provider,
+        "executable_digest": "abc123",
+        "cli_version": "0.144.6",
+        "auth_ready": True,
+        "structured_output": "jsonl",
+        "resolved_model": f"{provider}-test-model",
+        "model_resolution": "installation_allowed_pin",
+        "acceptance_policy": "isolated-empty-read-only-no-tool",
+        "binding_digest": "legacy-inner-binding-digest",
+    }
+
+
+def _worker_snapshot_command(
+    coord: StateCoordinator,
+    ctx: CommandContext,
+    ids: dict[str, str],
+    provider: str,
+    snapshot: dict[str, object],
+    snapshot_digest: str,
+    *,
+    idempotency_key: str,
+) -> dict[str, object]:
+    return coord.accept(
+        RuntimeCommand(
+            command_type="runtime.worker_snapshot",
+            target_id=ids["invocation_id"],
+            payload={
+                "invocation_id": ids["invocation_id"],
+                "provider": provider,
+                "snapshot": snapshot,
+                "snapshot_digest": snapshot_digest,
+            },
+            idempotency_key=idempotency_key,
+            context=ctx,
+        )
+    )
+
+
+def _pin_legacy_snapshot_row(
+    conn,
+    *,
+    invocation_id: str,
+    provider: str,
+    attempt_id: str,
+    packet_digest: str,
+    credit_reservation_id: str,
+) -> tuple[str, str]:
+    legacy = _legacy_snapshot(provider)
+    snapshot_digest = digest_json(legacy)
+    binding = _legacy_invocation_binding_fields(
+        provider=provider,
+        attempt_id=attempt_id,
+        invocation_id=invocation_id,
+        credit_reservation_id=credit_reservation_id,
+        packet_digest=packet_digest,
+        snapshot_digest=snapshot_digest,
+        resolved_model=str(legacy["resolved_model"]),
+        adapter_version=str(legacy["adapter_version"]),
+    )
+    binding_digest = digest_json(binding)
+    conn.execute(
+        """
+        UPDATE provider_invocations
+        SET adapter_snapshot_json = ?, adapter_snapshot_digest = ?, binding_digest = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(legacy, sort_keys=True),
+            snapshot_digest,
+            binding_digest,
+            invocation_id,
+        ),
+    )
+    return snapshot_digest, binding_digest
 
 
 @pytest.mark.parametrize("provider", ["codex", "cursor", "claude"])
@@ -293,3 +379,247 @@ def test_validate_packet_rejects_binding_digest_without_execution_profile(
     packet["binding_digest"] = stale_digest
     with pytest.raises(PermissionError, match="binding digest mismatch"):
         runner.validate_packet(packet)
+
+
+def test_coordinator_rejects_unknown_profile_then_accepts_valid_snapshot(
+    kernel_db, tmp_path: Path
+) -> None:
+    provider = "codex"
+    ids = _dispatch_invocation(kernel_db, provider)
+    handshake = _handshake_snapshot(tmp_path, provider)
+    coord = StateCoordinator(kernel_db.connection)
+    ctx = CommandContext(
+        principal_id=f"worker.provider.{provider}",
+        role=PrincipalRole.WORKER,
+        surface=Surface.WORKER,
+        grant=None,
+    )
+    bad = dict(handshake["snapshot"])
+    bad["execution_profile"] = "unknown-profile"
+    rejected = _worker_snapshot_command(
+        coord,
+        ctx,
+        ids,
+        provider,
+        bad,
+        digest_json(bad),
+        idempotency_key="snapshot-bad-profile",
+    )
+    assert rejected["status"] == "rejected"
+    assert rejected["error_code"] == "VALIDATION_FAILED"
+
+    applied = _worker_snapshot_command(
+        coord,
+        ctx,
+        ids,
+        provider,
+        handshake["snapshot"],
+        handshake["snapshot_digest"],
+        idempotency_key="snapshot-good-profile",
+    )
+    assert applied["status"] == "applied"
+    assert applied["result"]["snapshot"]["binding"]["execution_profile"] == EXECUTION_PROFILE_ACCEPTANCE
+
+
+def test_coordinator_rejects_incompatible_profile_then_accepts_valid_snapshot(
+    kernel_db, tmp_path: Path
+) -> None:
+    provider = "codex"
+    ids = _dispatch_invocation(kernel_db, provider)
+    handshake = _handshake_snapshot(tmp_path, provider)
+    coord = StateCoordinator(kernel_db.connection)
+    ctx = CommandContext(
+        principal_id=f"worker.provider.{provider}",
+        role=PrincipalRole.WORKER,
+        surface=Surface.WORKER,
+        grant=None,
+    )
+    bad = dict(handshake["snapshot"])
+    bad["execution_profile"] = EXECUTION_PROFILE_CURSOR_IMPLEMENTATION
+    rejected = _worker_snapshot_command(
+        coord,
+        ctx,
+        ids,
+        provider,
+        bad,
+        digest_json(bad),
+        idempotency_key="snapshot-incompatible-profile",
+    )
+    assert rejected["status"] == "rejected"
+    assert rejected["error_code"] == "VALIDATION_FAILED"
+
+    applied = _worker_snapshot_command(
+        coord,
+        ctx,
+        ids,
+        provider,
+        handshake["snapshot"],
+        handshake["snapshot_digest"],
+        idempotency_key="snapshot-compatible-profile",
+    )
+    assert applied["status"] == "applied"
+
+
+def test_legacy_pinned_snapshot_settles_after_upgrade(kernel_db) -> None:
+    provider = "codex"
+    ids = _dispatch_invocation(kernel_db, provider)
+    with transaction(kernel_db.connection):
+        row = kernel_db.connection.execute(
+            "SELECT request_digest FROM provider_invocations WHERE id = ?",
+            (ids["invocation_id"],),
+        ).fetchone()
+        credit = kernel_db.connection.execute(
+            """
+            SELECT id FROM credit_entries
+            WHERE invocation_id = ? AND kind = 'reservation'
+            ORDER BY created_at LIMIT 1
+            """,
+            (ids["invocation_id"],),
+        ).fetchone()
+        snapshot_digest, binding_digest = _pin_legacy_snapshot_row(
+            kernel_db.connection,
+            invocation_id=ids["invocation_id"],
+            provider=provider,
+            attempt_id=ids["attempt_id"],
+            packet_digest=row["request_digest"],
+            credit_reservation_id=credit["id"],
+        )
+        prepared = prepare_worker_delivery(
+            kernel_db.connection,
+            attempt_id=ids["attempt_id"],
+            delivery_job_id=ids["job_id"],
+            worker_principal_id=f"worker.provider.{provider}",
+        )
+        settled = settle_external_worker_delivery(
+            kernel_db.connection,
+            prepared=prepared,
+            provider_result={
+                "outcome": "complete",
+                "evidence": {"mock": True},
+                "anomalies": [],
+                "delivery_id": "call-legacy-1",
+                "provider_call_id": "call-legacy-1",
+                "snapshot_digest": snapshot_digest,
+                "binding_digest": binding_digest,
+            },
+            actor=f"worker.provider.{provider}",
+        )
+    assert settled["provider_result"]["outcome"] == "complete"
+
+
+def test_legacy_settlement_rejects_tampered_binding_digest(kernel_db) -> None:
+    provider = "codex"
+    ids = _dispatch_invocation(kernel_db, provider)
+    with transaction(kernel_db.connection):
+        row = kernel_db.connection.execute(
+            "SELECT request_digest FROM provider_invocations WHERE id = ?",
+            (ids["invocation_id"],),
+        ).fetchone()
+        credit = kernel_db.connection.execute(
+            """
+            SELECT id FROM credit_entries
+            WHERE invocation_id = ? AND kind = 'reservation'
+            ORDER BY created_at LIMIT 1
+            """,
+            (ids["invocation_id"],),
+        ).fetchone()
+        snapshot_digest, binding_digest = _pin_legacy_snapshot_row(
+            kernel_db.connection,
+            invocation_id=ids["invocation_id"],
+            provider=provider,
+            attempt_id=ids["attempt_id"],
+            packet_digest=row["request_digest"],
+            credit_reservation_id=credit["id"],
+        )
+        prepared = prepare_worker_delivery(
+            kernel_db.connection,
+            attempt_id=ids["attempt_id"],
+            delivery_job_id=ids["job_id"],
+            worker_principal_id=f"worker.provider.{provider}",
+        )
+        with pytest.raises(ConflictError, match="provider callback binding digest mismatch"):
+            settle_external_worker_delivery(
+                kernel_db.connection,
+                prepared=prepared,
+                provider_result={
+                    "outcome": "complete",
+                    "evidence": {},
+                    "anomalies": [],
+                    "delivery_id": "call-legacy-2",
+                    "provider_call_id": "call-legacy-2",
+                    "snapshot_digest": snapshot_digest,
+                    "binding_digest": "tampered-binding-digest",
+                },
+                actor=f"worker.provider.{provider}",
+            )
+
+
+def test_hybrid_snapshot_schema_rejected_at_settlement(kernel_db) -> None:
+    provider = "codex"
+    ids = _dispatch_invocation(kernel_db, provider)
+    hybrid = _legacy_snapshot(provider)
+    hybrid["execution_profile"] = EXECUTION_PROFILE_ACCEPTANCE
+    snapshot_digest = digest_json(hybrid)
+    with transaction(kernel_db.connection):
+        row = kernel_db.connection.execute(
+            "SELECT request_digest FROM provider_invocations WHERE id = ?",
+            (ids["invocation_id"],),
+        ).fetchone()
+        credit = kernel_db.connection.execute(
+            """
+            SELECT id FROM credit_entries
+            WHERE invocation_id = ? AND kind = 'reservation'
+            ORDER BY created_at LIMIT 1
+            """,
+            (ids["invocation_id"],),
+        ).fetchone()
+        binding_digest = digest_json(
+            _legacy_invocation_binding_fields(
+                provider=provider,
+                attempt_id=ids["attempt_id"],
+                invocation_id=ids["invocation_id"],
+                credit_reservation_id=credit["id"],
+                packet_digest=row["request_digest"],
+                snapshot_digest=snapshot_digest,
+                resolved_model=str(hybrid["resolved_model"]),
+                adapter_version=str(hybrid["adapter_version"]),
+            )
+        )
+        kernel_db.connection.execute(
+            """
+            UPDATE provider_invocations
+            SET adapter_snapshot_json = ?, adapter_snapshot_digest = ?, binding_digest = ?
+            WHERE id = ?
+            """,
+            (
+                json.dumps(hybrid, sort_keys=True),
+                snapshot_digest,
+                binding_digest,
+                ids["invocation_id"],
+            ),
+        )
+        prepared = prepare_worker_delivery(
+            kernel_db.connection,
+            attempt_id=ids["attempt_id"],
+            delivery_job_id=ids["job_id"],
+            worker_principal_id=f"worker.provider.{provider}",
+        )
+        with pytest.raises(ValidationFailedError, match="hybrid or unknown"):
+            settle_external_worker_delivery(
+                kernel_db.connection,
+                prepared=prepared,
+                provider_result={
+                    "outcome": "complete",
+                    "evidence": {},
+                    "anomalies": [],
+                    "delivery_id": "call-hybrid",
+                    "provider_call_id": "call-hybrid",
+                    "snapshot_digest": snapshot_digest,
+                    "binding_digest": binding_digest,
+                },
+                actor=f"worker.provider.{provider}",
+            )
+
+
+def test_legacy_schema_fields_are_exact(kernel_db) -> None:
+    assert set(_legacy_snapshot("codex")) == LEGACY_ADAPTER_SNAPSHOT_FIELDS

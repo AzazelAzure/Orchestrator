@@ -11,6 +11,12 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   handshake fields (`cli_version_pin`, `event_schema`, `execution_profile`); durable
   `binding_digest` and coordinator/worker invoke packets carry `execution_profile`
   end-to-end (`runtime.worker_snapshot` path no longer rejects valid handshakes).
+  Invalid or provider-incompatible `execution_profile` values raise
+  `ValidationFailedError` (with chaining) so `StateCoordinator.accept` rolls back its
+  savepoint and a subsequent valid snapshot on the same connection applies. Settlement
+  of already-persisted pre-#33 adapter snapshots uses a deterministic legacy binding
+  formula keyed only on exact legacy snapshot field sets; new persistence remains
+  strict to the bootstrap schema; hybrid or unknown shapes fail closed.
 
 ### Added
 
