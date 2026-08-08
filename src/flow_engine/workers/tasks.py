@@ -127,6 +127,7 @@ def _execute_socket_provider(
         "packet_digest": pinned["binding"]["packet_digest"],
         "snapshot_digest": handshake["snapshot_digest"],
         "binding_digest": pinned["binding_digest"],
+        "execution_profile": pinned["binding"]["execution_profile"],
         "task_packet": prepared["payload"],
         "cwd": ".",
     }

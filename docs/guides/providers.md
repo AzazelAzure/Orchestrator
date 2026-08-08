@@ -58,6 +58,14 @@ Profiles are explicit in the host-runner binding (`ORCH_PROVIDER_PROFILE`) and m
 match the signed invocation packet `execution_profile` field. Unknown or provider-incompatible
 profiles are denied; acceptance is never silently upgraded.
 
+**Adapter snapshot schema (persistence vs settlement):** new `runtime.worker_snapshot`
+persistence requires the full bootstrap field set (including `cli_version_pin`,
+`event_schema`, and `execution_profile`). Rows already persisted before bootstrap
+#33 with only the legacy snapshot keys settle using the pre-#33 binding digest
+formula (no `execution_profile` in the binding). Schema choice is deterministic from
+the stored snapshot keys: exact bootstrap set, exact legacy set, or fail closed on
+hybrid/unknown shapes — no silent default profile.
+
 | Profile | Providers | Behavior |
 |---------|-----------|----------|
 | `acceptance` (default) | all | Isolated empty read-only workspace; bounded argv |

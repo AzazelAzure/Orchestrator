@@ -40,12 +40,150 @@ from flow_engine.domain.errors import (
 from flow_engine.domain.models import new_id
 from flow_engine.domain.states import AttemptStatus, InvocationStatus, RunStatus
 from flow_engine.persistence.transactions import transaction
+from flow_engine.providers.cli_registry import validate_execution_profile
 from flow_engine.providers.host_runner import digest_json
 from flow_engine.providers.protocol import (
     InvocationRequest,
     ProviderRunner,
     default_mock_registry,
 )
+
+ADAPTER_SNAPSHOT_FIELDS = frozenset({
+    "protocol_version",
+    "provider",
+    "adapter_version",
+    "executable_name",
+    "executable_digest",
+    "cli_version",
+    "cli_version_pin",
+    "event_schema",
+    "auth_ready",
+    "structured_output",
+    "resolved_model",
+    "model_resolution",
+    "acceptance_policy",
+    "execution_profile",
+    "binding_digest",
+})
+
+LEGACY_ADAPTER_SNAPSHOT_FIELDS = frozenset({
+    "protocol_version",
+    "provider",
+    "adapter_version",
+    "executable_name",
+    "executable_digest",
+    "cli_version",
+    "auth_ready",
+    "structured_output",
+    "resolved_model",
+    "model_resolution",
+    "acceptance_policy",
+    "binding_digest",
+})
+
+
+def _invocation_binding_fields(
+    *,
+    provider: str,
+    attempt_id: str,
+    invocation_id: str,
+    credit_reservation_id: str,
+    packet_digest: str,
+    snapshot_digest: str,
+    resolved_model: str,
+    adapter_version: str,
+    execution_profile: str,
+) -> dict[str, Any]:
+    return {
+        "provider": provider,
+        "attempt_id": attempt_id,
+        "invocation_id": invocation_id,
+        "credit_reservation_id": credit_reservation_id,
+        "packet_digest": packet_digest,
+        "snapshot_digest": snapshot_digest,
+        "resolved_model": resolved_model,
+        "adapter_version": adapter_version,
+        "execution_profile": execution_profile,
+    }
+
+
+def classify_adapter_snapshot_schema(snapshot: dict[str, Any]) -> str:
+    """Return ``bootstrap`` or ``legacy``; fail closed on hybrid/unknown shapes."""
+    keys = set(snapshot)
+    if keys == ADAPTER_SNAPSHOT_FIELDS:
+        return "bootstrap"
+    if keys == LEGACY_ADAPTER_SNAPSHOT_FIELDS:
+        return "legacy"
+    raise ValidationFailedError("adapter snapshot schema is hybrid or unknown")
+
+
+def _validate_execution_profile_for_provider(provider: str, execution_profile: str) -> None:
+    try:
+        validate_execution_profile(provider, execution_profile)
+    except ValueError as exc:
+        raise ValidationFailedError(str(exc)) from exc
+
+
+def _legacy_invocation_binding_fields(
+    *,
+    provider: str,
+    attempt_id: str,
+    invocation_id: str,
+    credit_reservation_id: str,
+    packet_digest: str,
+    snapshot_digest: str,
+    resolved_model: str,
+    adapter_version: str,
+) -> dict[str, Any]:
+    """Pre-#33 binding formula for settlement of already-persisted legacy snapshots only."""
+    return {
+        "provider": provider,
+        "attempt_id": attempt_id,
+        "invocation_id": invocation_id,
+        "credit_reservation_id": credit_reservation_id,
+        "packet_digest": packet_digest,
+        "snapshot_digest": snapshot_digest,
+        "resolved_model": resolved_model,
+        "adapter_version": adapter_version,
+    }
+
+
+def _binding_fields_from_persisted_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    provider: str,
+    attempt_id: str,
+    invocation_id: str,
+    credit_reservation_id: str,
+    packet_digest: str,
+    snapshot_digest: str,
+) -> dict[str, Any]:
+    schema = classify_adapter_snapshot_schema(snapshot)
+    if schema == "bootstrap":
+        _validate_execution_profile_for_provider(
+            provider, str(snapshot["execution_profile"])
+        )
+        return _invocation_binding_fields(
+            provider=provider,
+            attempt_id=attempt_id,
+            invocation_id=invocation_id,
+            credit_reservation_id=credit_reservation_id,
+            packet_digest=packet_digest,
+            snapshot_digest=snapshot_digest,
+            resolved_model=snapshot["resolved_model"],
+            adapter_version=snapshot["adapter_version"],
+            execution_profile=str(snapshot["execution_profile"]),
+        )
+    return _legacy_invocation_binding_fields(
+        provider=provider,
+        attempt_id=attempt_id,
+        invocation_id=invocation_id,
+        credit_reservation_id=credit_reservation_id,
+        packet_digest=packet_digest,
+        snapshot_digest=snapshot_digest,
+        resolved_model=snapshot["resolved_model"],
+        adapter_version=snapshot["adapter_version"],
+    )
 
 
 def _record_runner_event(
@@ -79,19 +217,15 @@ def persist_adapter_snapshot(
     actor: str,
 ) -> dict[str, Any]:
     """Pin a non-secret handshake before provider dispatch."""
-    required = {
-        "protocol_version", "provider", "adapter_version", "executable_name",
-        "executable_digest", "cli_version", "auth_ready", "structured_output",
-        "resolved_model", "binding_digest",
-        "model_resolution",
-        "acceptance_policy",
-    }
-    if set(snapshot) != required:
+    if set(snapshot) != ADAPTER_SNAPSHOT_FIELDS:
         raise ValidationFailedError("adapter snapshot fields mismatch")
     if snapshot["provider"] != provider or not snapshot["auth_ready"]:
         raise ValidationFailedError("adapter snapshot provider/auth mismatch")
     if digest_json(snapshot) != snapshot_digest:
         raise ValidationFailedError("adapter snapshot digest mismatch")
+    _validate_execution_profile_for_provider(
+        provider, str(snapshot["execution_profile"])
+    )
     encoded = json.dumps(snapshot, sort_keys=True)
     if len(encoded.encode()) > 16_384:
         raise ValidationFailedError("adapter snapshot exceeds cap")
@@ -118,16 +252,17 @@ def persist_adapter_snapshot(
     ).fetchone()
     if credit is None:
         raise ConflictError("open credit reservation not found")
-    binding = {
-        "provider": provider,
-        "attempt_id": row["attempt_id"],
-        "invocation_id": invocation_id,
-        "credit_reservation_id": credit["id"],
-        "packet_digest": row["request_digest"],
-        "snapshot_digest": snapshot_digest,
-        "resolved_model": snapshot["resolved_model"],
-        "adapter_version": snapshot["adapter_version"],
-    }
+    binding = _invocation_binding_fields(
+        provider=provider,
+        attempt_id=row["attempt_id"],
+        invocation_id=invocation_id,
+        credit_reservation_id=credit["id"],
+        packet_digest=row["request_digest"],
+        snapshot_digest=snapshot_digest,
+        resolved_model=snapshot["resolved_model"],
+        adapter_version=snapshot["adapter_version"],
+        execution_profile=str(snapshot["execution_profile"]),
+    )
     binding_digest = digest_json(binding)
     if row["adapter_snapshot_digest"]:
         if row["adapter_snapshot_digest"] != snapshot_digest:
@@ -261,16 +396,17 @@ def settle_external_worker_delivery(
             "ORDER BY created_at LIMIT 1",
             (prepared["invocation_id"],),
         ).fetchone()
-        binding = {
-            "provider": row["provider"],
-            "attempt_id": row["attempt_id"],
-            "invocation_id": prepared["invocation_id"],
-            "credit_reservation_id": credit["id"] if credit else None,
-            "packet_digest": row["request_digest"],
-            "snapshot_digest": row["adapter_snapshot_digest"],
-            "resolved_model": snapshot.get("resolved_model"),
-            "adapter_version": snapshot.get("adapter_version"),
-        }
+        if credit is None:
+            raise ConflictError("open credit reservation not found")
+        binding = _binding_fields_from_persisted_snapshot(
+            snapshot,
+            provider=row["provider"],
+            attempt_id=row["attempt_id"],
+            invocation_id=prepared["invocation_id"],
+            credit_reservation_id=credit["id"],
+            packet_digest=row["request_digest"],
+            snapshot_digest=row["adapter_snapshot_digest"],
+        )
         if digest_json(binding) != row["binding_digest"]:
             raise ConflictError("authoritative provider binding digest mismatch")
         if provider_result.get("binding_digest") != row["binding_digest"]:
