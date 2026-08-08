@@ -44,6 +44,7 @@ from flow_engine.providers.host_runner import (
     digest_json,
     max_event_line_bytes,
     provider_argv,
+    provider_stream_identity,
     validate_provider_event,
     validate_write_set,
 )
@@ -1139,6 +1140,149 @@ def test_parser_failure_socket_invoke_returns_without_escape(tmp_path: Path) -> 
 def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
     """Legacy name: cursor events above 512 KiB fail closed with durable outcome_unknown."""
     test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("provider", "early_event"),
+    [
+        ("codex", {"type": "thread.started", "thread_id": "thread-early-only"}),
+        ("cursor", {"type": "thinking", "session_id": "sess-early-only"}),
+        ("claude", {"type": "assistant", "session_id": "sess-early-only"}),
+    ],
+)
+def test_early_stream_identity_without_terminal_is_outcome_unknown(
+    tmp_path: Path, provider: str, early_event: dict[str, str]
+) -> None:
+    """Early validated identity must not settle complete without a terminal event."""
+    binding = _binding(tmp_path, provider)
+    version_pins = {
+        "codex": "0.146.0",
+        "cursor": "2026.08.04-aaa8809",
+        "claude": "2.1.212",
+    }
+    early_line = json.dumps(early_event, separators=(",", ":"))
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "if '--version' in sys.argv:\n"
+        f"    print('{provider} {version_pins[provider]}'); raise SystemExit(0)\n"
+        f"print({early_line!r})\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id=f"inv-{provider}-no-terminal",
+            attempt_id=f"att-{provider}-no-terminal",
+            task_packet={"objective": "early identity without terminal"},
+        )
+    )
+    assert result["exit_code"] == 0
+    assert result["outcome"] == "outcome_unknown"
+    assert result["reconciliation_required"] is True
+    assert result.get("provider_call_id") is None
+
+
+def test_codex_turn_completed_without_identity_uses_stream_thread_id(tmp_path: Path) -> None:
+    """Codex 0.146.0: thread_id on thread.started; turn.completed lacks identity."""
+    binding = _binding(tmp_path, "codex")
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "if '--version' in sys.argv: print('codex 0.146.0'); raise SystemExit(0)\n"
+        "print(json.dumps({'type':'thread.started','thread_id':'thread-codex-146'}))\n"
+        "print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':2}}))\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-codex-146",
+            attempt_id="att-codex-146",
+            task_packet={"objective": "codex 0.146 identity"},
+        )
+    )
+    assert result["outcome"] == "complete"
+    assert result["reconciliation_required"] is False
+    assert result["exit_code"] == 0
+    assert result["provider_call_id"] == "thread-codex-146"
+
+
+def test_codex_terminal_identity_prefers_terminal_over_stream(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "codex")
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "if '--version' in sys.argv: print('codex 0.146.0'); raise SystemExit(0)\n"
+        "print(json.dumps({'type':'thread.started','thread_id':'thread-early'}))\n"
+        "print(json.dumps({"
+        "'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':1},"
+        "'provider_call_id':'call-terminal'}))\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-codex-prefer",
+            attempt_id="att-codex-prefer",
+            task_packet={"objective": "terminal identity wins"},
+        )
+    )
+    assert result["provider_call_id"] == "call-terminal"
+    assert result["outcome"] == "complete"
+
+
+def test_provider_stream_identity_accepts_request_id() -> None:
+    assert provider_stream_identity({"request_id": "req-1"}) == "req-1"
+    validate_provider_event("codex", {"type": "thread.started", "request_id": "req-2"})
+
+
+def test_terminal_event_not_duplicated_when_already_in_bounded_evidence(
+    tmp_path: Path,
+) -> None:
+    binding = _binding(tmp_path, "codex")
+    terminal_event = {
+        "type": "turn.completed",
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+        "thread_id": "thread-dup",
+    }
+    terminal_line = json.dumps(terminal_event, separators=(",", ":"))
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('codex 0.146.0'); raise SystemExit(0)\n"
+        f"print({terminal_line!r})\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-no-dup",
+            attempt_id="att-no-dup",
+            task_packet={"objective": "no duplicate terminal"},
+        )
+    )
+    output = result["redacted_output"]
+    assert output.count("turn.completed") == 1
+    assert output.endswith(terminal_line + "\n")
+    assert result["provider_call_id"] == "thread-dup"
+    assert result["outcome"] == "complete"
 
 
 def test_truncated_evidence_preserves_terminal_event(tmp_path: Path) -> None:
