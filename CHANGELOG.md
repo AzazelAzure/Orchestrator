@@ -5,6 +5,13 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bootstrap integration follow-up** — `persist_adapter_snapshot` accepts bootstrap
+  handshake fields (`cli_version_pin`, `event_schema`, `execution_profile`); durable
+  `binding_digest` and coordinator/worker invoke packets carry `execution_profile`
+  end-to-end (`runtime.worker_snapshot` path no longer rejects valid handshakes).
+
 ### Added
 
 - **ORCH-PORTFOLIO-SELF-HOSTING-BOOTSTRAP-2026-08-08** — Governed provider execution
