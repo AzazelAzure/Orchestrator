@@ -21,7 +21,7 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   `error_max_turns`, `error_max_budget_usd`, `error_max_structured_output_retries`)
   instead of the stale `success`/`error` pair; terminal error subtypes require
   reconciliation and never yield `outcome=complete`. `claude-independent-review-merge`
-  uses `--max-turns 20` and `--max-budget-usd 2.50` (acceptance remains `8` turns /
+  uses `--max-turns 32` and `--max-budget-usd 4.00` (acceptance remains `8` turns /
   `1.00` USD).
 - **Cursor stream-json** — `thinking` events are allowlisted for `cursor-events-v1`.
 - **Host runner stream bounds** — Incremental JSONL parsing replaces raw stdout

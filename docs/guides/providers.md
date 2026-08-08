@@ -207,7 +207,7 @@ env beyond explicit allowlist, or implement automatic paid retry.
 | Cursor | `acceptance` | `--mode ask`, `--trust` |
 | Cursor | `cursor-implementation` | Default write mode (no `--mode`; CLI permits only `plan`/`ask`); `--force` |
 | Claude | `acceptance` | All tools disallowed via `--disallowedTools`; `--max-turns 8`; `--max-budget-usd 1.00` |
-| Claude | `claude-independent-review-merge` | Disallows Edit/Write only; `--max-turns 20`; `--max-budget-usd 2.50` |
+| Claude | `claude-independent-review-merge` | Disallows Edit/Write only; `--max-turns 32`; `--max-budget-usd 4.00` |
 | Codex | `acceptance` | `--skip-git-repo-check` (isolated empty non-git workspace), `--sandbox read-only` |
 | Codex | `codex-admin-reconciliation` | `--sandbox read-only` (no `--skip-git-repo-check`) |
 | Claude | all | `--verbose` stream-json; stdin prompt; terminal `result` subtypes:

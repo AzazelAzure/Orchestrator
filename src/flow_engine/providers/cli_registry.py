@@ -74,11 +74,11 @@ CLAUDE_RESULT_SUBTYPES: Final[frozenset[str]] = frozenset(
 
 # Bounded agentic turn caps (acceptance stays tight; review-merge needs PR headroom).
 CLAUDE_ACCEPTANCE_MAX_TURNS: Final[str] = "8"
-CLAUDE_REVIEW_MERGE_MAX_TURNS: Final[str] = "20"
+CLAUDE_REVIEW_MERGE_MAX_TURNS: Final[str] = "32"
 
 # Profile-specific Claude --max-budget-usd ceilings (acceptance stays at 1.00).
 CLAUDE_ACCEPTANCE_MAX_BUDGET_USD: Final[str] = "1.00"
-CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD: Final[str] = "2.50"
+CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD: Final[str] = "4.00"
 
 
 def claude_result_subtype_is_terminal(subtype: object) -> bool:
