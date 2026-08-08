@@ -40,7 +40,7 @@ Durable SQLite backups must live **outside** `~/orchestrator/` (e.g. `~/backups/
    - Start **singleton shared mutation plane** (pinned Compose project `orchestrator`, CWD `$ORCH_ROOT`)
    - Run `healthcheck.sh shared` (strict script-runner / spool-init semantics)
    - Materialize blue presentation (`api-blue` + isolated console network)
-   - Reload edge proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only)
+   - Reload edge proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only; runs `ORCH_EDGE_PROXY_PRE_RELOAD_CMD` when configured)
    - Install systemd user units; **disable** legacy singleton `ops-console.service`
    - Smoke in-network presentation probes, proxy Host-header, and public ZT URLs
 

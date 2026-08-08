@@ -14,6 +14,10 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   in-network health/smoke probes (`orch_presentation_env.sh`, `ensure_presentation_networks.sh`).
   Supersedes nonviable `ORCH_PUBLISH_HOST` bridge-gateway bind contract from
   ORCH-VPS-PUBLISH-HOST-01.
+- **ORCH-VPS-NET-ATTACH-01 (review)** — Console in-container probes prefer `wget`/`curl`
+  (nginx:alpine-safe) before Python fallback; `healthcheck.sh` restores exact-one/ambiguous
+  compose discovery; generic `ORCH_EDGE_PROXY_PRE_RELOAD_CMD` hook runs before edge-proxy
+  nginx validation/reload (`orch_color.sh`, `vps_bootstrap.sh`).
 
 ### Removed
 

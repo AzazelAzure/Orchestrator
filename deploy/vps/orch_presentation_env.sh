@@ -96,8 +96,53 @@ orch_diag_publish_args() {
 orch_exec_http_ok() {
   local cid="$1"
   local url="$2"
+  if podman exec "$cid" wget -q -O /dev/null "$url" >/dev/null 2>&1; then
+    return 0
+  fi
+  if podman exec "$cid" curl -fsS --max-time 10 "$url" >/dev/null 2>&1; then
+    return 0
+  fi
   podman exec "$cid" python -c \
-    "import sys, urllib.request; urllib.request.urlopen('${url}')" >/dev/null 2>&1
+    "import urllib.request; urllib.request.urlopen('${url}')" >/dev/null 2>&1
+}
+
+orch_edge_proxy_pre_reload_load() {
+  if [[ -n "${ORCH_EDGE_PROXY_PRE_RELOAD_CMD:-}" ]]; then
+    return 0
+  fi
+  local env_file="${ORCH_EDGE_PROXY_ENV_FILE:-}"
+  if [[ -z "$env_file" && -n "${ORCH_ROOT:-}" ]]; then
+    env_file="$ORCH_ROOT/.env.vps"
+  fi
+  if [[ -n "$env_file" && -f "$env_file" ]]; then
+    local line key val
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      case "$line" in
+        ORCH_EDGE_PROXY_PRE_RELOAD_CMD=*|ORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED=*)
+          key="${line%%=*}"
+          val="${line#*=}"
+          val="${val%\"}"
+          val="${val#\"}"
+          val="${val%\'}"
+          val="${val#\'}"
+          printf -v "$key" '%s' "$val"
+          ;;
+      esac
+    done <"$env_file"
+  fi
+}
+
+orch_run_edge_proxy_pre_reload_hook() {
+  orch_edge_proxy_pre_reload_load || true
+  local hook="${ORCH_EDGE_PROXY_PRE_RELOAD_CMD:-}"
+  if [[ -z "$hook" ]]; then
+    if [[ "${ORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED:-0}" == "1" ]]; then
+      echo "ORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED=1 but ORCH_EDGE_PROXY_PRE_RELOAD_CMD is unset" >&2
+      return 1
+    fi
+    return 0
+  fi
+  bash -lc "$hook"
 }
 
 orch_presentation_probe_api() {

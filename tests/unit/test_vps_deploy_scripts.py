@@ -381,8 +381,8 @@ class TestHealthcheckHarness:
                 [[ "$fmt" == *Health* ]] && echo healthy && exit 0
                 ;;
               *script-spool-init*)
-                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
-                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
+                [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
                 ;;
               *script-runner*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
@@ -462,3 +462,88 @@ class TestHealthcheckHarness:
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
         assert "cwd=" in log
         assert "orchestrator" in log
+
+    def test_healthcheck_fails_on_ambiguous_presentation_api(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        orch = _fixture_orch_root(tmp_path)
+
+        compose_body = textwrap.dedent(
+            """
+            if [[ " $* " != *" ps "* ]]; then exit 0; fi
+            case "$*" in
+              *api-blue*) echo cid-api-1; echo cid-api-2 ;;
+              *script-spool-init*) echo cid-spool-init ;;
+              *script-runner*) echo cid-runner ;;
+              *script-worker*) echo cid-worker-script ;;
+              *scheduler*) echo cid-sched ;;
+              *coordinator*) echo cid-coord ;;
+              *redis*) echo cid-redis ;;
+              *worker*) echo cid-worker ;;
+            esac
+            exit 0
+            """
+        )
+        _write_stub(bin_dir, "podman-compose", compose_body)
+        _write_stub(
+            bin_dir,
+            "podman",
+            textwrap.dedent(
+                r"""
+                if [[ "$1" != "inspect" ]]; then exit 0; fi
+                fmt="$3"
+                target="$4"
+                if [[ "$fmt" == *Name* ]]; then
+                  case "$target" in
+                    cid-redis) echo "/orchestrator_redis_1" ;;
+                    cid-coord) echo "/orchestrator_coordinator_1" ;;
+                    cid-worker) echo "/orchestrator_worker_1" ;;
+                    cid-sched) echo "/orchestrator_scheduler_1" ;;
+                    cid-spool-init) echo "/orchestrator_script-spool-init_1" ;;
+                    cid-runner) echo "/orchestrator_script-runner_1" ;;
+                    cid-worker-script) echo "/orchestrator_script-worker_1" ;;
+                    cid-api-1) echo "/orchestrator_api-blue_1" ;;
+                    cid-api-2) echo "/orchestrator_api-blue_2" ;;
+                  esac
+                  exit 0
+                fi
+                case "$target" in
+                  *redis*|*coordinator*|*worker_1*|*scheduler*|*worker-script*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                    ;;
+                  *script-spool-init*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
+                    [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
+                    ;;
+                  *script-runner*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    ;;
+                  *api-blue*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                    ;;
+                esac
+                exit 0
+                """
+            ),
+        )
+        _write_stub(bin_dir, "curl", "exit 0")
+        _write_sed_stub(bin_dir)
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(tmp_path / "ambiguous.marker"),
+            "ORCH_ROOT": str(orch),
+            "ORCH_HEALTH_COLOR": "blue",
+            "COMPOSE": "podman-compose",
+        }
+        result = _run_script(
+            orch / "deploy/vps/healthcheck.sh",
+            env=env,
+            args=[],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "ambiguous API container count" in combined

@@ -111,8 +111,24 @@ def test_healthcheck_strict_script_runner_semantics() -> None:
     assert "$ORCH_ROOT" in text
     assert "script-spool-init" in text
     assert "script-runner" in text
+    assert "exact_one_compose_cid" in text
+    assert "ambiguous container count" in text
+    assert "orch_resolve_api_cid_for_color" in text
     assert "ambiguous API container count" in presentation
-    assert "healthy" in text
+    assert "service_health_ok" in text
+
+
+def test_edge_proxy_pre_reload_hook_contract() -> None:
+    bootstrap = _read(BOOTSTRAP)
+    color = _read(SCRIPT)
+    presentation = _read(PRESENTATION)
+    for needle in (
+        "orch_run_edge_proxy_pre_reload_hook",
+        "ORCH_EDGE_PROXY_PRE_RELOAD_CMD",
+    ):
+        assert needle in presentation, f"missing {needle!r} in orch_presentation_env.sh"
+    assert "orch_run_edge_proxy_pre_reload_hook" in bootstrap
+    assert "orch_run_edge_proxy_pre_reload_hook" in color
 
 
 def test_deploy_ecosystem_orchestrator_sync_contract() -> None:

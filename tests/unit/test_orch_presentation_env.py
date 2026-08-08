@@ -101,3 +101,67 @@ def test_generate_vps_env_omits_publish_host() -> None:
     text = gen.read_text(encoding="utf-8")
     assert "ORCH_PUBLISH_HOST" not in text
     assert "ORCH_SCRIPT_IMAGE_DIGEST" in text
+
+
+def test_exec_http_ok_prefers_wget_over_python(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    podman = bin_dir / "podman"
+    podman.write_text(
+        """
+#!/bin/bash
+set -euo pipefail
+if [[ "$1" == exec ]]; then
+  shift
+  cid="$1"
+  shift
+  tool="$1"
+  if [[ "$tool" == wget ]]; then
+    exit 0
+  fi
+  if [[ "$tool" == python ]]; then
+    echo "python should not be used when wget succeeds" >&2
+    exit 9
+  fi
+fi
+exit 1
+""",
+        encoding="utf-8",
+    )
+    podman.chmod(podman.stat().st_mode | 0o111)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+    proc = _run(
+        'orch_exec_http_ok test-cid "http://127.0.0.1:8081/"',
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_edge_proxy_pre_reload_hook_runs_configured_command(tmp_path: Path) -> None:
+    orch = tmp_path / "orchestrator"
+    orch.mkdir()
+    marker = tmp_path / "hook.ran"
+    hook = tmp_path / "hook.sh"
+    hook.write_text(f'#!/bin/bash\ntouch "{marker}"\n', encoding="utf-8")
+    hook.chmod(0o755)
+    (orch / ".env.vps").write_text(
+        f"ORCH_EDGE_PROXY_PRE_RELOAD_CMD={hook}\n",
+        encoding="utf-8",
+    )
+    proc = _run(
+        f'ORCH_ROOT={orch}\norch_run_edge_proxy_pre_reload_hook',
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert marker.is_file()
+
+
+def test_edge_proxy_pre_reload_required_fails_when_unset(tmp_path: Path) -> None:
+    orch = tmp_path / "orchestrator"
+    orch.mkdir()
+    (orch / ".env.vps").write_text("ORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED=1\n", encoding="utf-8")
+    proc = _run(
+        f'ORCH_ROOT={orch}\norch_run_edge_proxy_pre_reload_hook',
+    )
+    assert proc.returncode != 0
+    assert "ORCH_EDGE_PROXY_PRE_RELOAD_CMD is unset" in proc.stderr

@@ -114,12 +114,29 @@ reload_hfm_proxy() {
   local env_args=()
   if [[ -f "$FM_ROOT/.secrets/server.env" ]]; then
     env_args=(--env-file "$FM_ROOT/.secrets/server.env")
+    set -a
+    # shellcheck disable=SC1091
+    source "$FM_ROOT/.secrets/server.env"
+    set +a
   elif [[ -f "$FM_ROOT/.env" ]]; then
     env_args=(--env-file "$FM_ROOT/.env")
+    set -a
+    # shellcheck disable=SC1091
+    source "$FM_ROOT/.env"
+    set +a
   fi
   (
     cd "$FM_ROOT"
     COMPOSE_PROJECT_NAME="$FM_PROJECT" ${COMPOSE} -f docker-compose.bluegreen.yml "${env_args[@]}" up -d proxy --force-recreate --no-deps
+  )
+  orch_run_edge_proxy_pre_reload_hook || {
+    log "ERROR: edge proxy pre-reload hook failed"
+    return 1
+  }
+  (
+    cd "$FM_ROOT"
+    COMPOSE_PROJECT_NAME="$FM_PROJECT" ${COMPOSE} -f docker-compose.bluegreen.yml "${env_args[@]}" \
+      exec -T proxy nginx -t
   )
 }
 
