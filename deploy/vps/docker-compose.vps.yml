@@ -1,5 +1,4 @@
-# VPS deployment overlay — presentation ports bind to ORCH_PUBLISH_HOST in .env.vps
-# (installation bridge/gateway reachable from fm-beta proxy, not 0.0.0.0).
+# VPS deployment overlay — presentation tier uses per-color Podman networks (no host publish).
 # Base compose api publish remains ORCH_API_BIND (loopback default for local dev).
 services:
   api:

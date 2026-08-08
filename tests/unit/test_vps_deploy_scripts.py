@@ -70,7 +70,8 @@ def _fixture_orch_root(tmp_path: Path) -> Path:
         "deploy/vps/healthcheck.sh",
         "deploy/vps/run_ops_console.sh",
         "deploy/vps/vps_bootstrap.sh",
-        "deploy/vps/orch_publish_env.sh",
+        "deploy/vps/orch_presentation_env.sh",
+        "deploy/vps/ensure_presentation_networks.sh",
         "deploy/attestations/script-runner.attestation.json",
         "ops-console/Dockerfile",
     ):
@@ -80,7 +81,7 @@ def _fixture_orch_root(tmp_path: Path) -> Path:
             path.write_text("services: {}\nvolumes: {}\nnetworks: {}\n", encoding="utf-8")
         elif rel.endswith(".env.vps"):
             path.write_text(
-                "ORCH_TOKEN_FOUNDER=test-token\nORCH_PUBLISH_HOST=10.89.1.1\n",
+                "ORCH_TOKEN_FOUNDER=test-token\n",
                 encoding="utf-8",
             )
         elif rel.endswith(".json"):
@@ -128,9 +129,6 @@ def _write_sed_stub(bin_dir: Path) -> None:
             """
         ),
     )
-
-
-ECOSYSTEM_RENDER_FIXTURE = ROOT / "tests/fixtures/ecosystem_proxy_render"
 
 
 class TestDeployEcosystemHarness:
@@ -197,41 +195,26 @@ class TestDeployEcosystemHarness:
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
         assert "--delete" in log
 
-    def test_hfm_render_stages_without_dirtying_tracked_canonical(self, tmp_path: Path) -> None:
+    def test_hfm_sync_rsyncs_network_attach_tooling(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         hfm = tmp_path / "hfm"
-        canonical = hfm / "proxy/conf.d/ecosystem-hosts.conf"
-        canonical.parent.mkdir(parents=True)
-        canonical.write_text("CANONICAL_LOCAL_DEV_MARKER\n", encoding="utf-8")
         for rel in (
             "proxy/conf.d/ecosystem-hosts.conf.template",
             "scripts/ops/render_ecosystem_hosts.sh",
+            "scripts/ops/attach_orchestrator_proxy_networks.sh",
+            "proxy/nginx.bluegreen.conf",
+            "docker-compose.bluegreen.yml",
+            "proxy/certs/generate-ecosystem-certs.sh",
         ):
-            src = ECOSYSTEM_RENDER_FIXTURE / rel
-            assert src.is_file(), f"missing fixture source {src}"
             dest = hfm / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            dest.write_text(f"stub:{rel}\n", encoding="utf-8")
             if dest.suffix == ".sh":
                 dest.chmod(dest.stat().st_mode | stat.S_IXUSR)
 
-        marker = tmp_path / "hfm-render.marker"
-        _write_stub(
-            bin_dir,
-            "rsync",
-            textwrap.dedent(
-                """
-                if [[ " $* " == *"ecosystem-hosts.conf"* ]]; then
-                  if [[ " $* " == *"CANONICAL_LOCAL_DEV_MARKER"* ]]; then
-                    echo "rsync must not use tracked canonical" >&2
-                    exit 11
-                  fi
-                fi
-                exit 0
-                """
-            ),
-        )
+        marker = tmp_path / "hfm-sync.marker"
+        _write_stub(bin_dir, "rsync", "exit 0")
         _write_stub(bin_dir, "ssh", "exit 0")
 
         env = {
@@ -240,7 +223,6 @@ class TestDeployEcosystemHarness:
             "VPS_SSH_TARGET": "test-invalid.invalid",
             "HFM_ROOT": str(hfm),
             "PORT_ROOT": str(tmp_path / "missing-port"),
-            "ORCH_PUBLISH_HOST": "10.89.1.1",
         }
         result = _run_script(
             DEPLOY / "deploy_ecosystem.sh",
@@ -249,9 +231,10 @@ class TestDeployEcosystemHarness:
             cwd=Path("/tmp"),
         )
         assert result.returncode == 0, result.stderr
-        assert canonical.read_text(encoding="utf-8") == "CANONICAL_LOCAL_DEV_MARKER\n"
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
-        assert "ecosystem-hosts.conf" in log
+        assert "ecosystem-hosts.conf.template" in log
+        assert "attach_orchestrator_proxy_networks.sh" in log
+        assert "ORCH_PUBLISH_HOST" not in log
 
 
 class TestRunOpsConsoleHarness:
@@ -279,12 +262,12 @@ class TestRunOpsConsoleHarness:
                 """
                 case "$1" in
                   network)
-                    if [[ "$2" == "exists" ]]; then exit 1; fi
+                    if [[ "$2" == "exists" ]]; then exit 0; fi
                     if [[ "$2" == "create" ]]; then exit 0; fi
                     if [[ "$2" == "disconnect" ]]; then exit 0; fi
                     if [[ "$2" == "connect" ]]; then
-                      if [[ "$6" != "cid-blue" ]]; then echo "wrong api cid: $6" >&2; exit 3; fi
-                      if [[ "$5" != *"orchestrator-console-blue" ]]; then echo "wrong network: $5" >&2; exit 4; fi
+                      if [[ "$8" != "cid-blue" ]]; then echo "wrong api cid: $8" >&2; exit 3; fi
+                      if [[ "$7" != *"orchestrator-console-blue" ]]; then echo "wrong network: $7" >&2; exit 4; fi
                       exit 0
                     fi
                     ;;
@@ -292,20 +275,20 @@ class TestRunOpsConsoleHarness:
                   rm) exit 0 ;;
                   run) exit 0 ;;
                   logs) exit 0 ;;
+                  exec) exit 0 ;;
+                  container)
+                    if [[ "$2" == "exists" ]]; then exit 0; fi
+                    ;;
                 esac
                 exit 0
                 """
             ),
         )
-        _write_stub(
-            bin_dir,
-            "curl",
-            "exit 0",
-        )
+        _write_stub(bin_dir, "bash", "exit 0")
         _write_sed_stub(bin_dir)
 
         env = {
-            "PATH": _exclusive_path(bin_dir),
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
             "ORCH_TEST_MARKER": str(marker),
             "ORCH_ROOT": str(orch),
             "COMPOSE": "podman-compose",
@@ -327,7 +310,7 @@ class TestRunOpsConsoleHarness:
         _write_sed_stub(bin_dir)
 
         env = {
-            "PATH": _exclusive_path(bin_dir),
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
             "ORCH_TEST_MARKER": str(tmp_path / "missing.marker"),
             "ORCH_ROOT": str(orch),
             "COMPOSE": "podman-compose",
@@ -394,7 +377,8 @@ class TestHealthcheckHarness:
                 [[ "$fmt" == *Health* ]] && echo healthy && exit 0
                 ;;
               *scheduler*)
-                [[ "$fmt" == *Status* && "$fmt" != *Health* ]] && echo running && exit 0
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
                 ;;
               *script-spool-init*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
@@ -416,7 +400,7 @@ class TestHealthcheckHarness:
         _write_sed_stub(bin_dir)
 
         env = {
-            "PATH": _exclusive_path(bin_dir),
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
             "ORCH_TEST_MARKER": str(tmp_path / "health.marker"),
             "ORCH_ROOT": str(orch),
             "ORCH_HEALTH_COLOR": "shared",
@@ -478,3 +462,177 @@ class TestHealthcheckHarness:
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
         assert "cwd=" in log
         assert "orchestrator" in log
+
+    def test_healthcheck_fails_on_ambiguous_presentation_api(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        orch = _fixture_orch_root(tmp_path)
+
+        compose_body = textwrap.dedent(
+            """
+            if [[ " $* " != *" ps "* ]]; then exit 0; fi
+            case "$*" in
+              *api-blue*) echo cid-api-1; echo cid-api-2 ;;
+              *script-spool-init*) echo cid-spool-init ;;
+              *script-runner*) echo cid-runner ;;
+              *script-worker*) echo cid-worker-script ;;
+              *scheduler*) echo cid-sched ;;
+              *coordinator*) echo cid-coord ;;
+              *redis*) echo cid-redis ;;
+              *worker*) echo cid-worker ;;
+            esac
+            exit 0
+            """
+        )
+        _write_stub(bin_dir, "podman-compose", compose_body)
+        _write_stub(
+            bin_dir,
+            "podman",
+            textwrap.dedent(
+                r"""
+                if [[ "$1" != "inspect" ]]; then exit 0; fi
+                fmt="$3"
+                target="$4"
+                if [[ "$fmt" == *Name* ]]; then
+                  case "$target" in
+                    cid-redis) echo "/orchestrator_redis_1" ;;
+                    cid-coord) echo "/orchestrator_coordinator_1" ;;
+                    cid-worker) echo "/orchestrator_worker_1" ;;
+                    cid-sched) echo "/orchestrator_scheduler_1" ;;
+                    cid-spool-init) echo "/orchestrator_script-spool-init_1" ;;
+                    cid-runner) echo "/orchestrator_script-runner_1" ;;
+                    cid-worker-script) echo "/orchestrator_script-worker_1" ;;
+                    cid-api-1) echo "/orchestrator_api-blue_1" ;;
+                    cid-api-2) echo "/orchestrator_api-blue_2" ;;
+                  esac
+                  exit 0
+                fi
+                case "$target" in
+                  *redis*|*coordinator*|*worker_1*|*scheduler*|*worker-script*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                    ;;
+                  *script-spool-init*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
+                    [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
+                    ;;
+                  *script-runner*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    ;;
+                  *api-blue*)
+                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                    ;;
+                esac
+                exit 0
+                """
+            ),
+        )
+        _write_stub(bin_dir, "curl", "exit 0")
+        _write_sed_stub(bin_dir)
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(tmp_path / "ambiguous.marker"),
+            "ORCH_ROOT": str(orch),
+            "ORCH_HEALTH_COLOR": "blue",
+            "COMPOSE": "podman-compose",
+        }
+        result = _run_script(
+            orch / "deploy/vps/healthcheck.sh",
+            env=env,
+            args=[],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "ambiguous API container count" in combined
+
+
+class TestVpsBootstrapHarness:
+    def test_main_all_stops_when_required_proxy_pre_reload_hook_missing(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        marker = tmp_path / "bootstrap.marker"
+        orch = _fixture_orch_root(tmp_path)
+        (orch / ".env.vps").write_text(
+            "ORCH_TOKEN_FOUNDER=test-token\nORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED=1\n",
+            encoding="utf-8",
+        )
+        fm_root = tmp_path / "finance_manager"
+        fm_root.mkdir()
+        (fm_root / "docker-compose.bluegreen.yml").write_text(
+            "services:\n  proxy:\n    image: nginx:alpine\n",
+            encoding="utf-8",
+        )
+        port_root = tmp_path / "portfolio"
+        (port_root / "deploy").mkdir(parents=True)
+        (port_root / "deploy/docker-compose.vps.yml").write_text(
+            "services: {}\n",
+            encoding="utf-8",
+        )
+
+        _write_utility_stub(
+            bin_dir,
+            "bash",
+            textwrap.dedent(
+                """
+                if [[ "${1:-}" == "-lc" ]]; then
+                  exit 0
+                fi
+                case "${1:-}" in
+                  *orch_color.sh*|*healthcheck.sh*|*build_script_runner_attestation.sh*|*generate_vps_env.sh*)
+                    exit 0
+                    ;;
+                esac
+                exec /bin/bash "$@"
+                """
+            ),
+        )
+        _write_utility_stub(
+            bin_dir,
+            "python3",
+            "exit 0",
+        )
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            "exit 0",
+        )
+        _write_stub(
+            bin_dir,
+            "systemctl",
+            textwrap.dedent(
+                f"""
+                MARKER="{marker}"
+                printf '%s\\n' "systemctl-called" >> "${{MARKER}}.log"
+                exit 0
+                """
+            ),
+        )
+        _write_stub(bin_dir, "curl", "exit 0")
+        _write_sed_stub(bin_dir)
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(marker),
+            "ORCH_ROOT": str(orch),
+            "FM_ROOT": str(fm_root),
+            "PORT_ROOT": str(port_root),
+            "COMPOSE": "podman-compose",
+            "HOME": str(tmp_path / "home"),
+        }
+        (tmp_path / "home").mkdir()
+
+        result = _run_script(
+            orch / "deploy/vps/vps_bootstrap.sh",
+            env=env,
+            args=["all"],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode != 0, result.stdout + result.stderr
+        combined = result.stdout + result.stderr
+        assert "proxy reload failed" in combined
+        assert "ORCH_EDGE_PROXY_PRE_RELOAD_CMD is unset" in combined
+        log_path = Path(f"{marker}.log")
+        assert not log_path.exists() or "systemctl-called" not in log_path.read_text(encoding="utf-8")

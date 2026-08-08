@@ -1,0 +1,9 @@
+# Optional loopback-only diagnostic host publications (ORCH_DIAG_BIND=127.0.0.1).
+# Merge only when operators explicitly enable local diagnostics — never the VPS default.
+services:
+  api-blue:
+    ports:
+      - "127.0.0.1:8000:8000"
+  api-green:
+    ports:
+      - "127.0.0.1:8010:8000"

@@ -7,17 +7,15 @@ COMPOSE="${COMPOSE:-podman-compose}"
 ORCH_COMPOSE_PROJECT="${ORCH_COMPOSE_PROJECT:-orchestrator}"
 COLOR="${ORCH_HEALTH_COLOR:-all}"
 
-# shellcheck source=orch_publish_env.sh
-source "$ORCH_ROOT/deploy/vps/orch_publish_env.sh"
-
 SHARED_SERVICES=(redis coordinator worker scheduler script-spool-init script-runner script-worker)
 BLUE_API_SERVICE=api-blue
 GREEN_API_SERVICE=api-green
-BLUE_CONSOLE_NAME=orchestrator_ops-console_blue
-GREEN_CONSOLE_NAME=orchestrator_ops-console_green
 
 log() { printf '[orch-health] %s\n' "$*"; }
 fail() { log "FAIL: $*"; exit 1; }
+
+# shellcheck source=orch_presentation_env.sh
+source "$ORCH_ROOT/deploy/vps/orch_presentation_env.sh"
 
 orch_compose() {
   (
@@ -103,33 +101,28 @@ check_shared_plane() {
 
 check_presentation_color() {
   local color="$1"
-  local api_svc api_port console_name console_port
+  local api_svc
   case "$color" in
-    blue)
-      api_svc="$BLUE_API_SERVICE"
-      api_port=8000
-      console_name="$BLUE_CONSOLE_NAME"
-      console_port=8081
-      ;;
-    green)
-      api_svc="$GREEN_API_SERVICE"
-      api_port=8010
-      console_name="$GREEN_CONSOLE_NAME"
-      console_port=8091
-      ;;
+    blue) api_svc="$BLUE_API_SERVICE" ;;
+    green) api_svc="$GREEN_API_SERVICE" ;;
     *) fail "unknown color: $color" ;;
   esac
 
-  local cid cname
-  cid="$(exact_one_compose_cid 1 "$api_svc")" || fail "presentation api $api_svc is not running"
-  cname="$(podman inspect --format '{{.Name}}' "$cid" | sed 's#^/##')"
+  local api_cid cname
+  api_cid="$(orch_resolve_api_cid_for_color "$color")" || fail "presentation api $api_svc discovery failed"
+  cname="$(podman inspect --format '{{.Name}}' "$api_cid" | sed 's#^/##')"
   service_health_ok "$cname" "$api_svc" || fail "presentation $api_svc ($cname) unhealthy"
-  curl -fsS "$(orch_publish_url "$api_port" /health/)" >/dev/null || fail "host-published API :${api_port}/health/"
-  log "ok: api-$color host-published :${api_port}/health/"
+  orch_presentation_probe_api "$color" "$api_cid" || fail "in-container API health for color=$color"
+  log "ok: api-$color in-container /health/"
+  orch_presentation_network_probe_api "$color" || fail "in-network API probe for color=$color"
+  log "ok: api-$color in-network probe on $(orch_presentation_network_for_color "$color")"
 
+  local console_name
+  console_name="$(orch_console_container_for_color "$color")"
   if podman container exists "$console_name" 2>/dev/null; then
-    curl -fsS "$(orch_publish_url "$console_port" /)" >/dev/null || fail "host-published console :${console_port}/"
-    log "ok: console-$color host-published :${console_port}/"
+    orch_presentation_probe_console "$color" || fail "in-container console probe for color=$color"
+    orch_presentation_network_probe_console "$color" || fail "in-network console probe for color=$color"
+    log "ok: console-$color in-network probe"
   else
     log "skip: console container $console_name not present"
   fi

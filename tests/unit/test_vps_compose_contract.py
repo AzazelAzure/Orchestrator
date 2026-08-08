@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / "docker-compose.yml"
 VPS = ROOT / "deploy/vps/docker-compose.vps.yml"
 BLUEGREEN = ROOT / "deploy/vps/docker-compose.bluegreen.yml"
+BLUEGREEN_DIAG = ROOT / "deploy/vps/docker-compose.bluegreen.diag.yml"
+PRESENTATION_ENV = ROOT / "deploy/vps/orch_presentation_env.sh"
 
 SHARED_MUTABLE = {
     "redis",
@@ -114,12 +116,43 @@ def test_bluegreen_no_shared_api_alias() -> None:
         assert "api" not in aliases, f"{name} must not share network_aliases api"
 
 
-def test_bluegreen_host_published_ports() -> None:
+def test_bluegreen_has_no_host_published_ports_by_default() -> None:
     bg = _load(BLUEGREEN)
-    blue_ports = [str(p) for p in bg["services"]["api-blue"]["ports"]]
-    green_ports = [str(p) for p in bg["services"]["api-green"]["ports"]]
-    assert blue_ports == ["${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8000:8000"]
-    assert green_ports == ["${ORCH_PUBLISH_HOST:?ORCH_PUBLISH_HOST is required}:8010:8000"]
+    for name in PRESENTATION_API:
+        spec = bg["services"][name]
+        assert "ports" not in spec, f"{name} must not publish host ports by default"
+
+
+def test_bluegreen_diag_overlay_loopback_only() -> None:
+    diag = _load(BLUEGREEN_DIAG)
+    blue_ports = [str(p) for p in diag["services"]["api-blue"]["ports"]]
+    green_ports = [str(p) for p in diag["services"]["api-green"]["ports"]]
+    assert blue_ports == ["127.0.0.1:8000:8000"]
+    assert green_ports == ["127.0.0.1:8010:8000"]
+
+
+def test_merged_bluegreen_has_no_wildcard_host_publish() -> None:
+    merged = _merge_compose(BASE, VPS, BLUEGREEN)
+    for name in PRESENTATION_API:
+        ports = merged["services"][name].get("ports", [])
+        for entry in ports:
+            text = str(entry)
+            assert "0.0.0.0" not in text
+            assert "*" not in text
+            if ":" in text:
+                host = text.split(":", 1)[0]
+                assert host in {"", "127.0.0.1"}, f"{name} unexpected host bind: {text}"
+
+
+def test_presentation_env_defines_unique_color_aliases() -> None:
+    text = PRESENTATION_ENV.read_text(encoding="utf-8")
+    assert "orch-api-blue" in text
+    assert "orch-api-green" in text
+    assert "orch-console-blue" in text
+    assert "orch-console-green" in text
+    assert "orchestrator-console-blue" in text
+    assert "orchestrator-console-green" in text
+    assert "ORCH_PUBLISH_HOST" not in text
 
 
 def test_merged_vps_stack_has_one_coordinator_and_data_volume() -> None:
@@ -136,8 +169,8 @@ def test_merged_vps_stack_has_one_coordinator_and_data_volume() -> None:
         assert "orchestrator-data" not in joined, f"{name} must not mount orchestrator-data"
 
 
-def test_merged_bluegreen_ports_are_unique() -> None:
-    merged = _merge_compose(BASE, VPS, BLUEGREEN)
+def test_merged_bluegreen_diag_ports_are_loopback_unique() -> None:
+    merged = _merge_compose(BASE, VPS, BLUEGREEN, BLUEGREEN_DIAG)
     host_ports: list[int] = []
     for name in PRESENTATION_API:
         spec = merged["services"][name]

@@ -31,18 +31,18 @@ Durable SQLite backups must live **outside** `~/orchestrator/` (e.g. `~/backups/
 
 ## What deploy does
 
-1. Render + rsync edge-proxy ecosystem files (`ecosystem-hosts.conf` from `ORCH_PUBLISH_HOST`, nginx, compose, TLS script)
+1. Rsync installation edge-proxy tooling from the sibling ecosystem checkout (ecosystem template, render/attach scripts, nginx, compose, TLS script) — render + proxy network attach are owned by that checkout on VPS
 2. Rsync Orchestrator → `~/orchestrator` (protected excludes; no-delete by default), sibling site tree → `~/portfolio`
 3. Remote [`vps_bootstrap.sh`](vps_bootstrap.sh):
-   - Generate `.env.vps` if missing (secrets only — **does not** set `ORCH_PUBLISH_HOST`)
-   - **Fail closed** unless `ORCH_PUBLISH_HOST` is configured in `.env.vps` (installation bridge gateway; see `.env.vps.example`)
+   - Generate `.env.vps` if missing (secrets only)
+   - Presentation tier uses per-color Podman networks — **no host port publish** by default (optional `ORCH_DIAG_BIND=127.0.0.1`)
    - Build script-runner attestation; require regular JSON attestation file
    - Start **singleton shared mutation plane** (pinned Compose project `orchestrator`, CWD `$ORCH_ROOT`)
    - Run `healthcheck.sh shared` (strict script-runner / spool-init semantics)
    - Materialize blue presentation (`api-blue` + isolated console network)
-   - Reload edge proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only)
+   - Reload edge proxy (`COMPOSE_PROJECT_NAME=fm-beta`, proxy only; runs `ORCH_EDGE_PROXY_PRE_RELOAD_CMD` when configured)
    - Install systemd user units; **disable** legacy singleton `ops-console.service`
-   - Smoke host-published ports, proxy Host-header, and public ZT URLs
+   - Smoke in-network presentation probes, proxy Host-header, and public ZT URLs
 
 ## Blue/green materialization order
 

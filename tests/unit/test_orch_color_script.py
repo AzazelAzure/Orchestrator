@@ -9,6 +9,7 @@ SCRIPT = ROOT / "deploy/vps/orch_color.sh"
 BOOTSTRAP = ROOT / "deploy/vps/vps_bootstrap.sh"
 CONSOLE = ROOT / "deploy/vps/run_ops_console.sh"
 HEALTH = ROOT / "deploy/vps/healthcheck.sh"
+PRESENTATION = ROOT / "deploy/vps/orch_presentation_env.sh"
 ECOSYSTEM = ROOT / "deploy/vps/deploy_ecosystem.sh"
 ECOSYSTEM_UNIT = ROOT / "deploy/vps/systemd/orchestrator-ecosystem.service"
 
@@ -91,22 +92,49 @@ def test_ecosystem_unit_shared_plane_only_no_api() -> None:
 
 def test_ops_console_isolated_per_color_network() -> None:
     text = _read(CONSOLE)
+    presentation = _read(PRESENTATION)
     assert "--color" in text
     assert "orchestrator-console-" in text
     assert "network connect --alias api" in text
-    assert "ambiguous API container count" in text
+    assert "orch_resolve_api_cid_for_color" in text
+    assert "ambiguous API container count" in presentation
     assert "VITE_API_BASE_URL" not in text
     assert "8081" in text and "8091" in text
-    assert "COMPOSE_PROJECT_NAME" in text
+    assert "ORCH_COMPOSE_PROJECT" in text
+    assert "COMPOSE_PROJECT_NAME" in presentation
 
 
 def test_healthcheck_strict_script_runner_semantics() -> None:
     text = _read(HEALTH)
-    assert 'cd "$ORCH_ROOT"' in text
+    presentation = _read(PRESENTATION)
+    assert "orch_presentation_env.sh" in text
+    assert "$ORCH_ROOT" in text
     assert "script-spool-init" in text
     assert "script-runner" in text
+    assert "exact_one_compose_cid" in text
     assert "ambiguous container count" in text
-    assert "healthy" in text
+    assert "orch_resolve_api_cid_for_color" in text
+    assert "ambiguous API container count" in presentation
+    assert "service_health_ok" in text
+
+
+def test_edge_proxy_pre_reload_hook_contract() -> None:
+    bootstrap = _read(BOOTSTRAP)
+    color = _read(SCRIPT)
+    presentation = _read(PRESENTATION)
+    for needle in (
+        "orch_run_edge_proxy_pre_reload_hook",
+        "ORCH_EDGE_PROXY_PRE_RELOAD_CMD",
+    ):
+        assert needle in presentation, f"missing {needle!r} in orch_presentation_env.sh"
+    assert "orch_run_edge_proxy_pre_reload_hook" in bootstrap
+    assert "orch_run_edge_proxy_pre_reload_hook" in color
+
+
+def test_bootstrap_main_fails_closed_on_proxy_reload() -> None:
+    text = _read(BOOTSTRAP)
+    assert 'reload_hfm_proxy || log "proxy reload had errors"' not in text
+    assert "ERROR: proxy reload failed" in text
 
 
 def test_deploy_ecosystem_orchestrator_sync_contract() -> None:

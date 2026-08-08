@@ -7,6 +7,28 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-VPS-NET-ATTACH-01** — Rootless-native presentation routing without host port
+  publish: per-color Podman networks (`orchestrator-console-{color}`) with stable DNS
+  aliases (`orch-api-{color}`, `orch-console-{color}`); optional loopback-only diagnostics
+  via `ORCH_DIAG_BIND=127.0.0.1` + `docker-compose.bluegreen.diag.yml`; in-container and
+  in-network health/smoke probes (`orch_presentation_env.sh`, `ensure_presentation_networks.sh`).
+  Supersedes nonviable `ORCH_PUBLISH_HOST` bridge-gateway bind contract from
+  ORCH-VPS-PUBLISH-HOST-01.
+- **ORCH-VPS-NET-ATTACH-01 (review)** — Console in-container probes prefer `wget`/`curl`
+  (nginx:alpine-safe) before Python fallback; `healthcheck.sh` restores exact-one/ambiguous
+  compose discovery; generic `ORCH_EDGE_PROXY_PRE_RELOAD_CMD` hook runs before edge-proxy
+  nginx validation/reload (`orch_color.sh`, `vps_bootstrap.sh`).
+- **ORCH-VPS-NET-ATTACH-01 (review F4)** — `vps_bootstrap.sh all` fails closed when
+  `reload_hfm_proxy` fails (required pre-reload hook absent/failing no longer exits 0).
+
+### Removed
+
+- **ORCH-VPS-PUBLISH-HOST-01** — `ORCH_PUBLISH_HOST` / `orch_publish_env.sh` bridge-gateway
+  host bind contract (failed rootless bind on VPS; see anomaly
+  `orchestrator_vps_materialization_2026-08-02` containment attempt).
+
+### Added
+
 - **ORCH-VPS-PUBLISH-HOST-01** — `ORCH_PUBLISH_HOST` binds presentation ports
   (`8000`/`8010`/`8081`/`8091`) to the installation Podman bridge gateway instead
   of `0.0.0.0`; `orch_publish_env.sh` validation; VPS bootstrap and `generate_vps_env.sh`
