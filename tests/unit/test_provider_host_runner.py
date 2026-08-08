@@ -1142,6 +1142,51 @@ def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
     test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("provider", "early_event"),
+    [
+        ("codex", {"type": "thread.started", "thread_id": "thread-early-only"}),
+        ("cursor", {"type": "thinking", "session_id": "sess-early-only"}),
+        ("claude", {"type": "assistant", "session_id": "sess-early-only"}),
+    ],
+)
+def test_early_stream_identity_without_terminal_is_outcome_unknown(
+    tmp_path: Path, provider: str, early_event: dict[str, str]
+) -> None:
+    """Early validated identity must not settle complete without a terminal event."""
+    binding = _binding(tmp_path, provider)
+    version_pins = {
+        "codex": "0.146.0",
+        "cursor": "2026.08.04-aaa8809",
+        "claude": "2.1.212",
+    }
+    early_line = json.dumps(early_event, separators=(",", ":"))
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "if '--version' in sys.argv:\n"
+        f"    print('{provider} {version_pins[provider]}'); raise SystemExit(0)\n"
+        f"print({early_line!r})\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id=f"inv-{provider}-no-terminal",
+            attempt_id=f"att-{provider}-no-terminal",
+            task_packet={"objective": "early identity without terminal"},
+        )
+    )
+    assert result["exit_code"] == 0
+    assert result["outcome"] == "outcome_unknown"
+    assert result["reconciliation_required"] is True
+    assert result.get("provider_call_id") is None
+
+
 def test_codex_turn_completed_without_identity_uses_stream_thread_id(tmp_path: Path) -> None:
     """Codex 0.146.0: thread_id on thread.started; turn.completed lacks identity."""
     binding = _binding(tmp_path, "codex")

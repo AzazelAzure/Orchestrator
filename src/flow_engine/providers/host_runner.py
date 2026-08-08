@@ -577,9 +577,14 @@ class HostRunner:
             terminal_identity = (
                 provider_stream_identity(terminal) if terminal is not None else None
             )
-            if terminal_identity is None:
+            if terminal is not None and terminal_identity is None:
                 terminal_identity = parse_state.stream_identity
-            ambiguous = stderr_truncated or proc.returncode != 0 or not terminal_identity
+            ambiguous = (
+                stderr_truncated
+                or proc.returncode != 0
+                or terminal is None
+                or not terminal_identity
+            )
             if (
                 terminal is not None
                 and self.binding.provider == "claude"

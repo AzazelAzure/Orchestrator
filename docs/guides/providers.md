@@ -126,9 +126,11 @@ provider when needed, persist durable `outcome_unknown` with an `A3` anomaly, an
 automatically replay the invocation. Terminal stream events are retained in
 `redacted_output` even when earlier evidence is truncated (appended only when not
 already present in bounded evidence). `truncated=true` records partial evidence;
-outcome stays `complete` when stderr is bounded and terminal identity is present on
-the terminal event or retained from the first validated identity field earlier in the
-stream (`provider_call_id`, `session_id`, `thread_id`, `request_id`).
+outcome stays `complete` when stderr is bounded, a validated terminal event is present,
+and terminal identity is present on that event or retained from the first validated
+identity field earlier in the stream (`provider_call_id`, `session_id`, `thread_id`,
+`request_id`). Without a validated terminal event, outcome is always `outcome_unknown`
+even when an earlier event carried identity and exit code is 0.
 
 Subprocess uses argv arrays only (no shell). Transport uses selector-driven incremental
 parse with bounded wall time.
@@ -227,8 +229,9 @@ env beyond explicit allowlist, or implement automatic paid retry.
   `turn.completed` |
 
 Terminal identity fields: `provider_call_id`, `session_id`, `thread_id`, `request_id`.
-The parser retains the first validated identity across the bounded stream and uses it
-when the terminal event lacks identity (Codex 0.146.0 observed sequence).
+When a validated terminal event is present but lacks identity, the parser uses the
+first validated identity retained from earlier in the bounded stream (Codex 0.146.0
+observed sequence: `thread_id` on `thread.started`, then identity-free `turn.completed`).
 
 ---
 
