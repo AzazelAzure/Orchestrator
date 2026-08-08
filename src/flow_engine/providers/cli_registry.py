@@ -76,6 +76,10 @@ CLAUDE_RESULT_SUBTYPES: Final[frozenset[str]] = frozenset(
 CLAUDE_ACCEPTANCE_MAX_TURNS: Final[str] = "8"
 CLAUDE_REVIEW_MERGE_MAX_TURNS: Final[str] = "20"
 
+# Profile-specific Claude --max-budget-usd ceilings (acceptance stays at 1.00).
+CLAUDE_ACCEPTANCE_MAX_BUDGET_USD: Final[str] = "1.00"
+CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD: Final[str] = "2.50"
+
 
 def claude_result_subtype_is_terminal(subtype: object) -> bool:
     return isinstance(subtype, str) and subtype in CLAUDE_RESULT_SUBTYPES

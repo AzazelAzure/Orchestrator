@@ -13,16 +13,21 @@ import pytest
 
 from flow_engine.persistence.migrations import apply_migrations, list_tables
 from flow_engine.providers.cli_registry import (
+    CLAUDE_ACCEPTANCE_MAX_BUDGET_USD,
     CLAUDE_ACCEPTANCE_MAX_TURNS,
     CLAUDE_RESULT_SUBTYPE_SUCCESS,
     CLAUDE_RESULT_SUBTYPES_ERROR,
+    CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
+    CLAUDE_REVIEW_MERGE_MAX_TURNS,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
     EXECUTION_PROFILE_CODEX_ADMIN,
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
 )
 from flow_engine.providers.host_runner import (
+    COORDINATOR_PROVIDER_RESULT_CAP_BYTES,
     CURSOR_EVENT_TYPES,
+    DEFAULT_OUTPUT_CAP,
     MAX_FRAME_BYTES,
     MAX_LINE_BYTES,
     HostRunner,
@@ -474,13 +479,20 @@ def test_claude_review_argv_allows_bash(tmp_path: Path) -> None:
     denied = argv[argv.index("--disallowedTools") + 1]
     assert denied == "Edit,Write"
     assert "Bash" not in denied
-    assert argv[argv.index("--max-turns") + 1] == "20"
+    assert argv[argv.index("--max-turns") + 1] == CLAUDE_REVIEW_MERGE_MAX_TURNS
+    assert argv[argv.index("--max-budget-usd") + 1] == CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD
 
 
-def test_claude_acceptance_argv_caps_max_turns(tmp_path: Path) -> None:
+def test_claude_acceptance_argv_caps_max_turns_and_budget(tmp_path: Path) -> None:
     binding = _binding(tmp_path, "claude", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
     argv = provider_argv(binding, "accept", prompt_via_stdin=True)
     assert argv[argv.index("--max-turns") + 1] == CLAUDE_ACCEPTANCE_MAX_TURNS
+    assert argv[argv.index("--max-budget-usd") + 1] == CLAUDE_ACCEPTANCE_MAX_BUDGET_USD
+
+
+def test_default_output_cap_within_coordinator_provider_result_cap() -> None:
+    assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+    assert COORDINATOR_PROVIDER_RESULT_CAP_BYTES == 524_288
 
 
 @pytest.mark.parametrize(

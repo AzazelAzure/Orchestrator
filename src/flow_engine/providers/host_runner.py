@@ -24,8 +24,10 @@ from typing import Any
 
 from flow_engine.providers.cli_registry import (
     CLAUDE_ACCEPTANCE_DISALLOWED,
+    CLAUDE_ACCEPTANCE_MAX_BUDGET_USD,
     CLAUDE_ACCEPTANCE_MAX_TURNS,
     CLAUDE_REVIEW_DISALLOWED,
+    CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
     CLAUDE_REVIEW_MERGE_MAX_TURNS,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
@@ -51,8 +53,10 @@ from flow_engine.providers.protocol import (
 )
 
 MAX_FRAME_BYTES = 1_048_576
+COORDINATOR_PROVIDER_RESULT_CAP_BYTES = 524_288
 DEFAULT_OUTPUT_CAP = 262_144
 DEFAULT_STDERR_CAP = 262_144
+assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_LINE_BYTES = 65_536
 MAX_EVENTS = 2_000
 # Observed Cursor stream-json event types for cursor-events-v1 (CLI 2026.08.04-aaa8809).
@@ -256,10 +260,15 @@ def provider_argv(
         if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
         else CLAUDE_ACCEPTANCE_MAX_TURNS
     )
+    max_budget_usd = (
+        CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD
+        if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
+        else CLAUDE_ACCEPTANCE_MAX_BUDGET_USD
+    )
     return (
         executable, "--print", "--verbose", "--output-format", "stream-json",
         "--model", binding.model, "--max-turns", max_turns,
-        "--max-budget-usd", "1.00", "--no-session-persistence",
+        "--max-budget-usd", max_budget_usd, "--no-session-persistence",
         "--disallowedTools", disallowed,
         *prompt_args,
     )
