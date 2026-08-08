@@ -25,6 +25,7 @@ from flow_engine.providers.cli_registry import (
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
 )
 from flow_engine.providers.host_runner import (
+    AGENTIC_MAX_EVENT_LINE_BYTES,
     COORDINATOR_PROVIDER_RESULT_CAP_BYTES,
     CURSOR_EVENT_TYPES,
     CURSOR_MAX_EVENT_LINE_BYTES,
@@ -496,10 +497,20 @@ def test_claude_acceptance_argv_caps_max_turns_and_budget(tmp_path: Path) -> Non
 def test_default_output_cap_within_coordinator_provider_result_cap() -> None:
     assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
     assert COORDINATOR_PROVIDER_RESULT_CAP_BYTES == 524_288
-    assert CURSOR_MAX_EVENT_LINE_BYTES == 512 * 1024
-    assert CURSOR_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
-    assert max_event_line_bytes("cursor") == CURSOR_MAX_EVENT_LINE_BYTES
-    assert max_event_line_bytes("codex") == MAX_LINE_BYTES
+    assert AGENTIC_MAX_EVENT_LINE_BYTES == 512 * 1024
+    assert CURSOR_MAX_EVENT_LINE_BYTES == AGENTIC_MAX_EVENT_LINE_BYTES
+    assert AGENTIC_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+    assert max_event_line_bytes("cursor", EXECUTION_PROFILE_ACCEPTANCE) == MAX_LINE_BYTES
+    assert max_event_line_bytes("claude", EXECUTION_PROFILE_ACCEPTANCE) == MAX_LINE_BYTES
+    assert max_event_line_bytes("codex", EXECUTION_PROFILE_CODEX_ADMIN) == MAX_LINE_BYTES
+    assert (
+        max_event_line_bytes("cursor", EXECUTION_PROFILE_CURSOR_IMPLEMENTATION)
+        == AGENTIC_MAX_EVENT_LINE_BYTES
+    )
+    assert (
+        max_event_line_bytes("claude", EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE)
+        == AGENTIC_MAX_EVENT_LINE_BYTES
+    )
 
 
 @pytest.mark.parametrize(
@@ -751,18 +762,93 @@ def test_cursor_large_nonterminal_stream_completes(tmp_path: Path) -> None:
     assert len(result["redacted_output"].encode()) <= binding.output_cap
 
 
-def _cursor_event_line_at_byte_cap(event_type: str = "tool_call") -> str:
-    prefix = f'{{"type":"{event_type}","session_id":"s","text":"'
-    suffix = '"}'
-    padding = CURSOR_MAX_EVENT_LINE_BYTES - len((prefix + suffix).encode())
+def _init_git_worktree(path: Path) -> None:
+    import subprocess as sp
+
+    sp.run(["git", "init"], cwd=path, capture_output=True, check=True)
+    sp.run(
+        [
+            "git",
+            "-c",
+            "user.email=test@test",
+            "-c",
+            "user.name=test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+        cwd=path,
+        check=True,
+    )
+
+
+def _cursor_implementation_binding(tmp_path: Path) -> ProviderBinding:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    _init_git_worktree(worktree)
+    return ProviderBinding(
+        provider="cursor",
+        executable=_fake_cli(tmp_path, "cursor"),
+        model="cursor-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "cursor.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2026.08.04-aaa8809",
+        allowed_models=("cursor-test-model",),
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+
+
+def _claude_review_binding(tmp_path: Path) -> ProviderBinding:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    _init_git_worktree(worktree)
+    return ProviderBinding(
+        provider="claude",
+        executable=_fake_cli(tmp_path, "claude"),
+        model="claude-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "claude.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2.1.212",
+        allowed_models=("claude-test-model",),
+        execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    )
+
+
+def _event_line_at_byte_cap(
+    provider: str,
+    cap: int,
+    *,
+    event_type: str = "tool_call",
+) -> str:
+    if provider == "cursor":
+        prefix = f'{{"type":"{event_type}","session_id":"s","text":"'
+        suffix = '"}'
+    elif provider == "claude":
+        prefix = '{"type":"assistant","provider_call_id":"c","content":"'
+        suffix = '"}'
+    else:
+        prefix = '{"type":"result","provider_call_id":"c","text":"'
+        suffix = '"}'
+    padding = cap - len((prefix + suffix).encode())
     assert padding >= 0
     return prefix + ("x" * padding) + suffix
 
 
-def test_cursor_accepts_tool_result_at_512kib_boundary(tmp_path: Path) -> None:
+def _cursor_event_line_at_byte_cap(
+    event_type: str = "tool_call",
+    *,
+    cap: int = AGENTIC_MAX_EVENT_LINE_BYTES,
+) -> str:
+    return _event_line_at_byte_cap("cursor", cap, event_type=event_type)
+
+
+def test_cursor_implementation_accepts_tool_result_at_512kib_boundary(tmp_path: Path) -> None:
     big_line = _cursor_event_line_at_byte_cap("tool_call")
-    assert len(big_line.encode()) == CURSOR_MAX_EVENT_LINE_BYTES
-    binding = _binding(tmp_path, "cursor")
+    assert len(big_line.encode()) == AGENTIC_MAX_EVENT_LINE_BYTES
+    binding = _cursor_implementation_binding(tmp_path)
     binding.executable.write_text(
         _cursor_stream_script(
             f"print({big_line!r})\n"
@@ -780,7 +866,38 @@ def test_cursor_accepts_tool_result_at_512kib_boundary(tmp_path: Path) -> None:
             handshake,
             invocation_id="inv-512k",
             attempt_id="att-512k",
-            task_packet={"objective": "512k tool result"},
+            task_packet={"objective": "512k tool result", "write_set": ["."]},
+        )
+    )
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-512k"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def test_claude_review_accepts_assistant_event_at_512kib_boundary(tmp_path: Path) -> None:
+    big_line = _event_line_at_byte_cap("claude", AGENTIC_MAX_EVENT_LINE_BYTES)
+    assert len(big_line.encode()) == AGENTIC_MAX_EVENT_LINE_BYTES
+    binding = _claude_review_binding(tmp_path)
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('claude 2.1.212'); raise SystemExit(0)\n"
+        f"print({big_line!r})\n"
+        "import json\n"
+        "print(json.dumps({'type':'result','subtype':'success','provider_call_id':'call-512k'}))\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-claude-512k",
+            attempt_id="att-claude-512k",
+            task_packet={"objective": "512k review tool result"},
         )
     )
     assert result["outcome"] == "complete"
@@ -796,8 +913,18 @@ def _assert_stream_parse_failure_is_durable(
     script_body: str,
     invocation_id: str,
     detail_match: str,
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE,
+    task_packet: dict[str, object] | None = None,
 ) -> None:
-    binding = _binding(tmp_path, provider)
+    if execution_profile == EXECUTION_PROFILE_CURSOR_IMPLEMENTATION:
+        binding = _cursor_implementation_binding(tmp_path)
+        task_packet = task_packet or {"objective": "parse failure", "write_set": ["."]}
+    elif execution_profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE:
+        binding = _claude_review_binding(tmp_path)
+        task_packet = task_packet or {"objective": "parse failure"}
+    else:
+        binding = _binding(tmp_path, provider, execution_profile=execution_profile)
+        task_packet = task_packet or {"objective": "parse failure"}
     if provider == "cursor":
         binding.executable.write_text(_cursor_stream_script(script_body), encoding="utf-8")
     else:
@@ -818,7 +945,7 @@ def _assert_stream_parse_failure_is_durable(
         handshake,
         invocation_id=invocation_id,
         attempt_id=f"att-{invocation_id}",
-        task_packet={"objective": "parse failure"},
+        task_packet=task_packet,
     )
     result = runner.invoke(packet)
     assert result["outcome"] == "outcome_unknown"
@@ -832,15 +959,63 @@ def _assert_stream_parse_failure_is_durable(
     assert replay == result
 
 
-def test_cursor_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path: Path) -> None:
+def test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
     over_line = _cursor_event_line_at_byte_cap("tool_call") + "x"
-    assert len(over_line.encode()) > CURSOR_MAX_EVENT_LINE_BYTES
+    assert len(over_line.encode()) > AGENTIC_MAX_EVENT_LINE_BYTES
     _assert_stream_parse_failure_is_durable(
         tmp_path,
         provider="cursor",
         script_body=f"print({over_line!r})\n",
         invocation_id="inv-over-512k",
         detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+
+
+def test_claude_review_rejects_event_over_512kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("claude", AGENTIC_MAX_EVENT_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > AGENTIC_MAX_EVENT_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="claude",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-claude-over-512k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    )
+
+
+def test_cursor_acceptance_rejects_event_over_64kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("cursor", MAX_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > MAX_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-cursor-over-64k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_ACCEPTANCE,
+    )
+
+
+def test_claude_acceptance_rejects_event_over_64kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("claude", MAX_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > MAX_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="claude",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-claude-over-64k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_ACCEPTANCE,
     )
 
 
@@ -954,7 +1129,7 @@ def test_parser_failure_socket_invoke_returns_without_escape(tmp_path: Path) -> 
 
 def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
     """Legacy name: cursor events above 512 KiB fail closed with durable outcome_unknown."""
-    test_cursor_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
+    test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
 
 
 def test_truncated_evidence_preserves_terminal_event(tmp_path: Path) -> None:

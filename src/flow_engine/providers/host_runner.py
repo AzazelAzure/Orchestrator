@@ -31,6 +31,7 @@ from flow_engine.providers.cli_registry import (
     CLAUDE_REVIEW_MERGE_MAX_TURNS,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
     claude_result_subtype_is_success,
     claude_result_subtype_is_terminal,
     probe_matches_pinned_version,
@@ -58,13 +59,13 @@ DEFAULT_OUTPUT_CAP = 262_144
 DEFAULT_STDERR_CAP = 262_144
 assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_LINE_BYTES = 65_536
-CURSOR_MAX_EVENT_LINE_BYTES = 512 * 1024
-PROVIDER_MAX_EVENT_LINE_BYTES: dict[str, int] = {
-    "codex": MAX_LINE_BYTES,
-    "cursor": CURSOR_MAX_EVENT_LINE_BYTES,
-    "claude": MAX_LINE_BYTES,
-}
-assert CURSOR_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+AGENTIC_MAX_EVENT_LINE_BYTES = 512 * 1024
+CURSOR_MAX_EVENT_LINE_BYTES = AGENTIC_MAX_EVENT_LINE_BYTES
+AGENTIC_EXECUTION_PROFILES = frozenset({
+    EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+})
+assert AGENTIC_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_EVENTS = 2_000
 # Observed Cursor stream-json event types for cursor-events-v1 (CLI 2026.08.04-aaa8809).
 CURSOR_EVENT_TYPES = frozenset({
@@ -119,8 +120,11 @@ class StreamParseFailure(Exception):
     """Post-dispatch stdout JSONL parse failure; becomes durable outcome_unknown."""
 
 
-def max_event_line_bytes(provider: str) -> int:
-    return PROVIDER_MAX_EVENT_LINE_BYTES[provider]
+def max_event_line_bytes(provider: str, execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE) -> int:
+    del provider  # cap is binding/profile-driven; provider kept for call-site clarity
+    if execution_profile in AGENTIC_EXECUTION_PROFILES:
+        return AGENTIC_MAX_EVENT_LINE_BYTES
+    return MAX_LINE_BYTES
 
 
 def _terminate_dispatched_process(proc: subprocess.Popen[Any]) -> None:
@@ -356,8 +360,15 @@ class _StreamParseState:
     evidence_truncated: bool = False
 
 
-def validate_provider_event(provider: str, event: dict[str, Any]) -> None:
-    if len(canonical_json(event).encode()) > max_event_line_bytes(provider):
+def validate_provider_event(
+    provider: str,
+    event: dict[str, Any],
+    *,
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE,
+) -> None:
+    if len(canonical_json(event).encode()) > max_event_line_bytes(
+        provider, execution_profile
+    ):
         raise ValueError("provider event exceeds cap")
     event_type = event.get("type")
     if not isinstance(event_type, str) or event_type not in EVENT_TYPES[provider]:
@@ -647,7 +658,9 @@ class HostRunner:
     def _consume_stdout_line(self, line: str, state: _StreamParseState) -> None:
         if not line.strip():
             return
-        line_cap = max_event_line_bytes(self.binding.provider)
+        line_cap = max_event_line_bytes(
+            self.binding.provider, self.binding.execution_profile
+        )
         if len(line.encode()) > line_cap:
             raise StreamParseFailure("provider event line exceeds cap")
         try:
@@ -657,7 +670,11 @@ class HostRunner:
         if not isinstance(event, dict):
             raise StreamParseFailure("provider event must be an object")
         try:
-            validate_provider_event(self.binding.provider, event)
+            validate_provider_event(
+                self.binding.provider,
+                event,
+                execution_profile=self.binding.execution_profile,
+            )
         except ValueError as exc:
             raise StreamParseFailure(str(exc)) from exc
         state.event_count += 1
@@ -711,7 +728,9 @@ class HostRunner:
         stderr_buf = bytearray()
         state = _StreamParseState()
         stderr_cap = DEFAULT_STDERR_CAP
-        line_cap = max_event_line_bytes(self.binding.provider)
+        line_cap = max_event_line_bytes(
+            self.binding.provider, self.binding.execution_profile
+        )
         truncated = False
         deadline = time.monotonic() + self.binding.timeout_sec
         while selector.get_map():

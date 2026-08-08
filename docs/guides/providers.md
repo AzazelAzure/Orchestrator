@@ -109,7 +109,7 @@ pins — see [`r3-organization.md`](../r3-organization.md)).
 | Redacted evidence cap | 262,144 bytes | `DEFAULT_OUTPUT_CAP` / `binding.output_cap` |
 | Coordinator provider-result cap | 524,288 bytes | `worker_delivery` settlement validation |
 | Stderr cap | 262,144 bytes | `DEFAULT_STDERR_CAP` |
-| Max line / event bytes | 65,536 (`codex`, `claude`); 524,288 (`cursor` tool-result lines) | `MAX_LINE_BYTES`, `CURSOR_MAX_EVENT_LINE_BYTES` |
+| Max line / event bytes | 65,536 (acceptance, `codex-admin-reconciliation`); 524,288 (`cursor-implementation`, `claude-independent-review-merge` tool-result lines) | `MAX_LINE_BYTES`, `AGENTIC_MAX_EVENT_LINE_BYTES` |
 | Max parsed events | 2,000 | `MAX_EVENTS` |
 | Env allowlist | `HOME`, `LANG`, `LC_ALL`, `PATH`, `TERM`, `NO_COLOR` (+ `CURSOR_API_KEY` for cursor) | `SAFE_ENV`, `provider_env_allowlist` |
 | Secret redaction | Bearer, API keys, private keys | `SECRET_PATTERN`, `PRIVATE_KEY_PATTERN` |

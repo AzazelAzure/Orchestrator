@@ -10,6 +10,12 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - **Codex acceptance argv** — `acceptance` profile passes `--skip-git-repo-check` so
   Codex read-only acceptance can run in the host runner's isolated empty non-git
   workspace; `codex-admin-reconciliation` omits the flag.
+- **Profile-aware event-line caps** — `validate_provider_event` and the streaming
+  parser share `max_event_line_bytes(provider, execution_profile)`: acceptance and
+  `codex-admin-reconciliation` stay at 64 KiB (`MAX_LINE_BYTES`); agentic profiles
+  `cursor-implementation` and `claude-independent-review-merge` allow a bounded 512 KiB
+  single JSONL event (`AGENTIC_MAX_EVENT_LINE_BYTES`) for legitimate large tool
+  results without widening read-only probes.
 - **Claude stream-json terminal subtypes** — Host runner accepts the
   `claude-events-v1` result subtype family (`success`, `error_during_execution`,
   `error_max_turns`, `error_max_budget_usd`, `error_max_structured_output_retries`)
@@ -20,8 +26,9 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - **Cursor stream-json** — `thinking` events are allowlisted for `cursor-events-v1`.
 - **Host runner stream bounds** — Incremental JSONL parsing replaces raw stdout
   accumulation: large nonterminal Cursor streams no longer trigger process kill at
-  the legacy total output cap; per-provider event-line caps (`MAX_LINE_BYTES` for
-  Codex/Claude, `CURSOR_MAX_EVENT_LINE_BYTES` 512 KiB for Cursor tool-result lines),
+  the legacy total output cap; per-profile event-line caps (`MAX_LINE_BYTES` 64 KiB for
+  acceptance and `codex-admin-reconciliation`; `AGENTIC_MAX_EVENT_LINE_BYTES` 512 KiB
+  for `cursor-implementation` and `claude-independent-review-merge`),
   event-count (`MAX_EVENTS`), redacted evidence (`output_cap` 262,144 bytes),
   stderr (`DEFAULT_STDERR_CAP`), and socket frame (`MAX_FRAME_BYTES`) bounds remain
   enforced below the coordinator provider-result cap (524,288 bytes). JSON decode,
