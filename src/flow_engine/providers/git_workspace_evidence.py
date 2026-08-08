@@ -86,9 +86,9 @@ def repo_path_to_workspace_relative(
 def capture_git_baseline(cwd: Path, workspace_root: Path) -> GitWorkspaceBaseline:
     git_toplevel, workspace_root = resolve_git_workspace(cwd, workspace_root)
     head = _run_git(cwd, "rev-parse", "HEAD").strip()
-    untracked_raw = _run_git(
-        cwd, "ls-files", "--others", "--exclude-standard", check=False
-    )
+    # baseline_untracked is bound into baseline_digest for fail-safe replay; pre-existing
+    # untracked paths are recorded at capture and are not excluded from later diffs.
+    untracked_raw = _run_git(cwd, "ls-files", "--others", "--exclude-standard")
     untracked: list[str] = []
     for line in untracked_raw.splitlines():
         line = line.strip()
@@ -115,7 +115,7 @@ def capture_git_baseline(cwd: Path, workspace_root: Path) -> GitWorkspaceBaselin
 
 
 def _collect_repo_paths(cwd: Path, *git_args: str) -> list[str]:
-    output = _run_git(cwd, *git_args, check=False)
+    output = _run_git(cwd, *git_args)
     if not output.strip():
         return []
     return [line.strip() for line in output.splitlines() if line.strip()]
