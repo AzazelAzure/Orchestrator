@@ -19,6 +19,7 @@ from flow_engine.providers.cli_registry import (
     CLAUDE_RESULT_SUBTYPES_ERROR,
     CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
     CLAUDE_REVIEW_MERGE_MAX_TURNS,
+    CLAUDE_REVIEW_MERGE_PERMISSION_MODE,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
     EXECUTION_PROFILE_CODEX_ADMIN,
@@ -485,6 +486,14 @@ def test_claude_review_argv_allows_bash(tmp_path: Path) -> None:
     assert "Bash" not in denied
     assert argv[argv.index("--max-turns") + 1] == CLAUDE_REVIEW_MERGE_MAX_TURNS
     assert argv[argv.index("--max-budget-usd") + 1] == CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD
+    assert argv[argv.index("--permission-mode") + 1] == CLAUDE_REVIEW_MERGE_PERMISSION_MODE
+
+
+def test_claude_acceptance_argv_omits_permission_bypass(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "accept", prompt_via_stdin=True)
+    assert "--permission-mode" not in argv
+    assert CLAUDE_REVIEW_MERGE_PERMISSION_MODE not in argv
 
 
 def test_claude_acceptance_argv_caps_max_turns_and_budget(tmp_path: Path) -> None:

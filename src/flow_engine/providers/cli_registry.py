@@ -59,6 +59,8 @@ CLAUDE_ACCEPTANCE_DISALLOWED = (
     "Read,Grep,Glob,Edit,Write,Bash,WebFetch,WebSearch"
 )
 CLAUDE_REVIEW_DISALLOWED = "Edit,Write"
+# Headless host-runner review/merge: bypass interactive permission prompts for Bash/gh.
+CLAUDE_REVIEW_MERGE_PERMISSION_MODE: Final[str] = "bypassPermissions"
 
 # Claude stream-json terminal result subtypes for claude-events-v1 (CLI 2.1.212).
 CLAUDE_RESULT_SUBTYPE_SUCCESS: Final[str] = "success"

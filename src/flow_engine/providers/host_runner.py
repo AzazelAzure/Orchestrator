@@ -29,6 +29,7 @@ from flow_engine.providers.cli_registry import (
     CLAUDE_REVIEW_DISALLOWED,
     CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
     CLAUDE_REVIEW_MERGE_MAX_TURNS,
+    CLAUDE_REVIEW_MERGE_PERMISSION_MODE,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
@@ -316,13 +317,15 @@ def provider_argv(
         if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
         else CLAUDE_ACCEPTANCE_MAX_BUDGET_USD
     )
-    return (
+    argv: list[str] = [
         executable, "--print", "--verbose", "--output-format", "stream-json",
         "--model", binding.model, "--max-turns", max_turns,
         "--max-budget-usd", max_budget_usd, "--no-session-persistence",
-        "--disallowedTools", disallowed,
-        *prompt_args,
-    )
+    ]
+    if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE:
+        argv.extend(["--permission-mode", CLAUDE_REVIEW_MERGE_PERMISSION_MODE])
+    argv.extend(["--disallowedTools", disallowed, *prompt_args])
+    return tuple(argv)
 
 
 def provider_uses_stdin_prompt(binding: ProviderBinding) -> bool:

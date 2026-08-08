@@ -81,8 +81,12 @@ declared paths. Linked worktrees and cwd subdirectories resolve against `workspa
 baseline capture fails closed when git evidence cannot be established.
 
 The Claude independent-review/merge profile is a **trusted authorized role**: Bash remains
-available for tests and `gh` review/merge; it is not a filesystem sandbox. Git baseline
-diffs are recorded for workspace mutations without failing authorized `gh` operations.
+available for tests and `gh` review/merge; it is not a filesystem sandbox. Host-runner
+invocations pass `--permission-mode bypassPermissions` so authorized Bash/`gh` calls run
+non-interactively in headless operation (no interactive approval prompts). The
+`acceptance` profile does **not** receive this bypass — it stays tool-disallowed and
+isolated. Git baseline diffs are recorded for workspace mutations without failing
+authorized `gh` operations.
 
 ---
 
@@ -207,7 +211,7 @@ env beyond explicit allowlist, or implement automatic paid retry.
 | Cursor | `acceptance` | `--mode ask`, `--trust` |
 | Cursor | `cursor-implementation` | Default write mode (no `--mode`; CLI permits only `plan`/`ask`); `--force` |
 | Claude | `acceptance` | All tools disallowed via `--disallowedTools`; `--max-turns 8`; `--max-budget-usd 1.00` |
-| Claude | `claude-independent-review-merge` | Disallows Edit/Write only; `--max-turns 32`; `--max-budget-usd 4.00` |
+| Claude | `claude-independent-review-merge` | Disallows Edit/Write only; `--permission-mode bypassPermissions` (headless authorized Bash/gh); `--max-turns 32`; `--max-budget-usd 4.00` |
 | Codex | `acceptance` | `--skip-git-repo-check` (isolated empty non-git workspace), `--sandbox read-only` |
 | Codex | `codex-admin-reconciliation` | `--sandbox read-only` (no `--skip-git-repo-check`) |
 | Claude | all | `--verbose` stream-json; stdin prompt; terminal `result` subtypes:
