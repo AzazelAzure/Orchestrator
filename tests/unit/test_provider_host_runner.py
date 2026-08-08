@@ -15,6 +15,7 @@ from flow_engine.persistence.migrations import apply_migrations, list_tables
 from flow_engine.providers.cli_registry import (
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    EXECUTION_PROFILE_CODEX_ADMIN,
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
 )
 from flow_engine.providers.host_runner import (
@@ -166,6 +167,7 @@ def test_cli_bindings_are_noninteractive_structured(provider: str, tmp_path: Pat
         assert "bounded task" in argv
     if provider == "codex":
         assert argv[1:3] == ("exec", "--json")
+        assert "--skip-git-repo-check" in argv
         assert ("--sandbox", "read-only") == (
             argv[argv.index("--sandbox")],
             argv[argv.index("--sandbox") + 1],
@@ -429,6 +431,24 @@ def test_invoke_rejects_profile_upgrade(tmp_path: Path) -> None:
     packet["execution_profile"] = EXECUTION_PROFILE_CURSOR_IMPLEMENTATION
     with pytest.raises(PermissionError, match="execution profile"):
         runner.invoke(packet)
+
+
+def test_codex_acceptance_argv_includes_skip_git_repo_check(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "codex", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "acceptance probe")
+    sandbox_idx = argv.index("--sandbox")
+    assert argv[sandbox_idx - 1] == "--skip-git-repo-check"
+    assert ("--sandbox", "read-only") == (argv[sandbox_idx], argv[sandbox_idx + 1])
+
+
+def test_codex_admin_argv_omits_skip_git_repo_check(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "codex", execution_profile=EXECUTION_PROFILE_CODEX_ADMIN)
+    argv = provider_argv(binding, "reconcile")
+    assert "--skip-git-repo-check" not in argv
+    assert ("--sandbox", "read-only") == (
+        argv[argv.index("--sandbox")],
+        argv[argv.index("--sandbox") + 1],
+    )
 
 
 def test_cursor_implementation_argv_uses_force_without_mode_flag(tmp_path: Path) -> None:

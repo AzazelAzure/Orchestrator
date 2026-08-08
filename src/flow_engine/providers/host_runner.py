@@ -217,10 +217,14 @@ def provider_argv(
     executable = str(binding.executable)
     prompt_args: tuple[str, ...] = () if prompt_via_stdin else (prompt,)
     if binding.provider == "codex":
-        return (
+        argv = [
             executable, "exec", "--json", "--ephemeral",
-            "--sandbox", "read-only", "--model", binding.model, *prompt_args,
-        )
+            "--sandbox", "read-only", "--model", binding.model,
+        ]
+        if profile == EXECUTION_PROFILE_ACCEPTANCE:
+            argv.insert(argv.index("--sandbox"), "--skip-git-repo-check")
+        argv.extend(prompt_args)
+        return tuple(argv)
     if binding.provider == "cursor":
         if profile == EXECUTION_PROFILE_ACCEPTANCE:
             argv: list[str] = [

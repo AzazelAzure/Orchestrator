@@ -7,6 +7,9 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Fixed
 
+- **Codex acceptance argv** — `acceptance` profile passes `--skip-git-repo-check` so
+  Codex read-only acceptance can run in the host runner's isolated empty non-git
+  workspace; `codex-admin-reconciliation` omits the flag.
 - **Bootstrap integration follow-up** — `persist_adapter_snapshot` accepts bootstrap
   handshake fields (`cli_version_pin`, `event_schema`, `execution_profile`); durable
   `binding_digest` and coordinator/worker invoke packets carry `execution_profile`

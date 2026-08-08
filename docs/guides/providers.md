@@ -197,7 +197,8 @@ env beyond explicit allowlist, or implement automatic paid retry.
 | Cursor | `cursor-implementation` | Default write mode (no `--mode`; CLI permits only `plan`/`ask`); `--force` |
 | Claude | `acceptance` | All tools disallowed via `--disallowedTools` |
 | Claude | `claude-independent-review-merge` | Disallows Edit/Write only |
-| Codex | all profiles | `--sandbox read-only` |
+| Codex | `acceptance` | `--skip-git-repo-check` (isolated empty non-git workspace), `--sandbox read-only` |
+| Codex | `codex-admin-reconciliation` | `--sandbox read-only` (no `--skip-git-repo-check`) |
 | Claude | all | `--verbose` stream-json; stdin prompt |
 | Codex | all | `thread.started` / `turn.completed` event family |
 
