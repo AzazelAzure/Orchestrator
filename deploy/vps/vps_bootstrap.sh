@@ -199,7 +199,10 @@ main() {
   ensure_attestation
   up_orchestrator || log "orchestrator up had errors"
   up_portfolio || log "portfolio up had errors"
-  reload_hfm_proxy || log "proxy reload had errors"
+  reload_hfm_proxy || {
+    log "ERROR: proxy reload failed"
+    return 1
+  }
   install_systemd_user_units
   smoke_local || log "local smokes had failures"
   smoke_public || log "public ZT smokes skipped or failed"

@@ -547,3 +547,92 @@ class TestHealthcheckHarness:
         assert result.returncode != 0
         combined = result.stdout + result.stderr
         assert "ambiguous API container count" in combined
+
+
+class TestVpsBootstrapHarness:
+    def test_main_all_stops_when_required_proxy_pre_reload_hook_missing(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        marker = tmp_path / "bootstrap.marker"
+        orch = _fixture_orch_root(tmp_path)
+        (orch / ".env.vps").write_text(
+            "ORCH_TOKEN_FOUNDER=test-token\nORCH_EDGE_PROXY_PRE_RELOAD_REQUIRED=1\n",
+            encoding="utf-8",
+        )
+        fm_root = tmp_path / "finance_manager"
+        fm_root.mkdir()
+        (fm_root / "docker-compose.bluegreen.yml").write_text(
+            "services:\n  proxy:\n    image: nginx:alpine\n",
+            encoding="utf-8",
+        )
+        port_root = tmp_path / "portfolio"
+        (port_root / "deploy").mkdir(parents=True)
+        (port_root / "deploy/docker-compose.vps.yml").write_text(
+            "services: {}\n",
+            encoding="utf-8",
+        )
+
+        _write_utility_stub(
+            bin_dir,
+            "bash",
+            textwrap.dedent(
+                """
+                if [[ "${1:-}" == "-lc" ]]; then
+                  exit 0
+                fi
+                case "${1:-}" in
+                  *orch_color.sh*|*healthcheck.sh*|*build_script_runner_attestation.sh*|*generate_vps_env.sh*)
+                    exit 0
+                    ;;
+                esac
+                exec /bin/bash "$@"
+                """
+            ),
+        )
+        _write_utility_stub(
+            bin_dir,
+            "python3",
+            "exit 0",
+        )
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            "exit 0",
+        )
+        _write_stub(
+            bin_dir,
+            "systemctl",
+            textwrap.dedent(
+                f"""
+                MARKER="{marker}"
+                printf '%s\\n' "systemctl-called" >> "${{MARKER}}.log"
+                exit 0
+                """
+            ),
+        )
+        _write_stub(bin_dir, "curl", "exit 0")
+        _write_sed_stub(bin_dir)
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(marker),
+            "ORCH_ROOT": str(orch),
+            "FM_ROOT": str(fm_root),
+            "PORT_ROOT": str(port_root),
+            "COMPOSE": "podman-compose",
+            "HOME": str(tmp_path / "home"),
+        }
+        (tmp_path / "home").mkdir()
+
+        result = _run_script(
+            orch / "deploy/vps/vps_bootstrap.sh",
+            env=env,
+            args=["all"],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode != 0, result.stdout + result.stderr
+        combined = result.stdout + result.stderr
+        assert "proxy reload failed" in combined
+        assert "ORCH_EDGE_PROXY_PRE_RELOAD_CMD is unset" in combined
+        log_path = Path(f"{marker}.log")
+        assert not log_path.exists() or "systemctl-called" not in log_path.read_text(encoding="utf-8")

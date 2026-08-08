@@ -18,6 +18,8 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   (nginx:alpine-safe) before Python fallback; `healthcheck.sh` restores exact-one/ambiguous
   compose discovery; generic `ORCH_EDGE_PROXY_PRE_RELOAD_CMD` hook runs before edge-proxy
   nginx validation/reload (`orch_color.sh`, `vps_bootstrap.sh`).
+- **ORCH-VPS-NET-ATTACH-01 (review F4)** — `vps_bootstrap.sh all` fails closed when
+  `reload_hfm_proxy` fails (required pre-reload hook absent/failing no longer exits 0).
 
 ### Removed
 

@@ -131,6 +131,12 @@ def test_edge_proxy_pre_reload_hook_contract() -> None:
     assert "orch_run_edge_proxy_pre_reload_hook" in color
 
 
+def test_bootstrap_main_fails_closed_on_proxy_reload() -> None:
+    text = _read(BOOTSTRAP)
+    assert 'reload_hfm_proxy || log "proxy reload had errors"' not in text
+    assert "ERROR: proxy reload failed" in text
+
+
 def test_deploy_ecosystem_orchestrator_sync_contract() -> None:
     text = _read(ECOSYSTEM)
     assert "ORCH_PROTECTED_EXCLUDES" in text
