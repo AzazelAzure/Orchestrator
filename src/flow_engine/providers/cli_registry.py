@@ -60,6 +60,34 @@ CLAUDE_ACCEPTANCE_DISALLOWED = (
 )
 CLAUDE_REVIEW_DISALLOWED = "Edit,Write"
 
+# Claude stream-json terminal result subtypes for claude-events-v1 (CLI 2.1.212).
+CLAUDE_RESULT_SUBTYPE_SUCCESS: Final[str] = "success"
+CLAUDE_RESULT_SUBTYPES_ERROR: Final[frozenset[str]] = frozenset({
+    "error_during_execution",
+    "error_max_turns",
+    "error_max_budget_usd",
+    "error_max_structured_output_retries",
+})
+CLAUDE_RESULT_SUBTYPES: Final[frozenset[str]] = frozenset(
+    {CLAUDE_RESULT_SUBTYPE_SUCCESS, *CLAUDE_RESULT_SUBTYPES_ERROR}
+)
+
+# Bounded agentic turn caps (acceptance stays tight; review-merge needs PR headroom).
+CLAUDE_ACCEPTANCE_MAX_TURNS: Final[str] = "8"
+CLAUDE_REVIEW_MERGE_MAX_TURNS: Final[str] = "20"
+
+
+def claude_result_subtype_is_terminal(subtype: object) -> bool:
+    return isinstance(subtype, str) and subtype in CLAUDE_RESULT_SUBTYPES
+
+
+def claude_result_subtype_is_success(subtype: object) -> bool:
+    return subtype == CLAUDE_RESULT_SUBTYPE_SUCCESS
+
+
+def claude_result_subtype_is_error(subtype: object) -> bool:
+    return isinstance(subtype, str) and subtype in CLAUDE_RESULT_SUBTYPES_ERROR
+
 
 def registered_cli_versions(provider: str) -> frozenset[str]:
     versions = REGISTERED_CLI_VERSIONS.get(provider)

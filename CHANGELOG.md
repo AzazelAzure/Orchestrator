@@ -10,6 +10,19 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - **Codex acceptance argv** — `acceptance` profile passes `--skip-git-repo-check` so
   Codex read-only acceptance can run in the host runner's isolated empty non-git
   workspace; `codex-admin-reconciliation` omits the flag.
+- **Claude stream-json terminal subtypes** — Host runner accepts the
+  `claude-events-v1` result subtype family (`success`, `error_during_execution`,
+  `error_max_turns`, `error_max_budget_usd`, `error_max_structured_output_retries`)
+  instead of the stale `success`/`error` pair; terminal error subtypes require
+  reconciliation and never yield `outcome=complete`. `claude-independent-review-merge`
+  uses `--max-turns 20` (acceptance remains `8`).
+- **Cursor stream-json** — `thinking` events are allowlisted for `cursor-events-v1`.
+- **Host runner stream bounds** — Incremental JSONL parsing replaces raw stdout
+  accumulation: large nonterminal Cursor streams no longer trigger process kill at
+  the legacy total output cap; per-event (`MAX_LINE_BYTES`), event-count (`MAX_EVENTS`),
+  redacted evidence (`output_cap`), stderr (`DEFAULT_STDERR_CAP`), and socket frame
+  (`MAX_FRAME_BYTES`) bounds remain enforced. Terminal events are preserved when
+  evidence truncation occurs.
 - **Bootstrap integration follow-up** — `persist_adapter_snapshot` accepts bootstrap
   handshake fields (`cli_version_pin`, `event_schema`, `execution_profile`); durable
   `binding_digest` and coordinator/worker invoke packets carry `execution_profile`

@@ -106,15 +106,23 @@ pins — see [`r3-organization.md`](../r3-organization.md)).
 | Control | Value / behavior | Source |
 |---------|------------------|--------|
 | Max frame bytes | 1,048,576 | `MAX_FRAME_BYTES` |
-| Output cap | 262,144 bytes | `DEFAULT_OUTPUT_CAP` |
-| Max line bytes | 65,536 | `MAX_LINE_BYTES` |
+| Redacted evidence cap | 262,144 bytes | `DEFAULT_OUTPUT_CAP` / `binding.output_cap` |
+| Stderr cap | 262,144 bytes | `DEFAULT_STDERR_CAP` |
+| Max line / event bytes | 65,536 | `MAX_LINE_BYTES` |
 | Max parsed events | 2,000 | `MAX_EVENTS` |
 | Env allowlist | `HOME`, `LANG`, `LC_ALL`, `PATH`, `TERM`, `NO_COLOR` (+ `CURSOR_API_KEY` for cursor) | `SAFE_ENV`, `provider_env_allowlist` |
 | Secret redaction | Bearer, API keys, private keys | `SECRET_PATTERN`, `PRIVATE_KEY_PATTERN` |
 | Event allowlist | Per-provider `EVENT_TYPES` set | Stream parser rejects unknown events |
 
-Subprocess uses argv arrays only (no shell). Transport uses selector-driven
-binary capture with bounded wall time.
+Stdout is parsed incrementally (newline-delimited JSON). Nonterminal transcript volume
+may exceed the evidence cap without terminating the provider; oversized single events,
+unknown event types, and event-count overflow still fail closed. Terminal stream events
+are retained in `redacted_output` even when earlier evidence is truncated. `truncated=true`
+records partial evidence; outcome stays `complete` when stderr is bounded and terminal
+identity is present.
+
+Subprocess uses argv arrays only (no shell). Transport uses selector-driven incremental
+parse with bounded wall time.
 
 ---
 
@@ -195,11 +203,16 @@ env beyond explicit allowlist, or implement automatic paid retry.
 |----------|---------|-------------------------------|
 | Cursor | `acceptance` | `--mode ask`, `--trust` |
 | Cursor | `cursor-implementation` | Default write mode (no `--mode`; CLI permits only `plan`/`ask`); `--force` |
-| Claude | `acceptance` | All tools disallowed via `--disallowedTools` |
-| Claude | `claude-independent-review-merge` | Disallows Edit/Write only |
+| Claude | `acceptance` | All tools disallowed via `--disallowedTools`; `--max-turns 8` |
+| Claude | `claude-independent-review-merge` | Disallows Edit/Write only; `--max-turns 20` |
 | Codex | `acceptance` | `--skip-git-repo-check` (isolated empty non-git workspace), `--sandbox read-only` |
 | Codex | `codex-admin-reconciliation` | `--sandbox read-only` (no `--skip-git-repo-check`) |
-| Claude | all | `--verbose` stream-json; stdin prompt |
+| Claude | all | `--verbose` stream-json; stdin prompt; terminal `result` subtypes:
+  `success` (complete when identity present) or error family
+  (`error_during_execution`, `error_max_turns`, `error_max_budget_usd`,
+  `error_max_structured_output_retries` — reconciliation required) |
+| Cursor | all | Observed `cursor-events-v1` types: `system`, `user`, `assistant`,
+  `tool_call`, `result`, `error`, `thinking` |
 | Codex | all | `thread.started` / `turn.completed` event family |
 
 Terminal identity accepts `request_id` in stream parser (CHANGELOG 2026-07-28).

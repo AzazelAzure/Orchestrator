@@ -13,12 +13,18 @@ import pytest
 
 from flow_engine.persistence.migrations import apply_migrations, list_tables
 from flow_engine.providers.cli_registry import (
+    CLAUDE_ACCEPTANCE_MAX_TURNS,
+    CLAUDE_RESULT_SUBTYPE_SUCCESS,
+    CLAUDE_RESULT_SUBTYPES_ERROR,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
     EXECUTION_PROFILE_CODEX_ADMIN,
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
 )
 from flow_engine.providers.host_runner import (
+    CURSOR_EVENT_TYPES,
+    MAX_FRAME_BYTES,
+    MAX_LINE_BYTES,
     HostRunner,
     HostRunnerServer,
     ProviderBinding,
@@ -28,6 +34,7 @@ from flow_engine.providers.host_runner import (
     canonical_json,
     digest_json,
     provider_argv,
+    validate_provider_event,
     validate_write_set,
 )
 
@@ -467,6 +474,97 @@ def test_claude_review_argv_allows_bash(tmp_path: Path) -> None:
     denied = argv[argv.index("--disallowedTools") + 1]
     assert denied == "Edit,Write"
     assert "Bash" not in denied
+    assert argv[argv.index("--max-turns") + 1] == "20"
+
+
+def test_claude_acceptance_argv_caps_max_turns(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "accept", prompt_via_stdin=True)
+    assert argv[argv.index("--max-turns") + 1] == CLAUDE_ACCEPTANCE_MAX_TURNS
+
+
+@pytest.mark.parametrize(
+    "subtype",
+    [
+        CLAUDE_RESULT_SUBTYPE_SUCCESS,
+        *sorted(CLAUDE_RESULT_SUBTYPES_ERROR),
+    ],
+)
+def test_claude_result_subtype_validation_accepts_registered(subtype: str) -> None:
+    validate_provider_event(
+        "claude",
+        {
+            "type": "result",
+            "subtype": subtype,
+            "provider_call_id": "call-registered",
+        },
+    )
+
+
+@pytest.mark.parametrize("subtype", ["error", "success_with_extra", ""])
+def test_claude_result_subtype_validation_rejects_unknown(subtype: str) -> None:
+    with pytest.raises(ValueError, match="subtype invalid"):
+        validate_provider_event(
+            "claude",
+            {"type": "result", "subtype": subtype, "provider_call_id": "call-bad"},
+        )
+
+
+def test_cursor_thinking_event_type_is_accepted() -> None:
+    validate_provider_event(
+        "cursor",
+        {"type": "thinking", "session_id": "sess-thinking"},
+    )
+
+
+@pytest.mark.parametrize(
+    "subtype",
+    sorted(CLAUDE_RESULT_SUBTYPES_ERROR),
+)
+def test_claude_error_terminal_subtype_requires_reconciliation(
+    tmp_path: Path, subtype: str
+) -> None:
+    binding = _binding(tmp_path, "claude")
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('claude 2.1.212'); raise SystemExit(0)\n"
+        f"print('{{\"type\":\"result\",\"subtype\":\"{subtype}\",\"provider_call_id\":\"call-err\"}}')\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id=f"inv-{subtype}",
+            attempt_id=f"att-{subtype}",
+            task_packet={"objective": "terminal error"},
+        )
+    )
+    assert result["reconciliation_required"] is True
+    assert result["outcome"] != "complete"
+    assert result["provider_call_id"] == "call-err"
+
+
+def test_claude_success_terminal_subtype_can_complete(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude")
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-success",
+            attempt_id="att-success",
+            task_packet={"objective": "terminal success"},
+        )
+    )
+    assert result["reconciliation_required"] is False
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-1"
 
 
 def test_write_set_dot_allows_any_in_workspace_path(tmp_path: Path) -> None:
@@ -586,3 +684,152 @@ def test_write_set_violation_fails_without_deleting_evidence(tmp_path: Path) -> 
     assert "undeclared.py" in result["undeclared_paths"]
     assert result["outcome"] == "failed"
     assert result["redacted_output"]
+
+
+def _cursor_stream_script(body: str) -> str:
+    return (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv:\n"
+        "    print('cursor 2026.08.04-aaa8809')\n"
+        "    raise SystemExit(0)\n"
+        + body
+    )
+
+
+def test_cursor_event_contract_matches_observed_types() -> None:
+    assert CURSOR_EVENT_TYPES == frozenset({
+        "system", "user", "assistant", "tool_call", "result", "error", "thinking",
+    })
+
+
+def test_cursor_large_nonterminal_stream_completes(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "import json\n"
+            "for i in range(300):\n"
+            "    print(json.dumps({'type':'assistant','session_id':'s','text':'x'*900}))\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-big'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-big-stream",
+            attempt_id="att-big-stream",
+            task_packet={"objective": "large stream"},
+        )
+    )
+    assert result["provider_call_id"] == "call-big"
+    assert result["outcome"] == "complete"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "print('{' + '\"type\":\"assistant\",\"session_id\":\"s\",\"text\":\"' + 'y'*70000 + '\"}')\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    with pytest.raises(ValueError, match="exceeds cap"):
+        runner.invoke(
+            _invoke_packet(
+                runner,
+                handshake,
+                invocation_id="inv-huge-line",
+                attempt_id="att-huge-line",
+                task_packet={"objective": "oversized line"},
+            )
+        )
+
+
+def test_invoke_rejects_unknown_cursor_event_type(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "import json\n"
+            "print(json.dumps({'type':'progress','session_id':'s'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    with pytest.raises(ValueError, match="unsupported provider event type"):
+        runner.invoke(
+            _invoke_packet(
+                runner,
+                handshake,
+                invocation_id="inv-unknown",
+                attempt_id="att-unknown",
+                task_packet={"objective": "unknown event"},
+            )
+        )
+
+
+def test_truncated_evidence_preserves_terminal_event(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "import json\n"
+            "for i in range(400):\n"
+            "    print(json.dumps({'type':'thinking','session_id':'s','text':'z'*800}))\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-terminal'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-terminal",
+            attempt_id="att-terminal",
+            task_packet={"objective": "terminal preservation"},
+        )
+    )
+    assert result["truncated"] is True
+    assert result["provider_call_id"] == "call-terminal"
+    assert "call-terminal" in result["redacted_output"]
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def test_host_runner_recv_rejects_oversized_socket_frame() -> None:
+    from unittest.mock import MagicMock
+
+    conn = MagicMock()
+    conn.recv.return_value = b"x" * (MAX_FRAME_BYTES + 1)
+    with pytest.raises(ValueError, match="frame exceeds cap"):
+        HostRunnerServer._recv(conn)
+
+
+def test_invoke_result_socket_response_stays_within_frame_cap(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-frame",
+            attempt_id="att-frame",
+            task_packet={"objective": "frame bound"},
+        )
+    )
+    response = canonical_json(result).encode() + b"\n"
+    assert len(response) <= MAX_FRAME_BYTES
+    assert len(result["redacted_output"].encode()) <= MAX_LINE_BYTES
