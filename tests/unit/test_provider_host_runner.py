@@ -27,7 +27,9 @@ from flow_engine.providers.cli_registry import (
 from flow_engine.providers.host_runner import (
     COORDINATOR_PROVIDER_RESULT_CAP_BYTES,
     CURSOR_EVENT_TYPES,
+    CURSOR_MAX_EVENT_LINE_BYTES,
     DEFAULT_OUTPUT_CAP,
+    MAX_EVENTS,
     MAX_FRAME_BYTES,
     MAX_LINE_BYTES,
     HostRunner,
@@ -38,6 +40,7 @@ from flow_engine.providers.host_runner import (
     canonical_invocation_packet,
     canonical_json,
     digest_json,
+    max_event_line_bytes,
     provider_argv,
     validate_provider_event,
     validate_write_set,
@@ -493,6 +496,10 @@ def test_claude_acceptance_argv_caps_max_turns_and_budget(tmp_path: Path) -> Non
 def test_default_output_cap_within_coordinator_provider_result_cap() -> None:
     assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
     assert COORDINATOR_PROVIDER_RESULT_CAP_BYTES == 524_288
+    assert CURSOR_MAX_EVENT_LINE_BYTES == 512 * 1024
+    assert CURSOR_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+    assert max_event_line_bytes("cursor") == CURSOR_MAX_EVENT_LINE_BYTES
+    assert max_event_line_bytes("codex") == MAX_LINE_BYTES
 
 
 @pytest.mark.parametrize(
@@ -744,51 +751,210 @@ def test_cursor_large_nonterminal_stream_completes(tmp_path: Path) -> None:
     assert len(result["redacted_output"].encode()) <= binding.output_cap
 
 
-def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
+def _cursor_event_line_at_byte_cap(event_type: str = "tool_call") -> str:
+    prefix = f'{{"type":"{event_type}","session_id":"s","text":"'
+    suffix = '"}'
+    padding = CURSOR_MAX_EVENT_LINE_BYTES - len((prefix + suffix).encode())
+    assert padding >= 0
+    return prefix + ("x" * padding) + suffix
+
+
+def test_cursor_accepts_tool_result_at_512kib_boundary(tmp_path: Path) -> None:
+    big_line = _cursor_event_line_at_byte_cap("tool_call")
+    assert len(big_line.encode()) == CURSOR_MAX_EVENT_LINE_BYTES
     binding = _binding(tmp_path, "cursor")
     binding.executable.write_text(
         _cursor_stream_script(
-            "print('{' + '\"type\":\"assistant\",\"session_id\":\"s\",\"text\":\"' + 'y'*70000 + '\"}')\n"
+            f"print({big_line!r})\n"
+            "import json\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-512k'}))\n"
         ),
         encoding="utf-8",
     )
     binding.executable.chmod(0o700)
     runner = HostRunner(binding)
     handshake = runner.handshake()
-    with pytest.raises(ValueError, match="exceeds cap"):
-        runner.invoke(
-            _invoke_packet(
-                runner,
-                handshake,
-                invocation_id="inv-huge-line",
-                attempt_id="att-huge-line",
-                task_packet={"objective": "oversized line"},
-            )
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-512k",
+            attempt_id="att-512k",
+            task_packet={"objective": "512k tool result"},
         )
+    )
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-512k"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
 
 
-def test_invoke_rejects_unknown_cursor_event_type(tmp_path: Path) -> None:
-    binding = _binding(tmp_path, "cursor")
-    binding.executable.write_text(
-        _cursor_stream_script(
+def _assert_stream_parse_failure_is_durable(
+    tmp_path: Path,
+    *,
+    provider: str,
+    script_body: str,
+    invocation_id: str,
+    detail_match: str,
+) -> None:
+    binding = _binding(tmp_path, provider)
+    if provider == "cursor":
+        binding.executable.write_text(_cursor_stream_script(script_body), encoding="utf-8")
+    else:
+        binding.executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import sys\n"
+            f"if '--version' in sys.argv: print('{provider} "
+            + ("0.146.0" if provider == "codex" else "2.1.212")
+            + "'); raise SystemExit(0)\n"
+            + script_body,
+            encoding="utf-8",
+        )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id=invocation_id,
+        attempt_id=f"att-{invocation_id}",
+        task_packet={"objective": "parse failure"},
+    )
+    result = runner.invoke(packet)
+    assert result["outcome"] == "outcome_unknown"
+    assert result["reconciliation_required"] is True
+    assert result["anomalies"][0]["code"] == "A3"
+    assert detail_match in result["anomalies"][0]["detail"]
+    assert runner.reconcile(invocation_id) == result
+    restarted = HostRunner(binding)
+    assert restarted.reconcile(invocation_id) == result
+    replay = runner.invoke(packet)
+    assert replay == result
+
+
+def test_cursor_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path: Path) -> None:
+    over_line = _cursor_event_line_at_byte_cap("tool_call") + "x"
+    assert len(over_line.encode()) > CURSOR_MAX_EVENT_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-over-512k",
+        detail_match="exceeds cap",
+    )
+
+
+def test_codex_rejects_oversized_event_with_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="codex",
+        script_body=(
+            "print('{' + '\"type\":\"result\",\"provider_call_id\":\"c\",\"text\":\"' "
+            "+ 'y' * 70000 + '\"}')\n"
+        ),
+        invocation_id="inv-codex-huge",
+        detail_match="exceeds cap",
+    )
+
+
+def test_stream_json_decode_failure_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body="print('{not-json')\n",
+        invocation_id="inv-json-fail",
+        detail_match="json decode failure",
+    )
+
+
+def test_unknown_cursor_event_type_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=(
             "import json\n"
             "print(json.dumps({'type':'progress','session_id':'s'}))\n"
         ),
+        invocation_id="inv-unknown",
+        detail_match="unsupported provider event type",
+    )
+
+
+def test_event_count_overflow_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=(
+            "import json\n"
+            f"for i in range({MAX_EVENTS + 1}):\n"
+            "    print(json.dumps({'type':'thinking','session_id':'s'}))\n"
+        ),
+        invocation_id="inv-count",
+        detail_match="event count exceeds cap",
+    )
+
+
+def test_parser_failure_socket_invoke_returns_without_escape(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock
+
+    base_binding = _binding(tmp_path, "cursor")
+    base_binding.executable.write_text(
+        _cursor_stream_script("print('{not-json')\n"),
         encoding="utf-8",
     )
-    binding.executable.chmod(0o700)
+    base_binding.executable.chmod(0o700)
+    binding = ProviderBinding(
+        provider=base_binding.provider,
+        executable=base_binding.executable,
+        model=base_binding.model,
+        workspace_root=base_binding.workspace_root,
+        socket_path=base_binding.socket_path,
+        auth_token=base_binding.auth_token,
+        cli_version_pin=base_binding.cli_version_pin,
+        allowed_models=base_binding.allowed_models,
+        execution_profile=base_binding.execution_profile,
+        expected_peer_uid=None,
+    )
     runner = HostRunner(binding)
     handshake = runner.handshake()
-    with pytest.raises(ValueError, match="unsupported provider event type"):
-        runner.invoke(
-            _invoke_packet(
-                runner,
-                handshake,
-                invocation_id="inv-unknown",
-                attempt_id="att-unknown",
-                task_packet={"objective": "unknown event"},
-            )
-        )
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id="inv-socket-parse",
+        attempt_id="att-socket-parse",
+        task_packet={"objective": "socket parse failure"},
+    )
+    now = int(time.time())
+    unsigned = {
+        "payload": {"operation": "invoke", **packet},
+        "nonce": "s" * 32,
+        "issued_at": now,
+        "expires_at": now + 30,
+    }
+    envelope = {
+        **unsigned,
+        "signature": hmac.new(
+            binding.auth_token.encode(),
+            canonical_json(unsigned).encode(),
+            hashlib.sha256,
+        ).hexdigest(),
+    }
+    sent = bytearray()
+    conn = MagicMock()
+    conn.recv.side_effect = [canonical_json(envelope).encode() + b"\n"]
+    conn.sendall.side_effect = lambda data: sent.extend(data)
+
+    HostRunnerServer(runner)._handle(conn)
+
+    response = json.loads(bytes(sent).split(b"\n", 1)[0])
+    assert response["outcome"] == "outcome_unknown"
+    assert response["anomalies"][0]["code"] == "A3"
+    assert runner.reconcile("inv-socket-parse")["outcome"] == "outcome_unknown"
+
+
+def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
+    """Legacy name: cursor events above 512 KiB fail closed with durable outcome_unknown."""
+    test_cursor_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
 
 
 def test_truncated_evidence_preserves_terminal_event(tmp_path: Path) -> None:
@@ -844,4 +1010,4 @@ def test_invoke_result_socket_response_stays_within_frame_cap(tmp_path: Path) ->
     )
     response = canonical_json(result).encode() + b"\n"
     assert len(response) <= MAX_FRAME_BYTES
-    assert len(result["redacted_output"].encode()) <= MAX_LINE_BYTES
+    assert len(result["redacted_output"].encode()) <= DEFAULT_OUTPUT_CAP

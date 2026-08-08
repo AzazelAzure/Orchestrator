@@ -58,6 +58,13 @@ DEFAULT_OUTPUT_CAP = 262_144
 DEFAULT_STDERR_CAP = 262_144
 assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_LINE_BYTES = 65_536
+CURSOR_MAX_EVENT_LINE_BYTES = 512 * 1024
+PROVIDER_MAX_EVENT_LINE_BYTES: dict[str, int] = {
+    "codex": MAX_LINE_BYTES,
+    "cursor": CURSOR_MAX_EVENT_LINE_BYTES,
+    "claude": MAX_LINE_BYTES,
+}
+assert CURSOR_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_EVENTS = 2_000
 # Observed Cursor stream-json event types for cursor-events-v1 (CLI 2026.08.04-aaa8809).
 CURSOR_EVENT_TYPES = frozenset({
@@ -82,6 +89,8 @@ def provider_env_allowlist(provider: str) -> tuple[str, ...]:
     if provider == "cursor":
         return SAFE_ENV + (CURSOR_API_KEY_VAR,)
     return SAFE_ENV
+
+
 SECRET_PATTERN = re.compile(
     r"(?im)(authorization|proxy-authorization|cookie|set-cookie|x-api-key)"
     r"\s*:\s*[^\r\n]+|bearer\s+[a-z0-9._~+/=-]+|"
@@ -104,6 +113,44 @@ def digest_json(value: Any) -> str:
 
 def redact(value: str) -> str:
     return PRIVATE_KEY_PATTERN.sub("[REDACTED-PRIVATE-KEY]", SECRET_PATTERN.sub("[REDACTED]", value))
+
+
+class StreamParseFailure(Exception):
+    """Post-dispatch stdout JSONL parse failure; becomes durable outcome_unknown."""
+
+
+def max_event_line_bytes(provider: str) -> int:
+    return PROVIDER_MAX_EVENT_LINE_BYTES[provider]
+
+
+def _terminate_dispatched_process(proc: subprocess.Popen[Any]) -> None:
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(2)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait(2)
+
+
+def _stream_parse_failure_result(
+    *,
+    invocation_id: str,
+    provider: str,
+    execution_profile: str,
+    binding_digest: str,
+    detail: str,
+) -> dict[str, Any]:
+    return {
+        "invocation_id": invocation_id,
+        "provider": provider,
+        "execution_profile": execution_profile,
+        "outcome": "outcome_unknown",
+        "reconciliation_required": True,
+        "binding_digest": binding_digest,
+        "anomalies": [{"code": "A3", "detail": redact(detail)}],
+    }
 
 
 def canonical_invocation_packet(payload: dict[str, Any]) -> dict[str, Any]:
@@ -310,7 +357,7 @@ class _StreamParseState:
 
 
 def validate_provider_event(provider: str, event: dict[str, Any]) -> None:
-    if len(canonical_json(event).encode()) > MAX_LINE_BYTES:
+    if len(canonical_json(event).encode()) > max_event_line_bytes(provider):
         raise ValueError("provider event exceeds cap")
     event_type = event.get("type")
     if not isinstance(event_type, str) or event_type not in EVENT_TYPES[provider]:
@@ -545,17 +592,24 @@ class HostRunner:
                 "write_set": list(write_set) if write_set else [],
                 **write_evidence,
             }
+        except StreamParseFailure as exc:
+            _terminate_dispatched_process(proc)
+            result = _stream_parse_failure_result(
+                invocation_id=invocation_id,
+                provider=self.binding.provider,
+                execution_profile=self.binding.execution_profile,
+                binding_digest=str(packet["binding_digest"]),
+                detail=str(exc),
+            )
         except (subprocess.TimeoutExpired, TimeoutError):
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                proc.wait(2)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
+            _terminate_dispatched_process(proc)
             result = {
                 "invocation_id": invocation_id,
                 "provider": self.binding.provider,
+                "execution_profile": self.binding.execution_profile,
                 "outcome": "outcome_unknown",
                 "reconciliation_required": True,
+                "binding_digest": packet["binding_digest"],
                 "anomalies": [{"code": "A1", "detail": "provider timeout after dispatch"}],
             }
         finally:
@@ -593,15 +647,22 @@ class HostRunner:
     def _consume_stdout_line(self, line: str, state: _StreamParseState) -> None:
         if not line.strip():
             return
-        if len(line.encode()) > MAX_LINE_BYTES:
-            raise ValueError("provider event line exceeds cap")
-        event = json.loads(line)
+        line_cap = max_event_line_bytes(self.binding.provider)
+        if len(line.encode()) > line_cap:
+            raise StreamParseFailure("provider event line exceeds cap")
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise StreamParseFailure("provider stream json decode failure") from exc
         if not isinstance(event, dict):
-            raise ValueError("provider event must be an object")
-        validate_provider_event(self.binding.provider, event)
+            raise StreamParseFailure("provider event must be an object")
+        try:
+            validate_provider_event(self.binding.provider, event)
+        except ValueError as exc:
+            raise StreamParseFailure(str(exc)) from exc
         state.event_count += 1
         if state.event_count > MAX_EVENTS:
-            raise ValueError("provider event count exceeds cap")
+            raise StreamParseFailure("provider event count exceeds cap")
         if is_terminal_provider_event(self.binding.provider, event):
             state.terminal_event = event
         redacted_line = redact(line)
@@ -650,6 +711,7 @@ class HostRunner:
         stderr_buf = bytearray()
         state = _StreamParseState()
         stderr_cap = DEFAULT_STDERR_CAP
+        line_cap = max_event_line_bytes(self.binding.provider)
         truncated = False
         deadline = time.monotonic() + self.binding.timeout_sec
         while selector.get_map():
@@ -667,8 +729,8 @@ class HostRunner:
                         self._consume_stdout_line(
                             line_bytes.decode("utf-8", "replace"), state
                         )
-                    if len(stdout_buf) > MAX_LINE_BYTES:
-                        raise ValueError("provider event line exceeds cap")
+                    if len(stdout_buf) > line_cap:
+                        raise StreamParseFailure("provider event line exceeds cap")
                 else:
                     if len(stderr_buf) + len(chunk) > stderr_cap:
                         remaining = stderr_cap - len(stderr_buf)
@@ -784,22 +846,40 @@ class HostRunnerServer:
 
     def _handle(self, conn: socket.socket) -> None:
         with conn:
-            self._check_peer(conn)
-            request = self._recv(conn)
-            self._verify_envelope(request)
-            request = request["payload"]
-            operation = str(request.pop("operation", ""))
-            handlers = {
-                "handshake": lambda: self.runner.handshake(),
-                "invoke": lambda: self.runner.invoke(request),
-                "validate_packet": lambda: self.runner.validate_packet(request),
-                "heartbeat": lambda: self.runner.heartbeat(str(request["invocation_id"])),
-                "cancel": lambda: self.runner.cancel(str(request["invocation_id"])),
-                "reconcile": lambda: self.runner.reconcile(str(request["invocation_id"])),
-            }
-            if operation not in handlers:
-                raise ValueError("unsupported operation")
-            conn.sendall(canonical_json(handlers[operation]()).encode() + b"\n")
+            operation = ""
+            payload: dict[str, Any] = {}
+            try:
+                self._check_peer(conn)
+                request = self._recv(conn)
+                self._verify_envelope(request)
+                payload = request["payload"]
+                operation = str(payload.pop("operation", ""))
+                handlers = {
+                    "handshake": lambda: self.runner.handshake(),
+                    "invoke": lambda: self.runner.invoke(payload),
+                    "validate_packet": lambda: self.runner.validate_packet(payload),
+                    "heartbeat": lambda: self.runner.heartbeat(str(payload["invocation_id"])),
+                    "cancel": lambda: self.runner.cancel(str(payload["invocation_id"])),
+                    "reconcile": lambda: self.runner.reconcile(str(payload["invocation_id"])),
+                }
+                if operation not in handlers:
+                    raise ValueError("unsupported operation")
+                response: dict[str, Any] = handlers[operation]()
+            except Exception as exc:
+                if operation != "invoke":
+                    raise
+                invocation_id = str(payload.get("invocation_id", ""))
+                response = {
+                    "invocation_id": invocation_id,
+                    "provider": self.runner.binding.provider,
+                    "outcome": "outcome_unknown",
+                    "reconciliation_required": True,
+                    "anomalies": [{"code": "A3", "detail": redact(str(exc))}],
+                }
+                if invocation_id:
+                    self.runner._results[invocation_id] = response
+                    self.runner._persist_result(invocation_id, response)
+            conn.sendall(canonical_json(response).encode() + b"\n")
 
     def _verify_envelope(self, envelope: dict[str, Any]) -> None:
         if set(envelope) != {"payload", "nonce", "issued_at", "expires_at", "signature"}:

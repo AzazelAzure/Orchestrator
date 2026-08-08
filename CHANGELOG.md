@@ -20,10 +20,15 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 - **Cursor stream-json** — `thinking` events are allowlisted for `cursor-events-v1`.
 - **Host runner stream bounds** — Incremental JSONL parsing replaces raw stdout
   accumulation: large nonterminal Cursor streams no longer trigger process kill at
-  the legacy total output cap; per-event (`MAX_LINE_BYTES`), event-count (`MAX_EVENTS`),
-  redacted evidence (`output_cap`), stderr (`DEFAULT_STDERR_CAP`), and socket frame
-  (`MAX_FRAME_BYTES`) bounds remain enforced. Terminal events are preserved when
-  evidence truncation occurs.
+  the legacy total output cap; per-provider event-line caps (`MAX_LINE_BYTES` for
+  Codex/Claude, `CURSOR_MAX_EVENT_LINE_BYTES` 512 KiB for Cursor tool-result lines),
+  event-count (`MAX_EVENTS`), redacted evidence (`output_cap` 262,144 bytes),
+  stderr (`DEFAULT_STDERR_CAP`), and socket frame (`MAX_FRAME_BYTES`) bounds remain
+  enforced below the coordinator provider-result cap (524,288 bytes). JSON decode,
+  unknown event, oversized event, and event-count failures after dispatch terminate
+  the provider when needed, persist durable `outcome_unknown` with `A3` anomalies,
+  and never escape the socket handler without a result or allow automatic replay.
+  Terminal events are preserved when evidence truncation occurs.
 - **Bootstrap integration follow-up** — `persist_adapter_snapshot` accepts bootstrap
   handshake fields (`cli_version_pin`, `event_schema`, `execution_profile`); durable
   `binding_digest` and coordinator/worker invoke packets carry `execution_profile`
