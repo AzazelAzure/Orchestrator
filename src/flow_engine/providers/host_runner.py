@@ -26,9 +26,16 @@ from flow_engine.providers.cli_registry import (
     CLAUDE_ACCEPTANCE_DISALLOWED,
     CLAUDE_REVIEW_DISALLOWED,
     EXECUTION_PROFILE_ACCEPTANCE,
+    EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
     probe_matches_pinned_version,
     validate_cli_version_pin,
     validate_execution_profile,
+)
+from flow_engine.providers.git_workspace_evidence import (
+    GitWorkspaceEvidenceError,
+    capture_git_baseline,
+    diff_against_git_baseline,
+    validate_paths_against_write_set,
 )
 from flow_engine.providers.protocol import (
     DeliveryHandle,
@@ -52,12 +59,6 @@ EVENT_TYPES = {
         "system", "user", "assistant", "tool_call", "result", "error", "thinking",
     }),
     "claude": frozenset({"system", "user", "assistant", "result", "rate_limit_event"}),
-}
-# Back-compat alias for docs/tests referencing a default acceptance pin per provider.
-SUPPORTED_CLI_VERSIONS = {
-    "codex": "0.146.0",
-    "cursor": "2026.08.04-aaa8809",
-    "claude": "2.1.212",
 }
 # HOME is required by installed provider CLI wrappers (auth/session paths).
 # It is not a credential; secrets remain out of this tuple.
@@ -173,9 +174,12 @@ def _confined_cwd(root: Path, requested: str | None) -> Path:
 def _normalize_write_set_entry(path: str, workspace_root: Path) -> str:
     if not isinstance(path, str) or not path.strip():
         raise PermissionError("write_set entry must be a non-empty relative path")
-    if path.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", path):
+    stripped = path.strip()
+    if stripped == ".":
+        return "."
+    if stripped.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", stripped):
         raise ValueError("write_set paths must be relative")
-    relative = Path(path.strip())
+    relative = Path(stripped)
     if relative.is_absolute() or ".." in relative.parts:
         raise ValueError("write_set path escapes workspace")
     confined = (workspace_root / relative).resolve()
@@ -192,78 +196,6 @@ def validate_write_set(
     if not isinstance(write_set, list) or not write_set:
         raise PermissionError("write_set required for implementation profile")
     return tuple(_normalize_write_set_entry(str(item), workspace_root) for item in write_set)
-
-
-def _path_covered_by_write_set(rel_path: str, write_set: tuple[str, ...]) -> bool:
-    normalized = Path(rel_path).as_posix()
-    for entry in write_set:
-        base = Path(entry).as_posix()
-        if normalized == base:
-            return True
-        prefix = base.rstrip("/") + "/"
-        if normalized.startswith(prefix):
-            return True
-    return False
-
-
-def _git_changed_paths(cwd: Path) -> list[str]:
-    if not (cwd / ".git").exists():
-        return []
-    paths: list[str] = []
-    for args in (
-        ("diff", "--name-only", "HEAD"),
-        ("diff", "--cached", "--name-only"),
-    ):
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        if completed.returncode == 0:
-            for line in completed.stdout.splitlines():
-                line = line.strip()
-                if line:
-                    paths.append(line)
-    untracked = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
-        cwd=cwd,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    if untracked.returncode == 0:
-        for line in untracked.stdout.splitlines():
-            line = line.strip()
-            if line:
-                paths.append(line)
-    return sorted(set(paths))
-
-
-def _validate_workspace_writes(
-    cwd: Path,
-    write_set: tuple[str, ...],
-) -> dict[str, Any]:
-    changed = _git_changed_paths(cwd)
-    if not changed:
-        return {
-            "write_set_validation": "no_changes_or_no_git",
-            "undeclared_paths": [],
-        }
-    undeclared = [
-        path for path in changed if not _path_covered_by_write_set(path, write_set)
-    ]
-    return {
-        "write_set_validation": "fail" if undeclared else "pass",
-        "undeclared_paths": undeclared,
-        "changed_paths": changed,
-        "write_set": list(write_set),
-    }
 
 
 def _cleanup_acceptance_root(path: Path | None) -> None:
@@ -299,7 +231,7 @@ def provider_argv(
             return tuple(argv)
         argv = [
             executable, "--print", "--output-format", "stream-json",
-            "--mode", "agent", "--model", binding.model, "--force",
+            "--model", binding.model, "--force",
         ]
         argv.extend(prompt_args)
         return tuple(argv)
@@ -468,6 +400,7 @@ class HostRunner:
                 + prompt
             )
         acceptance_root: Path | None = None
+        git_baseline = None
         try:
             if self.binding.acceptance_mode:
                 acceptance_root = Path(
@@ -483,6 +416,14 @@ class HostRunner:
                 cwd = acceptance_root
             else:
                 cwd = _confined_cwd(self.binding.workspace_root, packet.get("cwd"))
+            git_baseline = None
+            if profile_spec.get("requires_git_evidence"):
+                try:
+                    git_baseline = capture_git_baseline(cwd, self.binding.workspace_root)
+                except GitWorkspaceEvidenceError as exc:
+                    raise PermissionError(
+                        "git workspace evidence could not be established"
+                    ) from exc
             via_stdin = provider_uses_stdin_prompt(self.binding)
             proc = subprocess.Popen(
                 provider_argv(self.binding, prompt, prompt_via_stdin=via_stdin),
@@ -536,8 +477,22 @@ class HostRunner:
                 )
             ambiguous = truncated or proc.returncode != 0 or not terminal_identity
             write_evidence: dict[str, Any] = {}
-            if write_set:
-                write_evidence = _validate_workspace_writes(cwd, write_set)
+            if git_baseline is not None:
+                git_diff = diff_against_git_baseline(git_baseline, cwd)
+                write_evidence.update(git_diff)
+                if write_set:
+                    write_evidence.update(
+                        validate_paths_against_write_set(
+                            git_diff["changed_paths"],
+                            write_set,
+                            outside_workspace_paths=git_diff["outside_workspace_paths"],
+                        )
+                    )
+                elif self.binding.execution_profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE:
+                    write_evidence.setdefault(
+                        "workspace_mutations_detected",
+                        git_diff["workspace_mutations_detected"],
+                    )
             outcome = "outcome_unknown" if ambiguous else "complete"
             if write_evidence.get("write_set_validation") == "fail":
                 outcome = "failed"

@@ -28,25 +28,33 @@ EXECUTION_PROFILES: Final[dict[str, dict[str, object]]] = {
     EXECUTION_PROFILE_ACCEPTANCE: {
         "providers": frozenset({"codex", "cursor", "claude"}),
         "requires_write_set": False,
+        "requires_git_evidence": False,
         "acceptance_policy": "isolated-empty-read-only-no-tool",
     },
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION: {
         "providers": frozenset({"cursor"}),
         "requires_write_set": True,
+        "requires_git_evidence": True,
         "acceptance_policy": "repository-confined-agent-write",
     },
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE: {
         "providers": frozenset({"claude"}),
         "requires_write_set": False,
-        "acceptance_policy": "repository-read-test-gh-review-merge",
+        "requires_git_evidence": True,
+        "acceptance_policy": (
+            "trusted-authorized-review-merge-bash-for-test-and-gh-not-sandbox-containment"
+        ),
     },
     EXECUTION_PROFILE_CODEX_ADMIN: {
         "providers": frozenset({"codex"}),
         "requires_write_set": False,
+        "requires_git_evidence": False,
         "acceptance_policy": "read-only-reconciliation",
     },
 }
 
+# Claude review profile: Bash is intentionally allowed for tests and gh merge/review.
+# This is a trusted authorized role, not filesystem sandbox containment.
 CLAUDE_ACCEPTANCE_DISALLOWED = (
     "Read,Grep,Glob,Edit,Write,Bash,WebFetch,WebSearch"
 )

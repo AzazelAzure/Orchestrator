@@ -43,7 +43,7 @@ def _fake_cli(tmp_path: Path, provider: str, version: str | None = None) -> Path
         "import json, sys\n"
         "if '--version' in sys.argv:\n"
         f" print('{provider} {versions[provider]}'); raise SystemExit(0)\n"
-        "print(json.dumps({'type':'result','provider_call_id':'call-1','result':'ok'}))\n",
+        "print(json.dumps({'type':'result','subtype':'success','provider_call_id':'call-1','result':'ok'}))\n",
         encoding="utf-8",
     )
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
@@ -431,22 +431,91 @@ def test_invoke_rejects_profile_upgrade(tmp_path: Path) -> None:
         runner.invoke(packet)
 
 
-def test_cursor_implementation_argv_uses_agent_mode(tmp_path: Path) -> None:
+def test_cursor_implementation_argv_uses_force_without_mode_flag(tmp_path: Path) -> None:
     binding = _binding(tmp_path, "cursor", execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION)
     argv = provider_argv(binding, "implement slice")
-    assert argv[argv.index("--mode") + 1] == "agent"
     assert "--force" in argv
     assert "--trust" not in argv
+    assert "--mode" not in argv
 
 
-def test_claude_review_argv_disallows_edit_write_only(tmp_path: Path) -> None:
+def test_claude_review_argv_allows_bash(tmp_path: Path) -> None:
     binding = _binding(
         tmp_path, "claude", execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
     )
     argv = provider_argv(binding, "review", prompt_via_stdin=True)
     denied = argv[argv.index("--disallowedTools") + 1]
     assert denied == "Edit,Write"
-    assert "Read" not in denied
+    assert "Bash" not in denied
+
+
+def test_write_set_dot_allows_any_in_workspace_path(tmp_path: Path) -> None:
+    assert validate_write_set(["."], tmp_path) == (".",)
+
+
+def test_invoke_requires_git_evidence_when_profile_demands_it(tmp_path: Path) -> None:
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    binding = ProviderBinding(
+        provider="cursor",
+        executable=_fake_cli(tmp_path, "cursor"),
+        model="cursor-test-model",
+        workspace_root=nogit,
+        socket_path=tmp_path / "sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2026.08.04-aaa8809",
+        allowed_models=("cursor-test-model",),
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id="inv-nogit",
+        task_packet={"objective": "task", "write_set": ["."]},
+    )
+    with pytest.raises(PermissionError, match="git workspace evidence"):
+        runner.invoke(packet)
+
+
+def test_claude_review_records_git_mutations_without_failing(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    import subprocess as sp
+
+    sp.run(["git", "init"], cwd=worktree, capture_output=True, check=True)
+    sp.run(
+        ["git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "--allow-empty", "-m", "init"],
+        cwd=worktree,
+        check=True,
+    )
+    (worktree / "notes.txt").write_text("review\n", encoding="utf-8")
+
+    binding = ProviderBinding(
+        provider="claude",
+        executable=_fake_cli(tmp_path, "claude"),
+        model="claude-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "claude.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2.1.212",
+        allowed_models=("claude-test-model",),
+        execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    )
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id="inv-review",
+        task_packet={"objective": "gh pr review"},
+    )
+    result = runner.invoke(packet)
+    assert result["workspace_mutations_detected"] is True
+    assert "notes.txt" in result["changed_paths"]
+    assert result.get("write_set_validation") is None
+    assert result["outcome"] == "complete"
 
 
 def test_write_set_validation_rejects_escape(tmp_path: Path) -> None:

@@ -61,13 +61,20 @@ profiles are denied; acceptance is never silently upgraded.
 | Profile | Providers | Behavior |
 |---------|-----------|----------|
 | `acceptance` (default) | all | Isolated empty read-only workspace; bounded argv |
-| `cursor-implementation` | `cursor` | Repository worktree; `--mode agent`; requires `write_set` in task packet |
-| `claude-independent-review-merge` | `claude` | Repository read/test/gh review; disallows Edit/Write only |
+| `cursor-implementation` | `cursor` | Repository worktree; default write mode + `--force`; requires `write_set` |
+| `claude-independent-review-merge` | `claude` | Trusted authorized review role: Bash allowed for tests/gh; disallows Edit/Write only; records git mutations without blocking gh |
 | `codex-admin-reconciliation` | `codex` | Read-only sandbox (same argv bounds as acceptance) |
 
-Repository campaigns use clean per-slice worktrees. Implementation profiles validate
-`write_set` relative paths against the confined workspace and, when git is present,
-fail closed on undeclared changed paths without deleting invocation evidence.
+Repository campaigns use clean per-slice worktrees. Profiles that require git evidence
+capture an immutable pre-invocation baseline and compare all workspace-root-relative
+paths (committed, staged, unstaged, untracked, renames, deletions). `write_set` may
+include `.` for the whole confined workspace. HEAD moves and commits cannot bypass
+declared paths. Linked worktrees and cwd subdirectories resolve against `workspace_root`;
+baseline capture fails closed when git evidence cannot be established.
+
+The Claude independent-review/merge profile is a **trusted authorized role**: Bash remains
+available for tests and `gh` review/merge; it is not a filesystem sandbox. Git baseline
+diffs are recorded for workspace mutations without failing authorized `gh` operations.
 
 ---
 
@@ -179,7 +186,7 @@ env beyond explicit allowlist, or implement automatic paid retry.
 | Provider | Profile | Notable argv / stream behavior |
 |----------|---------|-------------------------------|
 | Cursor | `acceptance` | `--mode ask`, `--trust` |
-| Cursor | `cursor-implementation` | `--mode agent`, `--force` |
+| Cursor | `cursor-implementation` | Default write mode (no `--mode`; CLI permits only `plan`/`ask`); `--force` |
 | Claude | `acceptance` | All tools disallowed via `--disallowedTools` |
 | Claude | `claude-independent-review-merge` | Disallows Edit/Write only |
 | Codex | all profiles | `--sandbox read-only` |

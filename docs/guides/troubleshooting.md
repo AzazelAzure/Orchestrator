@@ -131,7 +131,7 @@ curl -v http://127.0.0.1:8000/health/
 
 ### Causes
 
-- CLI version pin mismatch (`SUPPORTED_CLI_VERSIONS`)
+- CLI version pin mismatch (`REGISTERED_CLI_VERSIONS` / `ORCH_PROVIDER_CLI_VERSION`)
 - Missing API key in allowlisted env (Cursor)
 - Network blocked in acceptance environment
 - Event not in `EVENT_TYPES` allowlist
