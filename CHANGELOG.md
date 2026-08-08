@@ -13,6 +13,9 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
   reload validates/reloads nginx only (no `fm-beta` stack recreation); VPS
   `DJANGO_ALLOWED_HOSTS` generation merges required presentation aliases without dropping
   operator extras (`scripts/orch_vps_allowed_hosts.sh`).
+- **ORCH-VPS-POST-NET-ATTACH-01 (review)** — Allowed-host env rewrite uses line-by-line
+  replacement (no `sed` substitution from operator values); direct tests for metacharacter
+  preservation and idempotency.
 
 ### Added
 

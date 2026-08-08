@@ -52,18 +52,31 @@ orch_merge_django_allowed_hosts() {
 
 orch_ensure_env_allowed_hosts_line() {
   local env_file="$1"
-  local current merged
+  local current merged tmp replaced=0 mode dup_count
   if [[ ! -f "$env_file" ]]; then
     return 0
   fi
   current="$(grep -E '^DJANGO_ALLOWED_HOSTS=' "$env_file" | tail -n1 | cut -d= -f2- || true)"
   merged="$(orch_merge_django_allowed_hosts "$current")"
-  if [[ "$merged" == "$current" ]]; then
+  dup_count="$(grep -cE '^DJANGO_ALLOWED_HOSTS=' "$env_file" 2>/dev/null || true)"
+  if [[ "$merged" == "$current" && "$dup_count" -le 1 ]]; then
     return 0
   fi
-  if grep -qE '^DJANGO_ALLOWED_HOSTS=' "$env_file"; then
-    sed -i "s|^DJANGO_ALLOWED_HOSTS=.*|DJANGO_ALLOWED_HOSTS=${merged}|" "$env_file"
-  else
-    printf '\nDJANGO_ALLOWED_HOSTS=%s\n' "$merged" >>"$env_file"
+  mode="$(stat -c '%a' "$env_file" 2>/dev/null || echo 600)"
+  tmp="$(mktemp)"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == DJANGO_ALLOWED_HOSTS=* ]]; then
+      if [[ "$replaced" -eq 0 ]]; then
+        printf 'DJANGO_ALLOWED_HOSTS=%s\n' "$merged" >>"$tmp"
+        replaced=1
+      fi
+      continue
+    fi
+    printf '%s\n' "$line" >>"$tmp"
+  done <"$env_file"
+  if [[ "$replaced" -eq 0 ]]; then
+    printf '\nDJANGO_ALLOWED_HOSTS=%s\n' "$merged" >>"$tmp"
   fi
+  mv "$tmp" "$env_file"
+  chmod "$mode" "$env_file"
 }
