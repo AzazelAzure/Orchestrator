@@ -87,7 +87,7 @@ def build_binding(
     root: Path,
     pins: dict[str, str],
     run_dir: Path,
-    acceptance_mode: bool = True,
+    execution_profile: str = "acceptance",
 ) -> ProviderBinding:
     executable_name = PROVIDER_EXECUTABLES[provider]
     executable = Path(
@@ -104,6 +104,10 @@ def build_binding(
         for item in pins["ORCH_PROVIDER_ALLOWED_MODELS"].split(",")
         if item.strip()
     )
+    cli_version_pin = pins.get("ORCH_PROVIDER_CLI_VERSION", "").strip()
+    if not cli_version_pin:
+        raise RuntimeError("ORCH_PROVIDER_CLI_VERSION pin required in provider pins env")
+    profile = pins.get("ORCH_PROVIDER_PROFILE", execution_profile).strip()
     if provider == "cursor":
         bootstrap_cursor_host_runner_env(root)
     return ProviderBinding(
@@ -113,8 +117,9 @@ def build_binding(
         workspace_root=root.resolve(),
         socket_path=run_dir / "sockets" / f"{provider}.sock",
         auth_token=secrets.token_hex(32),
+        cli_version_pin=cli_version_pin,
         allowed_models=allowed,
-        acceptance_mode=acceptance_mode,
+        execution_profile=profile,
     )
 
 
@@ -138,6 +143,7 @@ def build_invoke_packet(
         "snapshot_digest": snapshot_digest,
         "resolved_model": handshake["snapshot"]["resolved_model"],
         "adapter_version": handshake["snapshot"]["adapter_version"],
+        "execution_profile": handshake["snapshot"]["execution_profile"],
     }
     return {
         **binding_fields,
@@ -233,6 +239,7 @@ def run_provider_acceptance(
             "provider": provider,
             "invocation_id": invocation_id,
             "model": binding.model,
+            "execution_profile": binding.execution_profile,
             "acceptance_mode": binding.acceptance_mode,
             "checks": checks,
             "success": acceptance_success(result),

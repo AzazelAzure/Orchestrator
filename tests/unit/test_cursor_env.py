@@ -48,6 +48,7 @@ def test_cursor_binding_without_key_still_constructs(
         workspace_root=tmp_path,
         socket_path=tmp_path / "cursor.sock",
         auth_token="test-token",
+        cli_version_pin="2026.08.04-aaa8809",
         allowed_models=("composer-2.5",),
     )
     binding.executable.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -70,6 +71,7 @@ def test_cursor_child_env_passes_api_key_when_set(
         workspace_root=tmp_path,
         socket_path=tmp_path / "cursor.sock",
         auth_token="test-token",
+        cli_version_pin="2026.08.04-aaa8809",
         allowed_models=("composer-2.5",),
     )
     binding.executable.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -92,6 +94,7 @@ def test_codex_child_env_does_not_pass_cursor_api_key(
         workspace_root=tmp_path,
         socket_path=tmp_path / "codex.sock",
         auth_token="test-token",
+        cli_version_pin="0.146.0",
         allowed_models=("codex-test-model",),
     )
     binding.executable.write_text("#!/bin/sh\n", encoding="utf-8")

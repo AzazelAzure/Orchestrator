@@ -22,13 +22,13 @@ def main() -> None:
         workspace_root=workspace_root,
         socket_path=Path(os.environ["ORCH_PROVIDER_SOCKET"]),
         auth_token=os.environ["ORCH_HOST_RUNNER_TOKEN"],
+        cli_version_pin=os.environ["ORCH_PROVIDER_CLI_VERSION"],
         allowed_models=tuple(
             item.strip()
             for item in os.environ["ORCH_PROVIDER_ALLOWED_MODELS"].split(",")
             if item.strip()
         ),
-        acceptance_mode=os.environ.get("ORCH_PROVIDER_PROFILE", "acceptance")
-        == "acceptance",
+        execution_profile=os.environ.get("ORCH_PROVIDER_PROFILE", "acceptance"),
         expected_peer_uid=(
             int(os.environ["ORCH_EXPECTED_PEER_UID"])
             if os.environ.get("ORCH_EXPECTED_PEER_UID")

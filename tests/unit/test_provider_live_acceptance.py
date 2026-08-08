@@ -94,6 +94,8 @@ def test_build_binding_codex_uses_pins_and_executable(
     pins = {
         "ORCH_PROVIDER_MODEL": "gpt-5.6-sol",
         "ORCH_PROVIDER_ALLOWED_MODELS": "gpt-5.6-sol",
+        "ORCH_PROVIDER_CLI_VERSION": "0.146.0",
+        "ORCH_PROVIDER_PROFILE": "acceptance",
     }
     run_dir = tmp_path / "run"
     binding = build_binding("codex", root=tmp_path, pins=pins, run_dir=run_dir)
@@ -110,7 +112,9 @@ def test_run_provider_acceptance_codex_mocked(
     pins_path.parent.mkdir(parents=True)
     pins_path.write_text(
         "ORCH_PROVIDER_MODEL=gpt-5.6-sol\n"
-        "ORCH_PROVIDER_ALLOWED_MODELS=gpt-5.6-sol\n",
+        "ORCH_PROVIDER_ALLOWED_MODELS=gpt-5.6-sol\n"
+        "ORCH_PROVIDER_CLI_VERSION=0.146.0\n"
+        "ORCH_PROVIDER_PROFILE=acceptance\n",
         encoding="utf-8",
     )
     codex_bin = tmp_path / "codex"
@@ -134,6 +138,7 @@ def test_run_provider_acceptance_codex_mocked(
                 "snapshot": {
                     "resolved_model": "gpt-5.6-sol",
                     "adapter_version": "0.1",
+                    "execution_profile": "acceptance",
                 },
                 "snapshot_digest": "digest-1",
             }

@@ -34,17 +34,40 @@ is recorded (`application/worker_delivery.py`).
 
 ---
 
-## Supported providers (pinned CLI versions)
+## Supported providers (registered CLI versions)
 
-From `providers/host_runner.py` → `SUPPORTED_CLI_VERSIONS`:
+From `providers/cli_registry.py` → `REGISTERED_CLI_VERSIONS`. Installation pins select
+**one exact registered version** via `ORCH_PROVIDER_CLI_VERSION` in
+`.local/provider/<provider>.pins.env` (examples in `docs/provider-*-pins.env.example`).
+Model pins (`ORCH_PROVIDER_MODEL`) remain separate. Handshake requires the probed
+`--version` output to match the pin exactly and maps the pin to a registered event schema.
 
-| Provider | Pinned version (acceptance) |
-|----------|----------------------------|
-| `codex` | `0.144.6` |
-| `cursor` | `2026.07.23` |
+| Provider | Registered CLI versions |
+|----------|---------------------------|
+| `codex` | `0.144.6`, `0.146.0` |
+| `cursor` | `2026.07.23`, `2026.08.04-aaa8809` |
 | `claude` | `2.1.212` |
 
-Version mismatch fails closed during preflight.
+Unknown or mismatched pins fail closed during handshake.
+
+---
+
+## Execution profiles
+
+Profiles are explicit in the host-runner binding (`ORCH_PROVIDER_PROFILE`) and must
+match the signed invocation packet `execution_profile` field. Unknown or provider-incompatible
+profiles are denied; acceptance is never silently upgraded.
+
+| Profile | Providers | Behavior |
+|---------|-----------|----------|
+| `acceptance` (default) | all | Isolated empty read-only workspace; bounded argv |
+| `cursor-implementation` | `cursor` | Repository worktree; `--mode agent`; requires `write_set` in task packet |
+| `claude-independent-review-merge` | `claude` | Repository read/test/gh review; disallows Edit/Write only |
+| `codex-admin-reconciliation` | `codex` | Read-only sandbox (same argv bounds as acceptance) |
+
+Repository campaigns use clean per-slice worktrees. Implementation profiles validate
+`write_set` relative paths against the confined workspace and, when git is present,
+fail closed on undeclared changed paths without deleting invocation evidence.
 
 ---
 
@@ -138,7 +161,7 @@ Use mock mode for:
 ## Safely adding a provider (contributor checklist)
 
 1. Add protocol handler implementing `providers/protocol.py` contracts.
-2. Extend `EVENT_TYPES` and `SUPPORTED_CLI_VERSIONS` with bounded allowlists.
+2. Extend `EVENT_TYPES` and `REGISTERED_CLI_VERSIONS` with bounded allowlists.
 3. Add migration row types if persistence changes (`007_provider_adapters.sql` pattern).
 4. Wire worker delivery path only through coordinator commands.
 5. Add unit tests in `tests/unit/test_provider_host_runner.py` (mock subprocess).
@@ -151,13 +174,17 @@ env beyond explicit allowlist, or implement automatic paid retry.
 
 ---
 
-## CLI binding notes (acceptance)
+## CLI binding notes (by profile)
 
-| Provider | Notable argv / stream behavior |
-|----------|-------------------------------|
-| Cursor | `--trust` flag for acceptance |
-| Claude | `--verbose` stream-json; stdin prompt |
-| Codex | `thread.started` / `turn.completed` event family |
+| Provider | Profile | Notable argv / stream behavior |
+|----------|---------|-------------------------------|
+| Cursor | `acceptance` | `--mode ask`, `--trust` |
+| Cursor | `cursor-implementation` | `--mode agent`, `--force` |
+| Claude | `acceptance` | All tools disallowed via `--disallowedTools` |
+| Claude | `claude-independent-review-merge` | Disallows Edit/Write only |
+| Codex | all profiles | `--sandbox read-only` |
+| Claude | all | `--verbose` stream-json; stdin prompt |
+| Codex | all | `thread.started` / `turn.completed` event family |
 
 Terminal identity accepts `request_id` in stream parser (CHANGELOG 2026-07-28).
 

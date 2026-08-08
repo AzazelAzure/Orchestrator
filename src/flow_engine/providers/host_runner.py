@@ -22,6 +22,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from flow_engine.providers.cli_registry import (
+    CLAUDE_ACCEPTANCE_DISALLOWED,
+    CLAUDE_REVIEW_DISALLOWED,
+    EXECUTION_PROFILE_ACCEPTANCE,
+    probe_matches_pinned_version,
+    validate_cli_version_pin,
+    validate_execution_profile,
+)
 from flow_engine.providers.protocol import (
     DeliveryHandle,
     HeartbeatResult,
@@ -45,9 +53,10 @@ EVENT_TYPES = {
     }),
     "claude": frozenset({"system", "user", "assistant", "result", "rate_limit_event"}),
 }
+# Back-compat alias for docs/tests referencing a default acceptance pin per provider.
 SUPPORTED_CLI_VERSIONS = {
-    "codex": "0.144.6",
-    "cursor": "2026.07.23",
+    "codex": "0.146.0",
+    "cursor": "2026.08.04-aaa8809",
     "claude": "2.1.212",
 }
 # HOME is required by installed provider CLI wrappers (auth/session paths).
@@ -124,6 +133,7 @@ class ProviderBinding:
     workspace_root: Path
     socket_path: Path
     auth_token: str
+    cli_version_pin: str
     adapter_version: str = "1"
     timeout_sec: int = 1800
     output_cap: int = DEFAULT_OUTPUT_CAP
@@ -131,7 +141,7 @@ class ProviderBinding:
     expected_peer_uid: int | None = None
     request_ttl_sec: int = 60
     allowed_models: tuple[str, ...] = ()
-    acceptance_mode: bool = True
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE
 
     def __post_init__(self) -> None:
         if self.provider not in {"codex", "cursor", "claude"}:
@@ -142,8 +152,14 @@ class ProviderBinding:
             raise ValueError("resolved model must match installation allowed-model pin")
         if not self.executable.is_absolute() or not self.workspace_root.is_absolute():
             raise ValueError("executable and workspace root must be absolute")
+        validate_execution_profile(self.provider, self.execution_profile)
+        validate_cli_version_pin(self.provider, self.cli_version_pin)
         if self.env_allowlist == SAFE_ENV:
             object.__setattr__(self, "env_allowlist", provider_env_allowlist(self.provider))
+
+    @property
+    def acceptance_mode(self) -> bool:
+        return self.execution_profile == EXECUTION_PROFILE_ACCEPTANCE
 
 
 def _confined_cwd(root: Path, requested: str | None) -> Path:
@@ -152,6 +168,102 @@ def _confined_cwd(root: Path, requested: str | None) -> Path:
     if candidate != root and root not in candidate.parents:
         raise ValueError("cwd escapes configured workspace")
     return candidate
+
+
+def _normalize_write_set_entry(path: str, workspace_root: Path) -> str:
+    if not isinstance(path, str) or not path.strip():
+        raise PermissionError("write_set entry must be a non-empty relative path")
+    if path.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", path):
+        raise ValueError("write_set paths must be relative")
+    relative = Path(path.strip())
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("write_set path escapes workspace")
+    confined = (workspace_root / relative).resolve()
+    root = workspace_root.resolve(strict=True)
+    if confined != root and root not in confined.parents:
+        raise ValueError("write_set path escapes workspace")
+    return relative.as_posix()
+
+
+def validate_write_set(
+    write_set: object,
+    workspace_root: Path,
+) -> tuple[str, ...]:
+    if not isinstance(write_set, list) or not write_set:
+        raise PermissionError("write_set required for implementation profile")
+    return tuple(_normalize_write_set_entry(str(item), workspace_root) for item in write_set)
+
+
+def _path_covered_by_write_set(rel_path: str, write_set: tuple[str, ...]) -> bool:
+    normalized = Path(rel_path).as_posix()
+    for entry in write_set:
+        base = Path(entry).as_posix()
+        if normalized == base:
+            return True
+        prefix = base.rstrip("/") + "/"
+        if normalized.startswith(prefix):
+            return True
+    return False
+
+
+def _git_changed_paths(cwd: Path) -> list[str]:
+    if not (cwd / ".git").exists():
+        return []
+    paths: list[str] = []
+    for args in (
+        ("diff", "--name-only", "HEAD"),
+        ("diff", "--cached", "--name-only"),
+    ):
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if completed.returncode == 0:
+            for line in completed.stdout.splitlines():
+                line = line.strip()
+                if line:
+                    paths.append(line)
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=cwd,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if untracked.returncode == 0:
+        for line in untracked.stdout.splitlines():
+            line = line.strip()
+            if line:
+                paths.append(line)
+    return sorted(set(paths))
+
+
+def _validate_workspace_writes(
+    cwd: Path,
+    write_set: tuple[str, ...],
+) -> dict[str, Any]:
+    changed = _git_changed_paths(cwd)
+    if not changed:
+        return {
+            "write_set_validation": "no_changes_or_no_git",
+            "undeclared_paths": [],
+        }
+    undeclared = [
+        path for path in changed if not _path_covered_by_write_set(path, write_set)
+    ]
+    return {
+        "write_set_validation": "fail" if undeclared else "pass",
+        "undeclared_paths": undeclared,
+        "changed_paths": changed,
+        "write_set": list(write_set),
+    }
 
 
 def _cleanup_acceptance_root(path: Path | None) -> None:
@@ -169,6 +281,7 @@ def provider_argv(
     *,
     prompt_via_stdin: bool = False,
 ) -> tuple[str, ...]:
+    profile = binding.execution_profile
     executable = str(binding.executable)
     prompt_args: tuple[str, ...] = () if prompt_via_stdin else (prompt,)
     if binding.provider == "codex":
@@ -177,21 +290,29 @@ def provider_argv(
             "--sandbox", "read-only", "--model", binding.model, *prompt_args,
         )
     if binding.provider == "cursor":
-        argv: list[str] = [
+        if profile == EXECUTION_PROFILE_ACCEPTANCE:
+            argv: list[str] = [
+                executable, "--print", "--output-format", "stream-json",
+                "--mode", "ask", "--model", binding.model, "--trust",
+            ]
+            argv.extend(prompt_args)
+            return tuple(argv)
+        argv = [
             executable, "--print", "--output-format", "stream-json",
-            "--mode", "ask", "--model", binding.model,
+            "--mode", "agent", "--model", binding.model, "--force",
         ]
-        if binding.acceptance_mode:
-            # Ephemeral empty 0700 workspace; --mode ask is read-only; --trust skips
-            # interactive workspace prompt only (bounded acceptance probe, not production).
-            argv.append("--trust")
         argv.extend(prompt_args)
         return tuple(argv)
+    disallowed = (
+        CLAUDE_ACCEPTANCE_DISALLOWED
+        if profile == EXECUTION_PROFILE_ACCEPTANCE
+        else CLAUDE_REVIEW_DISALLOWED
+    )
     return (
         executable, "--print", "--verbose", "--output-format", "stream-json",
         "--model", binding.model, "--max-turns", "8",
         "--max-budget-usd", "1.00", "--no-session-persistence",
-        "--disallowedTools", "Read,Grep,Glob,Edit,Write,Bash,WebFetch,WebSearch",
+        "--disallowedTools", disallowed,
         *prompt_args,
     )
 
@@ -267,8 +388,10 @@ class HostRunner:
         if completed.returncode != 0:
             raise RuntimeError("provider CLI version probe failed")
         version = redact(completed.stdout.strip())[:256]
-        if SUPPORTED_CLI_VERSIONS[self.binding.provider] not in version:
-            raise RuntimeError("provider CLI version has no registered event schema")
+        pinned = self.binding.cli_version_pin
+        if not probe_matches_pinned_version(version, pinned):
+            raise RuntimeError("provider CLI version does not match installation pin")
+        event_schema = validate_cli_version_pin(self.binding.provider, pinned)
         auth_probe = subprocess.run(
             auth_probe_argv(self.binding),
             cwd=self.binding.workspace_root,
@@ -288,21 +411,24 @@ class HostRunner:
             "adapter_version": self.binding.adapter_version,
             "executable_name": executable.name,
             "executable_digest": executable_digest,
-            "cli_version": version,
+            "cli_version": pinned,
+            "cli_version_pin": pinned,
+            "event_schema": event_schema,
             "auth_ready": True,
             "structured_output": "jsonl",
             "resolved_model": self.binding.model,
             "model_resolution": "installation_allowed_pin",
-            "acceptance_policy": (
-                "isolated-empty-read-only-no-tool"
-                if self.binding.acceptance_mode
-                else "installation-implementation-profile"
-            ),
+            "execution_profile": self.binding.execution_profile,
+            "acceptance_policy": validate_execution_profile(
+                self.binding.provider, self.binding.execution_profile
+            )["acceptance_policy"],
             "binding_digest": digest_json({
                 "provider": self.binding.provider,
                 "model": self.binding.model,
                 "adapter_version": self.binding.adapter_version,
                 "executable_digest": executable_digest,
+                "cli_version_pin": pinned,
+                "execution_profile": self.binding.execution_profile,
             }),
         }
         return {"snapshot": snapshot, "snapshot_digest": digest_json(snapshot)}
@@ -315,14 +441,26 @@ class HostRunner:
             return prior
         required_binding = {
             "invocation_id", "attempt_id", "provider", "credit_reservation_id",
-            "packet_digest", "snapshot_digest", "binding_digest",
+            "packet_digest", "snapshot_digest", "binding_digest", "execution_profile",
         }
         if any(not packet.get(key) for key in required_binding):
             raise PermissionError("signed invocation binding is incomplete")
+        if packet.get("execution_profile") != self.binding.execution_profile:
+            raise PermissionError("execution profile mismatch or missing explicit profile")
+        profile_spec = validate_execution_profile(
+            self.binding.provider, self.binding.execution_profile
+        )
         self.validate_packet(packet)
         if packet.get("provider") != self.binding.provider:
             raise PermissionError("provider binding mismatch")
-        prompt = canonical_json(canonical_invocation_packet(packet["task_packet"]))
+        canonical_packet = canonical_invocation_packet(packet["task_packet"])
+        write_set: tuple[str, ...] = ()
+        if profile_spec["requires_write_set"]:
+            write_set = validate_write_set(
+                canonical_packet.get("write_set"),
+                self.binding.workspace_root,
+            )
+        prompt = canonical_json(canonical_packet)
         if self.binding.acceptance_mode:
             prompt = (
                 "ACCEPTANCE MODE: do not invoke tools, shell, network, or modify "
@@ -397,10 +535,18 @@ class HostRunner:
                     or terminal.get("request_id")
                 )
             ambiguous = truncated or proc.returncode != 0 or not terminal_identity
+            write_evidence: dict[str, Any] = {}
+            if write_set:
+                write_evidence = _validate_workspace_writes(cwd, write_set)
+            outcome = "outcome_unknown" if ambiguous else "complete"
+            if write_evidence.get("write_set_validation") == "fail":
+                outcome = "failed"
+                ambiguous = True
             result = {
                 "invocation_id": invocation_id,
                 "provider": self.binding.provider,
-                "outcome": "outcome_unknown" if ambiguous else "complete",
+                "execution_profile": self.binding.execution_profile,
+                "outcome": outcome,
                 "exit_code": proc.returncode,
                 "provider_call_id": terminal_identity,
                 "binding_digest": packet["binding_digest"],
@@ -408,6 +554,8 @@ class HostRunner:
                 "redacted_error": redact(stderr),
                 "truncated": truncated,
                 "reconciliation_required": ambiguous,
+                "write_set": list(write_set) if write_set else [],
+                **write_evidence,
             }
         except (subprocess.TimeoutExpired, TimeoutError):
             os.killpg(proc.pid, signal.SIGTERM)
@@ -448,6 +596,7 @@ class HostRunner:
             "snapshot_digest": packet.get("snapshot_digest"),
             "resolved_model": current["snapshot"]["resolved_model"],
             "adapter_version": current["snapshot"]["adapter_version"],
+            "execution_profile": packet.get("execution_profile"),
         }
         if digest_json(binding) != packet.get("binding_digest"):
             raise PermissionError("signed invocation binding digest mismatch")

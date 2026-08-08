@@ -7,6 +7,17 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-PORTFOLIO-SELF-HOSTING-BOOTSTRAP-2026-08-08** — Governed provider execution
+  profiles (`acceptance`, `cursor-implementation`, `claude-independent-review-merge`,
+  `codex-admin-reconciliation`) with explicit profile in signed invocation packets;
+  product-side `REGISTERED_CLI_VERSIONS` registry with installation `ORCH_PROVIDER_CLI_VERSION`
+  pins (Cursor `2026.08.04-aaa8809` / `2026.07.23`, Codex `0.146.0` / `0.144.6`, Claude
+  `2.1.212`); `write_set` validation for implementation profiles with post-invoke git
+  path checks; live API acceptance treats delegation `404 NOT_FOUND` as valid negative
+  result for missing assignments.
+
+### Added
+
 - **ORCH-VPS-POST-NET-ATTACH-01** — Portable fixes for remaining VPS runtime friction after
   network-attach deploy: compose service discovery via Podman labels (no `podman-compose ps -q
   <service>` shim); `CMD-SHELL` healthchecks compatible with podman-compose 1.0.6; edge proxy

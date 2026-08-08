@@ -336,7 +336,7 @@ def run_provider_runtime_acceptance(
             root=provider_workspace,
             pins=pins,
             run_dir=evidence_dir,
-            acceptance_mode=True,
+            execution_profile="acceptance",
         )
         binding = replace(binding, socket_path=socket_path)
         runner = HostRunner(binding)

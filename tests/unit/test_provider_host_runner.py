@@ -7,12 +7,16 @@ import os
 import stat
 import threading
 import time
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from flow_engine.persistence.migrations import apply_migrations, list_tables
+from flow_engine.providers.cli_registry import (
+    EXECUTION_PROFILE_ACCEPTANCE,
+    EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+)
 from flow_engine.providers.host_runner import (
     HostRunner,
     HostRunnerServer,
@@ -23,14 +27,15 @@ from flow_engine.providers.host_runner import (
     canonical_json,
     digest_json,
     provider_argv,
+    validate_write_set,
 )
 
 
-def _fake_cli(tmp_path: Path, provider: str) -> Path:
+def _fake_cli(tmp_path: Path, provider: str, version: str | None = None) -> Path:
     versions = {
-        "codex": "0.144.6",
-        "cursor": "2026.07.23",
-        "claude": "2.1.212",
+        "codex": version or "0.146.0",
+        "cursor": version or "2026.08.04-aaa8809",
+        "claude": version or "2.1.212",
     }
     path = tmp_path / provider
     path.write_text(
@@ -45,17 +50,62 @@ def _fake_cli(tmp_path: Path, provider: str) -> Path:
     return path
 
 
-def _binding(tmp_path: Path, provider: str = "codex") -> ProviderBinding:
+def _binding(
+    tmp_path: Path,
+    provider: str = "codex",
+    *,
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE,
+    cli_version: str | None = None,
+) -> ProviderBinding:
+    version_pins = {
+        "codex": cli_version or "0.146.0",
+        "cursor": cli_version or "2026.08.04-aaa8809",
+        "claude": cli_version or "2.1.212",
+    }
     return ProviderBinding(
         provider=provider,
-        executable=_fake_cli(tmp_path, provider),
+        executable=_fake_cli(tmp_path, provider, version_pins[provider]),
         model=f"{provider}-test-model",
         workspace_root=tmp_path,
         socket_path=tmp_path / "sockets" / f"{provider}.sock",
         auth_token="test-only-host-token",
+        cli_version_pin=version_pins[provider],
         allowed_models=(f"{provider}-test-model",),
         expected_peer_uid=os.getuid(),
+        execution_profile=execution_profile,
     )
+
+
+def _invoke_packet(
+    runner: HostRunner,
+    handshake: dict[str, object],
+    *,
+    invocation_id: str = "inv-1",
+    attempt_id: str = "att-1",
+    task_packet: dict[str, object] | None = None,
+    cwd: str = ".",
+) -> dict[str, object]:
+    snapshot = handshake["snapshot_digest"]
+    task = task_packet or {"objective": "task"}
+    packet_digest = digest_json(task)
+    binding_fields = {
+        "provider": runner.binding.provider,
+        "attempt_id": attempt_id,
+        "invocation_id": invocation_id,
+        "credit_reservation_id": f"credit-{invocation_id}",
+        "packet_digest": packet_digest,
+        "snapshot_digest": snapshot,
+        "resolved_model": handshake["snapshot"]["resolved_model"],
+        "adapter_version": handshake["snapshot"]["adapter_version"],
+        "execution_profile": runner.binding.execution_profile,
+    }
+    return {
+        **binding_fields,
+        "binding_digest": digest_json(binding_fields),
+        "task_packet": task,
+        "cwd": cwd,
+        "execution_profile": runner.binding.execution_profile,
+    }
 
 
 def test_migration_007_is_additive_and_persists_provider_fields(kernel_db) -> None:
@@ -149,36 +199,14 @@ def test_invoke_redacts_and_replays_without_second_process(tmp_path: Path) -> No
     binding.executable.write_text(
         "#!/usr/bin/env python3\n"
         "import sys\n"
-        "if '--version' in sys.argv: print('codex 0.144.6'); raise SystemExit(0)\n"
+        "if '--version' in sys.argv: print('codex 0.146.0'); raise SystemExit(0)\n"
         "print('{\"type\":\"result\",\"result\":\"token=leaked-value\"}')\n",
         encoding="utf-8",
     )
     binding.executable.chmod(0o700)
     runner = HostRunner(binding)
     handshake = runner.handshake()
-    snapshot = handshake["snapshot_digest"]
-    task_packet = {"objective": "task"}
-    packet_digest = digest_json(task_packet)
-    packet = {
-        "invocation_id": "inv-1",
-        "attempt_id": "att-1",
-        "provider": "codex",
-        "credit_reservation_id": "credit-1",
-        "packet_digest": packet_digest,
-        "snapshot_digest": snapshot,
-        "task_packet": task_packet,
-        "cwd": ".",
-    }
-    packet["binding_digest"] = digest_json({
-        "provider": "codex",
-        "attempt_id": "att-1",
-        "invocation_id": "inv-1",
-        "credit_reservation_id": "credit-1",
-        "packet_digest": packet_digest,
-        "snapshot_digest": snapshot,
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    })
+    packet = _invoke_packet(runner, handshake)
     first = runner.invoke(packet)
     binding.executable.unlink()
     second = runner.invoke(packet)
@@ -207,30 +235,23 @@ def test_socket_mode_peer_and_authenticated_handshake(tmp_path: Path) -> None:
 
 
 def test_cwd_escape_is_denied(tmp_path: Path) -> None:
-    runner = HostRunner(replace(_binding(tmp_path), acceptance_mode=False))
+    runner = HostRunner(
+        _binding(
+            tmp_path,
+            "cursor",
+            execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+        )
+    )
     with pytest.raises(ValueError, match="escapes"):
         handshake = runner.handshake()
-        task_packet = {"objective": "task"}
-        packet_digest = digest_json(task_packet)
-        packet = {
-                "invocation_id": "inv-escape",
-                "attempt_id": "att-escape",
-                "provider": "codex",
-                "credit_reservation_id": "credit-escape",
-                "packet_digest": packet_digest,
-                "snapshot_digest": handshake["snapshot_digest"],
-                "task_packet": task_packet,
-                "cwd": "..",
-            }
-        packet["binding_digest"] = digest_json({
-            "provider": "codex", "attempt_id": "att-escape",
-            "invocation_id": "inv-escape",
-            "credit_reservation_id": "credit-escape",
-            "packet_digest": packet_digest,
-            "snapshot_digest": handshake["snapshot_digest"],
-            "resolved_model": handshake["snapshot"]["resolved_model"],
-            "adapter_version": handshake["snapshot"]["adapter_version"],
-        })
+        packet = _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-escape",
+            attempt_id="att-escape",
+            task_packet={"objective": "task", "write_set": ["src/"]},
+            cwd="..",
+        )
         runner.invoke(packet)
 
 
@@ -284,28 +305,9 @@ def test_reconcile_survives_runner_restart(tmp_path: Path) -> None:
     binding = _binding(tmp_path)
     first_runner = HostRunner(binding)
     handshake = first_runner.handshake()
-    snapshot = handshake["snapshot_digest"]
-    task_packet = {"objective": "task"}
-    packet_digest = digest_json(task_packet)
-    packet = {
-        "invocation_id": "inv-durable",
-        "attempt_id": "att-durable",
-        "provider": "codex",
-        "credit_reservation_id": "credit-durable",
-        "packet_digest": packet_digest,
-        "snapshot_digest": snapshot,
-        "task_packet": task_packet,
-        "cwd": ".",
-    }
-    packet["binding_digest"] = digest_json({
-        "provider": "codex", "attempt_id": "att-durable",
-        "invocation_id": "inv-durable",
-        "credit_reservation_id": "credit-durable",
-        "packet_digest": packet_digest,
-        "snapshot_digest": snapshot,
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    })
+    packet = _invoke_packet(
+        first_runner, handshake, invocation_id="inv-durable", attempt_id="att-durable"
+    )
     result = first_runner.invoke(packet)
     restarted = HostRunner(binding)
     assert restarted.reconcile("inv-durable") == result
@@ -316,23 +318,8 @@ def test_prompt_substitution_rejected_before_cli_process(
 ) -> None:
     runner = HostRunner(_binding(tmp_path))
     handshake = runner.handshake()
-    original = {"objective": "approved"}
-    digest = digest_json(original)
-    binding = {
-        "provider": "codex",
-        "attempt_id": "att-sub",
-        "invocation_id": "inv-sub",
-        "credit_reservation_id": "credit-sub",
-        "packet_digest": digest,
-        "snapshot_digest": handshake["snapshot_digest"],
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    }
-    packet = {
-        **binding,
-        "binding_digest": digest_json(binding),
-        "task_packet": {"objective": "substituted"},
-    }
+    packet = _invoke_packet(runner, handshake, attempt_id="att-sub", invocation_id="inv-sub")
+    packet["task_packet"] = {"objective": "substituted"}
     monkeypatch.setattr(
         "flow_engine.providers.host_runner.subprocess.Popen",
         lambda *args, **kwargs: pytest.fail("provider CLI process launched"),
@@ -344,21 +331,8 @@ def test_prompt_substitution_rejected_before_cli_process(
 def test_acceptance_workspace_is_isolated_and_removed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    binding = _binding(tmp_path)
-    runner = HostRunner(binding)
+    runner = HostRunner(_binding(tmp_path))
     handshake = runner.handshake()
-    task_packet = {"objective": "read-only acceptance"}
-    packet_digest = digest_json(task_packet)
-    binding_fields = {
-        "provider": "codex",
-        "attempt_id": "att-isolated",
-        "invocation_id": "inv-isolated",
-        "credit_reservation_id": "credit-isolated",
-        "packet_digest": packet_digest,
-        "snapshot_digest": handshake["snapshot_digest"],
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    }
     isolated = tmp_path / "dedicated-acceptance"
 
     def make_workspace(*args, **kwargs):
@@ -369,11 +343,15 @@ def test_acceptance_workspace_is_isolated_and_removed(
     monkeypatch.setattr(
         "flow_engine.providers.host_runner.tempfile.mkdtemp", make_workspace
     )
-    runner.invoke({
-        **binding_fields,
-        "binding_digest": digest_json(binding_fields),
-        "task_packet": task_packet,
-    })
+    runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            attempt_id="att-isolated",
+            invocation_id="inv-isolated",
+            task_packet={"objective": "read-only acceptance"},
+        )
+    )
     assert not isolated.exists()
 
 
@@ -383,17 +361,6 @@ def test_acceptance_workspace_removed_when_popen_fails(
 ) -> None:
     runner = HostRunner(_binding(tmp_path))
     handshake = runner.handshake()
-    task_packet = {"objective": "launch failure"}
-    packet_digest = digest_json(task_packet)
-    binding_fields = {
-        "provider": "codex", "attempt_id": "att-launch",
-        "invocation_id": f"inv-{type(error).__name__}",
-        "credit_reservation_id": "credit-launch",
-        "packet_digest": packet_digest,
-        "snapshot_digest": handshake["snapshot_digest"],
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    }
     isolated = tmp_path / f"accept-{type(error).__name__}"
     monkeypatch.setattr(
         "flow_engine.providers.host_runner.tempfile.mkdtemp",
@@ -404,11 +371,15 @@ def test_acceptance_workspace_removed_when_popen_fails(
         lambda *args, **kwargs: (_ for _ in ()).throw(error),
     )
     with pytest.raises(type(error)):
-        runner.invoke({
-            **binding_fields,
-            "binding_digest": digest_json(binding_fields),
-            "task_packet": task_packet,
-        })
+        runner.invoke(
+            _invoke_packet(
+                runner,
+                handshake,
+                attempt_id="att-launch",
+                invocation_id=f"inv-{type(error).__name__}",
+                task_packet={"objective": "launch failure"},
+            )
+        )
     assert not isolated.exists()
 
 
@@ -424,21 +395,105 @@ def test_symlink_acceptance_workspace_is_unlinked(
     monkeypatch.setattr(
         "flow_engine.providers.host_runner.tempfile.mkdtemp", lambda **kwargs: str(link)
     )
-    task_packet = {"objective": "symlink rejection"}
-    packet_digest = digest_json(task_packet)
-    binding_fields = {
-        "provider": "codex", "attempt_id": "att-link",
-        "invocation_id": "inv-link", "credit_reservation_id": "credit-link",
-        "packet_digest": packet_digest,
-        "snapshot_digest": handshake["snapshot_digest"],
-        "resolved_model": handshake["snapshot"]["resolved_model"],
-        "adapter_version": handshake["snapshot"]["adapter_version"],
-    }
     with pytest.raises(PermissionError, match="symlink"):
-        runner.invoke({
-            **binding_fields,
-            "binding_digest": digest_json(binding_fields),
-            "task_packet": task_packet,
-        })
+        runner.invoke(
+            _invoke_packet(
+                runner,
+                handshake,
+                attempt_id="att-link",
+                invocation_id="inv-link",
+                task_packet={"objective": "symlink rejection"},
+            )
+        )
     assert not link.exists()
     assert target.exists()
+
+
+def test_handshake_rejects_unpinned_cli_version(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, cli_version="0.144.6")
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('codex 0.146.0'); raise SystemExit(0)\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    with pytest.raises(RuntimeError, match="does not match"):
+        HostRunner(binding).handshake()
+
+
+def test_invoke_rejects_profile_upgrade(tmp_path: Path) -> None:
+    runner = HostRunner(_binding(tmp_path))
+    handshake = runner.handshake()
+    packet = _invoke_packet(runner, handshake)
+    packet["execution_profile"] = EXECUTION_PROFILE_CURSOR_IMPLEMENTATION
+    with pytest.raises(PermissionError, match="execution profile"):
+        runner.invoke(packet)
+
+
+def test_cursor_implementation_argv_uses_agent_mode(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor", execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION)
+    argv = provider_argv(binding, "implement slice")
+    assert argv[argv.index("--mode") + 1] == "agent"
+    assert "--force" in argv
+    assert "--trust" not in argv
+
+
+def test_claude_review_argv_disallows_edit_write_only(tmp_path: Path) -> None:
+    binding = _binding(
+        tmp_path, "claude", execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
+    )
+    argv = provider_argv(binding, "review", prompt_via_stdin=True)
+    denied = argv[argv.index("--disallowedTools") + 1]
+    assert denied == "Edit,Write"
+    assert "Read" not in denied
+
+
+def test_write_set_validation_rejects_escape(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="relative"):
+        validate_write_set(["/etc/passwd"], tmp_path)
+    with pytest.raises(ValueError, match="escapes"):
+        validate_write_set(["../outside"], tmp_path)
+
+
+def test_write_set_violation_fails_without_deleting_evidence(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    src = worktree / "src"
+    src.mkdir()
+    (src / "allowed.py").write_text("x=1\n", encoding="utf-8")
+    import subprocess as sp
+
+    sp.run(["git", "init"], cwd=worktree, capture_output=True, check=True)
+    sp.run(["git", "add", "src/allowed.py"], cwd=worktree, check=True)
+    sp.run(
+        ["git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-m", "init"],
+        cwd=worktree,
+        check=True,
+    )
+    (worktree / "undeclared.py").write_text("y=2\n", encoding="utf-8")
+
+    binding = ProviderBinding(
+        provider="cursor",
+        executable=_fake_cli(tmp_path, "cursor"),
+        model="cursor-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "cursor.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2026.08.04-aaa8809",
+        allowed_models=("cursor-test-model",),
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id="inv-write-set",
+        task_packet={"objective": "task", "write_set": ["src/"]},
+    )
+    result = runner.invoke(packet)
+    assert result["write_set_validation"] == "fail"
+    assert "undeclared.py" in result["undeclared_paths"]
+    assert result["outcome"] == "failed"
+    assert result["redacted_output"]
