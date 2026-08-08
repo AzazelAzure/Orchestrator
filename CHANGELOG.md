@@ -7,6 +7,18 @@ the `flow_engine` Python package (`orchestrator` on PyPI metadata).
 
 ### Added
 
+- **ORCH-VPS-POST-NET-ATTACH-01** — Portable fixes for remaining VPS runtime friction after
+  network-attach deploy: compose service discovery via Podman labels (no `podman-compose ps -q
+  <service>` shim); `CMD-SHELL` healthchecks compatible with podman-compose 1.0.6; edge proxy
+  reload validates/reloads nginx only (no `fm-beta` stack recreation); VPS
+  `DJANGO_ALLOWED_HOSTS` generation merges required presentation aliases without dropping
+  operator extras (`scripts/orch_vps_allowed_hosts.sh`).
+- **ORCH-VPS-POST-NET-ATTACH-01 (review)** — Allowed-host env rewrite uses line-by-line
+  replacement (no `sed` substitution from operator values); direct tests for metacharacter
+  preservation and idempotency.
+
+### Added
+
 - **ORCH-VPS-NET-ATTACH-01** — Rootless-native presentation routing without host port
   publish: per-color Podman networks (`orchestrator-console-{color}`) with stable DNS
   aliases (`orch-api-{color}`, `orch-console-{color}`); optional loopback-only diagnostics

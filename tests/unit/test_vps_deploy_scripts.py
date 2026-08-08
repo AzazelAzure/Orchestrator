@@ -72,6 +72,7 @@ def _fixture_orch_root(tmp_path: Path) -> Path:
         "deploy/vps/vps_bootstrap.sh",
         "deploy/vps/orch_presentation_env.sh",
         "deploy/vps/ensure_presentation_networks.sh",
+        "scripts/orch_vps_allowed_hosts.sh",
         "deploy/attestations/script-runner.attestation.json",
         "ops-console/Dockerfile",
     ):
@@ -247,13 +248,7 @@ class TestRunOpsConsoleHarness:
         _write_stub(
             bin_dir,
             "podman-compose",
-            textwrap.dedent(
-                """
-                if [[ " $* " == *" ps "* && " $* " == *" api-blue "* ]]; then echo cid-blue; exit 0; fi
-                if [[ " $* " == *" ps "* && " $* " == *" api-green "* ]]; then echo cid-green; exit 0; fi
-                exit 0
-                """
-            ),
+            'echo "podman-compose ps must not be used for discovery" >&2; exit 9',
         )
         _write_stub(
             bin_dir,
@@ -261,6 +256,19 @@ class TestRunOpsConsoleHarness:
             textwrap.dedent(
                 """
                 case "$1" in
+                  ps)
+                    shift
+                    args="$*"
+                    if [[ "$args" == *"com.docker.compose.service=api-blue"* ]]; then
+                      echo cid-blue
+                      exit 0
+                    fi
+                    if [[ "$args" == *"com.docker.compose.service=api-green"* ]]; then
+                      echo cid-green
+                      exit 0
+                    fi
+                    exit 0
+                    ;;
                   network)
                     if [[ "$2" == "exists" ]]; then exit 0; fi
                     if [[ "$2" == "create" ]]; then exit 0; fi
@@ -325,35 +333,52 @@ class TestRunOpsConsoleHarness:
         assert "no running API container" in result.stderr
 
 
+def _write_podman_label_discovery_stub(
+    bin_dir: Path,
+    service_cids: dict[str, str | list[str]],
+    *,
+    inspect_body: str = "",
+) -> None:
+    cases: list[str] = []
+    for svc, cids in service_cids.items():
+        cid_list = [cids] if isinstance(cids, str) else list(cids)
+        echoes = "\n".join(f'    echo "{cid}"' for cid in cid_list)
+        cases.append(
+            textwrap.dedent(
+                f"""
+                if [[ "$args" == *"label=com.docker.compose.service={svc}"* ]]; then
+                {echoes}
+                  exit 0
+                fi
+                """
+            )
+        )
+    body = textwrap.dedent(
+        f"""
+        if [[ "$1" == ps ]]; then
+          shift
+          args="$*"
+        {''.join(cases)}
+          exit 0
+        fi
+        {inspect_body}
+        exit 0
+        """
+    )
+    _write_stub(bin_dir, "podman", body)
+
+
 class TestHealthcheckHarness:
     def test_exited_script_runner_fails(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         orch = _fixture_orch_root(tmp_path)
 
-        compose_body = textwrap.dedent(
-            """
-            if [[ " $* " != *" ps "* ]]; then exit 0; fi
-            case "$*" in
-              *script-spool-init*) echo cid-spool-init ;;
-              *script-runner*) echo cid-runner ;;
-              *script-worker*) echo cid-worker-script ;;
-              *scheduler*) echo cid-sched ;;
-              *coordinator*) echo cid-coord ;;
-              *redis*) echo cid-redis ;;
-              *worker*) echo cid-worker ;;
-            esac
-            exit 0
-            """
-        )
-        _write_stub(bin_dir, "podman-compose", compose_body)
-
-        podman_body = textwrap.dedent(
+        inspect_body = textwrap.dedent(
             r"""
             if [[ "$1" != "inspect" ]]; then exit 0; fi
             fmt="$3"
             target="$4"
-            name_hint="$target"
             if [[ "$fmt" == *Name* ]]; then
               case "$target" in
                 cid-redis) echo "/orchestrator_redis_1" ;;
@@ -372,22 +397,18 @@ class TestHealthcheckHarness:
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
                 [[ "$fmt" == *Health* ]] && echo healthy && exit 0
                 ;;
-              *coordinator*|*worker_1*|*worker\"*)
+              *coord*|*worker_1*|*sched*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
                 [[ "$fmt" == *Health* ]] && echo healthy && exit 0
                 ;;
-              *scheduler*)
-                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
-                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
-                ;;
-              *script-spool-init*)
+              *spool-init*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
                 [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
                 ;;
-              *script-runner*)
+              *runner*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
                 ;;
-              *script-worker*)
+              *worker-script*)
                 [[ "$fmt" == *Status* && "$fmt" != *Health* ]] && echo running && exit 0
                 ;;
             esac
@@ -395,7 +416,24 @@ class TestHealthcheckHarness:
             exit 0
             """
         )
-        _write_stub(bin_dir, "podman", podman_body)
+        _write_podman_label_discovery_stub(
+            bin_dir,
+            {
+                "redis": "cid-redis",
+                "coordinator": "cid-coord",
+                "worker": "cid-worker",
+                "scheduler": "cid-sched",
+                "script-spool-init": "cid-spool-init",
+                "script-runner": "cid-runner",
+                "script-worker": "cid-worker-script",
+            },
+            inspect_body=inspect_body,
+        )
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            'echo "podman-compose ps -q must not be used for discovery" >&2; exit 9',
+        )
         _write_stub(bin_dir, "curl", "exit 0")
         _write_sed_stub(bin_dir)
 
@@ -416,32 +454,77 @@ class TestHealthcheckHarness:
         combined = result.stdout + result.stderr
         assert "script-runner" in combined
 
-    def test_compose_invoked_from_unrelated_cwd(self, tmp_path: Path) -> None:
+    def test_label_discovery_works_from_unrelated_cwd(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
-        marker = tmp_path / "compose.marker"
+        marker = tmp_path / "podman.marker"
         orch = _fixture_orch_root(tmp_path)
-        _write_stub(
-            bin_dir,
-            "podman-compose",
-            'if [[ "$PWD" != *"orchestrator" ]]; then echo "wrong cwd: $PWD" >&2; exit 7; fi; exit 0',
+        inspect_body = textwrap.dedent(
+            r"""
+            if [[ "$1" != "inspect" ]]; then exit 0; fi
+            fmt="$3"
+            target="$4"
+            if [[ "$fmt" == *Name* ]]; then
+              case "$target" in
+                cid-redis) echo "/orchestrator_redis_1" ;;
+                cid-coord) echo "/orchestrator_coordinator_1" ;;
+                cid-worker) echo "/orchestrator_worker_1" ;;
+                cid-sched) echo "/orchestrator_scheduler_1" ;;
+                cid-spool-init) echo "/orchestrator_script-spool-init_1" ;;
+                cid-runner) echo "/orchestrator_script-runner_1" ;;
+                cid-worker-script) echo "/orchestrator_script-worker_1" ;;
+              esac
+              exit 0
+            fi
+            case "$target" in
+              cid-redis|orchestrator_redis_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                ;;
+              cid-coord|orchestrator_coordinator_1|cid-worker|orchestrator_worker_1|cid-sched|orchestrator_scheduler_1|cid-worker-script|orchestrator_script-worker_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                ;;
+              cid-spool-init|orchestrator_script-spool-init_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
+                [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
+                ;;
+              cid-runner|orchestrator_script-runner_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                ;;
+            esac
+            exit 0
+            """
         )
         _write_stub(
             bin_dir,
             "podman",
             textwrap.dedent(
-                """
-                if [[ "$1" == "inspect" ]]; then
-                  case "$3" in
-                    *Name*) echo "/orchestrator_redis_1" ;;
-                    *Status*) echo "healthy" ;;
-                    *Health*) echo "healthy" ;;
+                f"""
+                MARKER="{marker}"
+                printf '%s\\n' "$0 $*" >> "${{MARKER}}.log"
+                if [[ "$1" == ps ]]; then
+                  shift
+                  args="$*"
+                  case "$args" in
+                    *com.docker.compose.service=redis*) echo cid-redis; exit 0 ;;
+                    *com.docker.compose.service=coordinator*) echo cid-coord; exit 0 ;;
+                    *com.docker.compose.service=scheduler*) echo cid-sched; exit 0 ;;
+                    *com.docker.compose.service=script-spool-init*) echo cid-spool-init; exit 0 ;;
+                    *com.docker.compose.service=script-runner*) echo cid-runner; exit 0 ;;
+                    *com.docker.compose.service=script-worker*) echo cid-worker-script; exit 0 ;;
+                    *com.docker.compose.service=worker*) echo cid-worker; exit 0 ;;
                   esac
                   exit 0
                 fi
-                exit 0
+                {inspect_body}
                 """
             ),
+        )
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            'echo "podman-compose ps -q must not be used for discovery" >&2; exit 9',
         )
         _write_stub(bin_dir, "curl", "exit 0")
         _write_sed_stub(bin_dir)
@@ -453,80 +536,88 @@ class TestHealthcheckHarness:
             "ORCH_HEALTH_COLOR": "shared",
             "COMPOSE": "podman-compose",
         }
-        _run_script(
+        result = _run_script(
             orch / "deploy/vps/healthcheck.sh",
             env=env,
             args=[],
             cwd=Path("/tmp"),
         )
         log = Path(f"{marker}.log").read_text(encoding="utf-8")
-        assert "cwd=" in log
-        assert "orchestrator" in log
+        assert "label=com.docker.compose.service=redis" in log
+        assert result.returncode == 0, result.stdout + result.stderr
 
     def test_healthcheck_fails_on_ambiguous_presentation_api(self, tmp_path: Path) -> None:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
         orch = _fixture_orch_root(tmp_path)
 
-        compose_body = textwrap.dedent(
-            """
-            if [[ " $* " != *" ps "* ]]; then exit 0; fi
-            case "$*" in
-              *api-blue*) echo cid-api-1; echo cid-api-2 ;;
-              *script-spool-init*) echo cid-spool-init ;;
-              *script-runner*) echo cid-runner ;;
-              *script-worker*) echo cid-worker-script ;;
-              *scheduler*) echo cid-sched ;;
-              *coordinator*) echo cid-coord ;;
-              *redis*) echo cid-redis ;;
-              *worker*) echo cid-worker ;;
+        inspect_body = textwrap.dedent(
+            r"""
+            if [[ "$1" != "inspect" ]]; then exit 0; fi
+            fmt="$3"
+            target="$4"
+            if [[ "$fmt" == *Name* ]]; then
+              case "$target" in
+                cid-redis) echo "/orchestrator_redis_1" ;;
+                cid-coord) echo "/orchestrator_coordinator_1" ;;
+                cid-worker) echo "/orchestrator_worker_1" ;;
+                cid-sched) echo "/orchestrator_scheduler_1" ;;
+                cid-spool-init) echo "/orchestrator_script-spool-init_1" ;;
+                cid-runner) echo "/orchestrator_script-runner_1" ;;
+                cid-worker-script) echo "/orchestrator_script-worker_1" ;;
+                cid-api-1) echo "/orchestrator_api-blue_1" ;;
+                cid-api-2) echo "/orchestrator_api-blue_2" ;;
+              esac
+              exit 0
+            fi
+            case "$target" in
+              cid-redis|orchestrator_redis_1|cid-coord|orchestrator_coordinator_1|cid-worker|orchestrator_worker_1|cid-sched|orchestrator_scheduler_1|cid-worker-script|orchestrator_script-worker_1|cid-api-1|orchestrator_api-blue_1|cid-api-2|orchestrator_api-blue_2)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                [[ "$fmt" == *Health* ]] && echo healthy && exit 0
+                ;;
+              cid-spool-init|orchestrator_script-spool-init_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
+                [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
+                ;;
+              cid-runner|orchestrator_script-runner_1)
+                [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
+                ;;
             esac
             exit 0
             """
         )
-        _write_stub(bin_dir, "podman-compose", compose_body)
         _write_stub(
             bin_dir,
             "podman",
             textwrap.dedent(
-                r"""
-                if [[ "$1" != "inspect" ]]; then exit 0; fi
-                fmt="$3"
-                target="$4"
-                if [[ "$fmt" == *Name* ]]; then
-                  case "$target" in
-                    cid-redis) echo "/orchestrator_redis_1" ;;
-                    cid-coord) echo "/orchestrator_coordinator_1" ;;
-                    cid-worker) echo "/orchestrator_worker_1" ;;
-                    cid-sched) echo "/orchestrator_scheduler_1" ;;
-                    cid-spool-init) echo "/orchestrator_script-spool-init_1" ;;
-                    cid-runner) echo "/orchestrator_script-runner_1" ;;
-                    cid-worker-script) echo "/orchestrator_script-worker_1" ;;
-                    cid-api-1) echo "/orchestrator_api-blue_1" ;;
-                    cid-api-2) echo "/orchestrator_api-blue_2" ;;
+                f"""
+                if [[ "$1" == ps ]]; then
+                  shift
+                  args="$*"
+                  case "$args" in
+                    *com.docker.compose.service=redis*) echo cid-redis; exit 0 ;;
+                    *com.docker.compose.service=coordinator*) echo cid-coord; exit 0 ;;
+                    *com.docker.compose.service=scheduler*) echo cid-sched; exit 0 ;;
+                    *com.docker.compose.service=script-spool-init*) echo cid-spool-init; exit 0 ;;
+                    *com.docker.compose.service=script-runner*) echo cid-runner; exit 0 ;;
+                    *com.docker.compose.service=script-worker*) echo cid-worker-script; exit 0 ;;
+                    *com.docker.compose.service=worker*) echo cid-worker; exit 0 ;;
+                    *com.docker.compose.service=api-blue*)
+                      echo cid-api-1
+                      echo cid-api-2
+                      exit 0
+                      ;;
                   esac
                   exit 0
                 fi
-                case "$target" in
-                  *redis*|*coordinator*|*worker_1*|*scheduler*|*worker-script*)
-                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
-                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
-                    ;;
-                  *script-spool-init*)
-                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo exited && exit 0
-                    [[ "$fmt" == *ExitCode* ]] && echo 0 && exit 0
-                    ;;
-                  *script-runner*)
-                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
-                    ;;
-                  *api-blue*)
-                    [[ "$fmt" == *Status* && "$fmt" != *Health* && "$fmt" != *Exit* ]] && echo running && exit 0
-                    [[ "$fmt" == *Health* ]] && echo healthy && exit 0
-                    ;;
-                esac
-                exit 0
+                {inspect_body}
                 """
             ),
+        )
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            'echo "podman-compose ps -q must not be used for discovery" >&2; exit 9',
         )
         _write_stub(bin_dir, "curl", "exit 0")
         _write_sed_stub(bin_dir)
@@ -597,7 +688,36 @@ class TestVpsBootstrapHarness:
         _write_stub(
             bin_dir,
             "podman-compose",
-            "exit 0",
+            textwrap.dedent(
+                """
+                if [[ " $* " == *" up "* ]]; then
+                  echo "reload_hfm_proxy must not recreate the fm-beta stack" >&2
+                  exit 9
+                fi
+                if [[ " $* " == *" exec "* ]]; then
+                  exit 0
+                fi
+                exit 0
+                """
+            ),
+        )
+        _write_stub(
+            bin_dir,
+            "podman",
+            textwrap.dedent(
+                """
+                if [[ "$1" == ps ]]; then
+                  shift
+                  args="$*"
+                  if [[ "$args" == *"com.docker.compose.service=proxy"* ]]; then
+                    echo proxy-cid
+                    exit 0
+                  fi
+                  exit 0
+                fi
+                exit 0
+                """
+            ),
         )
         _write_stub(
             bin_dir,
@@ -636,3 +756,78 @@ class TestVpsBootstrapHarness:
         assert "ORCH_EDGE_PROXY_PRE_RELOAD_CMD is unset" in combined
         log_path = Path(f"{marker}.log")
         assert not log_path.exists() or "systemctl-called" not in log_path.read_text(encoding="utf-8")
+
+    def test_reload_hfm_proxy_validates_and_reloads_without_recreate(self, tmp_path: Path) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        marker = tmp_path / "proxy.marker"
+        orch = _fixture_orch_root(tmp_path)
+        fm_root = tmp_path / "finance_manager"
+        fm_root.mkdir()
+        (fm_root / "docker-compose.bluegreen.yml").write_text(
+            "services:\n  proxy:\n    image: nginx:alpine\n",
+            encoding="utf-8",
+        )
+        hook = tmp_path / "attach.sh"
+        hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+        hook.chmod(0o755)
+        (orch / ".env.vps").write_text(
+            f"ORCH_TOKEN_FOUNDER=test-token\nORCH_EDGE_PROXY_PRE_RELOAD_CMD={hook}\n",
+            encoding="utf-8",
+        )
+
+        _write_stub(
+            bin_dir,
+            "podman-compose",
+            textwrap.dedent(
+                f"""
+                MARKER="{marker}"
+                printf '%s\\n' "$0 $*" >> "${{MARKER}}.log"
+                if [[ " $* " == *" up "* ]]; then
+                  echo "must not recreate stack" >&2
+                  exit 9
+                fi
+                if [[ " $* " == *" exec "* && " $* " == *" nginx -t "* ]]; then exit 0; fi
+                if [[ " $* " == *" exec "* && " $* " == *" nginx -s reload "* ]]; then exit 0; fi
+                exit 0
+                """
+            ),
+        )
+        _write_stub(
+            bin_dir,
+            "podman",
+            textwrap.dedent(
+                """
+                if [[ "$1" == ps ]]; then
+                  shift
+                  args="$*"
+                  if [[ "$args" == *"com.docker.compose.service=proxy"* ]]; then
+                    echo proxy-cid
+                    exit 0
+                  fi
+                  exit 0
+                fi
+                exit 0
+                """
+            ),
+        )
+        _write_utility_stub(bin_dir, "bash", 'if [[ "${1:-}" == "-lc" ]]; then exit 0; fi; exec /bin/bash "$@"')
+
+        env = {
+            "PATH": f"{_exclusive_path(bin_dir)}:/usr/bin:/bin",
+            "ORCH_TEST_MARKER": str(marker),
+            "ORCH_ROOT": str(orch),
+            "FM_ROOT": str(fm_root),
+            "COMPOSE": "podman-compose",
+        }
+        result = _run_script(
+            orch / "deploy/vps/vps_bootstrap.sh",
+            env=env,
+            args=["proxy"],
+            cwd=Path("/tmp"),
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        log = Path(f"{marker}.log").read_text(encoding="utf-8")
+        assert " up " not in log
+        assert "nginx -t" in log
+        assert "nginx -s reload" in log

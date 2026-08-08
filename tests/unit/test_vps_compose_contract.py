@@ -186,6 +186,61 @@ def test_worker_healthcheck_uses_hostname() -> None:
     assert "celery@$(hostname)" in joined
 
 
+def _podman_compose_106_healthcheck_argv(test: list[str] | str) -> list[str]:
+    """Mirror podman-compose 1.0.6 healthcheck → podman run argv fragment."""
+    import shlex
+
+    def cmd_quote(cmd: str) -> str:
+        if not cmd:
+            return "''"
+        return shlex.quote(cmd)
+
+    if isinstance(test, str):
+        return ["/bin/sh", "-c", test]
+    if not test:
+        raise ValueError("empty healthcheck test")
+    kind = test[0]
+    rest = test[1:]
+    if kind == "CMD":
+        cmd = "' '".join(cmd_quote(part) for part in rest)
+        return ["/bin/sh", "-c", cmd]
+    if kind == "CMD-SHELL":
+        if len(rest) != 1:
+            raise ValueError("CMD-SHELL requires exactly one command string")
+        return ["/bin/sh", "-c", rest[0]]
+    raise ValueError(f"unsupported healthcheck type: {kind}")
+
+
+def test_compose_healthchecks_use_cmd_shell_for_podman_compose_106() -> None:
+    """CMD arrays render malformed /bin/sh -c vectors on podman-compose 1.0.6."""
+    merged = _merge_compose(BASE, VPS, BLUEGREEN)
+    targets = {
+        "redis": merged["services"]["redis"]["healthcheck"]["test"],
+        "coordinator": merged["services"]["coordinator"]["healthcheck"]["test"],
+        "api": merged["services"]["api"]["healthcheck"]["test"],
+        "api-blue": merged["services"]["api-blue"]["healthcheck"]["test"],
+        "api-green": merged["services"]["api-green"]["healthcheck"]["test"],
+        "worker": merged["services"]["worker"]["healthcheck"]["test"],
+    }
+    for name, test in targets.items():
+        assert isinstance(test, list), f"{name} healthcheck must be a list"
+        assert test[0] == "CMD-SHELL", f"{name} must use CMD-SHELL, got {test!r}"
+        argv = _podman_compose_106_healthcheck_argv(test)
+        assert argv[0:2] == ["/bin/sh", "-c"]
+        shell_cmd = argv[2]
+        assert shell_cmd
+        assert "' '" not in shell_cmd, f"{name} must not use broken CMD join quoting"
+        if name in {"coordinator", "api", "api-blue", "api-green"}:
+            assert "urllib.request.urlopen" in shell_cmd
+            assert ";" in shell_cmd
+
+
+def test_cmd_healthcheck_renders_malformed_on_podman_compose_106() -> None:
+    broken = ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9001/health')"]
+    argv = _podman_compose_106_healthcheck_argv(broken)
+    assert "' '" in argv[2]
+
+
 def test_base_ops_console_has_no_host_publish() -> None:
     compose = _load(BASE)
     console = compose["services"]["ops-console"]

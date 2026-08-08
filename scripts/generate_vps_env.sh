@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=orch_vps_allowed_hosts.sh
+source "$ROOT/scripts/orch_vps_allowed_hosts.sh"
+
 ENV_FILE="${1:-$ROOT/.env.vps}"
 
 if [[ -d "$ROOT/.git" ]] && command -v git >/dev/null 2>&1; then
@@ -26,7 +29,7 @@ umask 077
   echo "# Generated VPS secrets — do not commit"
   echo "REDIS_PASSWORD=$(_rand)"
   echo "DJANGO_SECRET_KEY=$(_rand)"
-  echo "DJANGO_ALLOWED_HOSTS=api.thedirectorate.app,127.0.0.1,localhost"
+  echo "DJANGO_ALLOWED_HOSTS=$(orch_vps_default_allowed_hosts)"
   echo "CORS_ALLOWED_ORIGINS=https://www.thedirectorate.app"
   echo "CSRF_TRUSTED_ORIGINS=https://www.thedirectorate.app,https://api.thedirectorate.app"
   echo "COORDINATOR_URL=http://coordinator:9001"

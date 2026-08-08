@@ -65,26 +65,13 @@ orch_compose_bg() {
 compose_service_cids() {
   local use_bg="$1"
   local svc="$2"
-  if [[ "$use_bg" == "1" ]]; then
-    orch_compose_bg ps -q "$svc" 2>/dev/null | sed '/^$/d'
-  else
-    orch_compose ps -q "$svc" 2>/dev/null | sed '/^$/d'
-  fi
+  orch_compose_service_cids "$svc"
 }
 
 exact_one_compose_cid() {
   local use_bg="$1"
   local svc="$2"
-  local -a cids=()
-  mapfile -t cids < <(compose_service_cids "$use_bg" "$svc")
-  if [[ ${#cids[@]} -eq 0 ]]; then
-    return 1
-  fi
-  if [[ ${#cids[@]} -gt 1 ]]; then
-    echo "ambiguous container count (${#cids[@]}) for $svc" >&2
-    return 1
-  fi
-  echo "${cids[0]}"
+  orch_exact_one_compose_cid "$svc"
 }
 
 selector_path() {
