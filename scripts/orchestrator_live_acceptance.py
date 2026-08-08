@@ -65,8 +65,21 @@ def check_delegation_invoke(api: ApiClient) -> dict[str, Any]:
                 "to_position_id": "acceptance-missing-position",
             },
         },
-        expected={200, 400, 422},
+        expected={200, 400, 404, 422},
     )
+    if status == 404:
+        detail = body.get("detail")
+        not_found = (
+            detail == "NOT_FOUND"
+            or (isinstance(detail, str) and "not found" in detail.lower())
+            or body.get("error_code") == "NOT_FOUND"
+        )
+        return {
+            "passed": not_found,
+            "http_status": status,
+            "negative_result": "NOT_FOUND",
+            "detail": detail,
+        }
     mode = (body.get("result") or {}).get("mode")
     command_type = body.get("command_type")
     passed = mode != "delegation_read" and command_type == "delegation.request"

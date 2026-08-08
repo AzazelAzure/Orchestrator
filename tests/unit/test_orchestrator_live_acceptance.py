@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-from scripts.orchestrator_live_acceptance import check_ops_summary
+from scripts.orchestrator_live_acceptance import check_delegation_invoke, check_ops_summary
 
 
 def test_check_ops_summary_sends_founder_bearer() -> None:
@@ -61,3 +61,14 @@ def test_check_ops_summary_other_status_fails() -> None:
 
     assert result["passed"] is False
     assert result["status"] == "error"
+
+
+def test_check_delegation_invoke_accepts_404_not_found() -> None:
+    class FakeApi:
+        def request(self, *args, **kwargs):
+            return 404, {"detail": "NOT_FOUND"}
+
+    result = check_delegation_invoke(FakeApi())
+    assert result["passed"] is True
+    assert result["http_status"] == 404
+    assert result["negative_result"] == "NOT_FOUND"
