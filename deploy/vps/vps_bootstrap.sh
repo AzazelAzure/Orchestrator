@@ -31,6 +31,10 @@ ensure_orch_env() {
   if [[ ! -f "$ORCH_ROOT/.env.vps" ]]; then
     log "generating $ORCH_ROOT/.env.vps"
     bash "$ORCH_ROOT/scripts/generate_vps_env.sh" "$ORCH_ROOT/.env.vps"
+  else
+    # shellcheck source=orch_vps_allowed_hosts.sh
+    source "$ORCH_ROOT/scripts/orch_vps_allowed_hosts.sh"
+    orch_ensure_env_allowed_hosts_line "$ORCH_ROOT/.env.vps"
   fi
   if grep -q 'thedirectorate\.dev' "$ORCH_ROOT/.env.vps" 2>/dev/null; then
     sed -i 's/thedirectorate\.dev/thedirectorate.app/g' "$ORCH_ROOT/.env.vps"
@@ -125,10 +129,10 @@ reload_hfm_proxy() {
     source "$FM_ROOT/.env"
     set +a
   fi
-  (
-    cd "$FM_ROOT"
-    COMPOSE_PROJECT_NAME="$FM_PROJECT" ${COMPOSE} -f docker-compose.bluegreen.yml "${env_args[@]}" up -d proxy --force-recreate --no-deps
-  )
+  if ! orch_exact_one_compose_cid proxy "$FM_PROJECT" >/dev/null; then
+    log "ERROR: proxy container discovery failed for compose project $FM_PROJECT"
+    return 1
+  fi
   orch_run_edge_proxy_pre_reload_hook || {
     log "ERROR: edge proxy pre-reload hook failed"
     return 1
@@ -137,6 +141,8 @@ reload_hfm_proxy() {
     cd "$FM_ROOT"
     COMPOSE_PROJECT_NAME="$FM_PROJECT" ${COMPOSE} -f docker-compose.bluegreen.yml "${env_args[@]}" \
       exec -T proxy nginx -t
+    COMPOSE_PROJECT_NAME="$FM_PROJECT" ${COMPOSE} -f docker-compose.bluegreen.yml "${env_args[@]}" \
+      exec -T proxy nginx -s reload
   )
 }
 

@@ -42,6 +42,36 @@ orch_console_container_for_color() {
   esac
 }
 
+orch_compose_project_name() {
+  printf '%s' "${ORCH_COMPOSE_PROJECT:-orchestrator}"
+}
+
+# podman-compose 1.0.6 cannot scope compose ps to a single service and bare project
+# listing returns every container. Discover by compose labels instead (1.0.6+).
+orch_compose_service_cids() {
+  local svc="$1"
+  local project="${2:-$(orch_compose_project_name)}"
+  podman ps -a \
+    --filter "label=io.podman.compose.project=${project}" \
+    --filter "label=com.docker.compose.service=${svc}" \
+    --format '{{.ID}}' | sed '/^$/d'
+}
+
+orch_exact_one_compose_cid() {
+  local svc="$1"
+  local project="${2:-$(orch_compose_project_name)}"
+  local -a cids=()
+  mapfile -t cids < <(orch_compose_service_cids "$svc" "$project")
+  if [[ ${#cids[@]} -eq 0 ]]; then
+    return 1
+  fi
+  if [[ ${#cids[@]} -gt 1 ]]; then
+    echo "ambiguous container count (${#cids[@]}) for $svc" >&2
+    return 1
+  fi
+  printf '%s' "${cids[0]}"
+}
+
 orch_diag_bind_load() {
   if [[ -n "${ORCH_DIAG_BIND:-}" ]]; then
     return 0
@@ -206,28 +236,20 @@ orch_presentation_network_probe_console() {
 
 orch_resolve_api_cid_for_color() {
   local color="$1"
-  local svc compose="${COMPOSE:-podman-compose}"
-  local project="${ORCH_COMPOSE_PROJECT:-orchestrator}"
+  local svc cid count
   case "$color" in
     blue) svc="api-blue" ;;
     green) svc="api-green" ;;
     *) echo "invalid color: $color" >&2; return 1 ;;
   esac
-  local -a cids=()
-  mapfile -t cids < <(
-    COMPOSE_PROJECT_NAME="$project" ${compose} \
-      -f "${ORCH_ROOT}/docker-compose.yml" \
-      -f "${ORCH_ROOT}/deploy/vps/docker-compose.vps.yml" \
-      -f "${ORCH_ROOT}/deploy/vps/docker-compose.bluegreen.yml" \
-      --env-file "${ORCH_ROOT}/.env.vps" ps -q "$svc" 2>/dev/null | sed '/^$/d'
-  )
-  if [[ ${#cids[@]} -eq 0 ]]; then
-    echo "no running API container for color=$color" >&2
+  if ! cid="$(orch_exact_one_compose_cid "$svc")"; then
+    count="$(orch_compose_service_cids "$svc" | wc -l | tr -d '[:space:]')"
+    if [[ "$count" -eq 0 ]]; then
+      echo "no running API container for color=$color" >&2
+    else
+      echo "ambiguous API container count (${count}) for color=$color" >&2
+    fi
     return 1
   fi
-  if [[ ${#cids[@]} -gt 1 ]]; then
-    echo "ambiguous API container count (${#cids[@]}) for color=$color" >&2
-    return 1
-  fi
-  printf '%s' "${cids[0]}"
+  printf '%s' "$cid"
 }

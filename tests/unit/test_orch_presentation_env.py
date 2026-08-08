@@ -97,10 +97,103 @@ def test_presentation_urls_use_color_aliases() -> None:
 
 def test_generate_vps_env_omits_publish_host() -> None:
     gen = ROOT / "scripts/generate_vps_env.sh"
+    allowed = ROOT / "scripts/orch_vps_allowed_hosts.sh"
     assert gen.is_file()
+    assert allowed.is_file()
     text = gen.read_text(encoding="utf-8")
+    allowed_text = allowed.read_text(encoding="utf-8")
     assert "ORCH_PUBLISH_HOST" not in text
     assert "ORCH_SCRIPT_IMAGE_DIGEST" in text
+    assert "orch_vps_default_allowed_hosts" in text
+    assert "orch-api-blue" in allowed_text
+    assert "orch-console-green" in allowed_text
+
+
+def test_merge_django_allowed_hosts_preserves_operator_extras() -> None:
+    proc = subprocess.run(
+        [
+            "/bin/bash",
+            "-c",
+            (
+                f'source "{ROOT}/scripts/orch_vps_allowed_hosts.sh"; '
+                'orch_merge_django_allowed_hosts "api.thedirectorate.app,custom.operator.example"'
+            ),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    merged = proc.stdout.strip().split(",")
+    assert "custom.operator.example" in merged
+    assert "orch-api-blue" in merged
+    assert merged.index("api.thedirectorate.app") < merged.index("orch-api-blue")
+
+
+def test_compose_service_cids_use_podman_labels_not_compose_ps(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "podman.marker"
+    podman = bin_dir / "podman"
+    podman.write_text(
+        f"""
+#!/bin/bash
+set -euo pipefail
+MARKER="{marker}"
+printf '%s\\n' "$0 $*" >> "${{MARKER}}.log"
+if [[ "$1" == ps ]]; then
+  echo cid-api-blue-1
+  exit 0
+fi
+if [[ "$1" == compose ]]; then
+  echo "podman-compose ps -q must not be called" >&2
+  exit 9
+fi
+exit 0
+""",
+        encoding="utf-8",
+    )
+    podman.chmod(podman.stat().st_mode | 0o111)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+    proc = _run(
+        'ORCH_COMPOSE_PROJECT=orchestrator\norch_compose_service_cids api-blue',
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "cid-api-blue-1"
+    log = Path(f"{marker}.log").read_text(encoding="utf-8")
+    assert "label=io.podman.compose.project=orchestrator" in log
+    assert "label=com.docker.compose.service=api-blue" in log
+    assert "podman-compose" not in log
+
+
+def test_exact_one_compose_cid_fails_on_ambiguous(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    podman = bin_dir / "podman"
+    podman.write_text(
+        """
+#!/bin/bash
+set -euo pipefail
+if [[ "$1" == ps ]]; then
+  echo cid-1
+  echo cid-2
+  exit 0
+fi
+exit 0
+""",
+        encoding="utf-8",
+    )
+    podman.chmod(podman.stat().st_mode | 0o111)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+    proc = _run(
+        "orch_exact_one_compose_cid api-blue || true",
+        env=env,
+    )
+    assert proc.returncode == 0
+    assert "ambiguous container count (2) for api-blue" in proc.stderr
 
 
 def test_exec_http_ok_prefers_wget_over_python(tmp_path: Path) -> None:

@@ -101,7 +101,8 @@ def test_ops_console_isolated_per_color_network() -> None:
     assert "VITE_API_BASE_URL" not in text
     assert "8081" in text and "8091" in text
     assert "ORCH_COMPOSE_PROJECT" in text
-    assert "COMPOSE_PROJECT_NAME" in presentation
+    assert "orch_compose_service_cids" in presentation
+    assert "com.docker.compose.service" in presentation
 
 
 def test_healthcheck_strict_script_runner_semantics() -> None:
@@ -111,10 +112,10 @@ def test_healthcheck_strict_script_runner_semantics() -> None:
     assert "$ORCH_ROOT" in text
     assert "script-spool-init" in text
     assert "script-runner" in text
-    assert "exact_one_compose_cid" in text
-    assert "ambiguous container count" in text
     assert "orch_resolve_api_cid_for_color" in text
     assert "ambiguous API container count" in presentation
+    assert "orch_exact_one_compose_cid" in presentation
+    assert "ambiguous container count" in presentation
     assert "service_health_ok" in text
 
 
@@ -135,6 +136,23 @@ def test_bootstrap_main_fails_closed_on_proxy_reload() -> None:
     text = _read(BOOTSTRAP)
     assert 'reload_hfm_proxy || log "proxy reload had errors"' not in text
     assert "ERROR: proxy reload failed" in text
+    assert "force-recreate" not in text
+    assert "nginx -s reload" in text
+    assert "orch_exact_one_compose_cid proxy" in text
+
+
+def test_compose_discovery_uses_podman_labels_not_ps_q_service() -> None:
+    presentation = _read(PRESENTATION)
+    color = _read(SCRIPT)
+    health = _read(HEALTH)
+    for path, text in (
+        (PRESENTATION, presentation),
+        (SCRIPT, color),
+        (HEALTH, health),
+    ):
+        assert "ps -q" not in text, f"{path.name} must not call podman-compose ps -q <service>"
+    assert "orch_compose_service_cids" in presentation
+    assert "com.docker.compose.service" in presentation
 
 
 def test_deploy_ecosystem_orchestrator_sync_contract() -> None:
