@@ -13,11 +13,27 @@ import pytest
 
 from flow_engine.persistence.migrations import apply_migrations, list_tables
 from flow_engine.providers.cli_registry import (
+    CLAUDE_ACCEPTANCE_MAX_BUDGET_USD,
+    CLAUDE_ACCEPTANCE_MAX_TURNS,
+    CLAUDE_RESULT_SUBTYPE_SUCCESS,
+    CLAUDE_RESULT_SUBTYPES_ERROR,
+    CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
+    CLAUDE_REVIEW_MERGE_MAX_TURNS,
+    CLAUDE_REVIEW_MERGE_PERMISSION_MODE,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    EXECUTION_PROFILE_CODEX_ADMIN,
     EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
 )
 from flow_engine.providers.host_runner import (
+    AGENTIC_MAX_EVENT_LINE_BYTES,
+    COORDINATOR_PROVIDER_RESULT_CAP_BYTES,
+    CURSOR_EVENT_TYPES,
+    CURSOR_MAX_EVENT_LINE_BYTES,
+    DEFAULT_OUTPUT_CAP,
+    MAX_EVENTS,
+    MAX_FRAME_BYTES,
+    MAX_LINE_BYTES,
     HostRunner,
     HostRunnerServer,
     ProviderBinding,
@@ -26,7 +42,9 @@ from flow_engine.providers.host_runner import (
     canonical_invocation_packet,
     canonical_json,
     digest_json,
+    max_event_line_bytes,
     provider_argv,
+    validate_provider_event,
     validate_write_set,
 )
 
@@ -166,6 +184,7 @@ def test_cli_bindings_are_noninteractive_structured(provider: str, tmp_path: Pat
         assert "bounded task" in argv
     if provider == "codex":
         assert argv[1:3] == ("exec", "--json")
+        assert "--skip-git-repo-check" in argv
         assert ("--sandbox", "read-only") == (
             argv[argv.index("--sandbox")],
             argv[argv.index("--sandbox") + 1],
@@ -431,6 +450,24 @@ def test_invoke_rejects_profile_upgrade(tmp_path: Path) -> None:
         runner.invoke(packet)
 
 
+def test_codex_acceptance_argv_includes_skip_git_repo_check(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "codex", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "acceptance probe")
+    sandbox_idx = argv.index("--sandbox")
+    assert argv[sandbox_idx - 1] == "--skip-git-repo-check"
+    assert ("--sandbox", "read-only") == (argv[sandbox_idx], argv[sandbox_idx + 1])
+
+
+def test_codex_admin_argv_omits_skip_git_repo_check(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "codex", execution_profile=EXECUTION_PROFILE_CODEX_ADMIN)
+    argv = provider_argv(binding, "reconcile")
+    assert "--skip-git-repo-check" not in argv
+    assert ("--sandbox", "read-only") == (
+        argv[argv.index("--sandbox")],
+        argv[argv.index("--sandbox") + 1],
+    )
+
+
 def test_cursor_implementation_argv_uses_force_without_mode_flag(tmp_path: Path) -> None:
     binding = _binding(tmp_path, "cursor", execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION)
     argv = provider_argv(binding, "implement slice")
@@ -447,6 +484,126 @@ def test_claude_review_argv_allows_bash(tmp_path: Path) -> None:
     denied = argv[argv.index("--disallowedTools") + 1]
     assert denied == "Edit,Write"
     assert "Bash" not in denied
+    assert argv[argv.index("--max-turns") + 1] == CLAUDE_REVIEW_MERGE_MAX_TURNS
+    assert argv[argv.index("--max-budget-usd") + 1] == CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD
+    assert argv[argv.index("--permission-mode") + 1] == CLAUDE_REVIEW_MERGE_PERMISSION_MODE
+
+
+def test_claude_acceptance_argv_omits_permission_bypass(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "accept", prompt_via_stdin=True)
+    assert "--permission-mode" not in argv
+    assert CLAUDE_REVIEW_MERGE_PERMISSION_MODE not in argv
+
+
+def test_claude_acceptance_argv_caps_max_turns_and_budget(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude", execution_profile=EXECUTION_PROFILE_ACCEPTANCE)
+    argv = provider_argv(binding, "accept", prompt_via_stdin=True)
+    assert argv[argv.index("--max-turns") + 1] == CLAUDE_ACCEPTANCE_MAX_TURNS
+    assert argv[argv.index("--max-budget-usd") + 1] == CLAUDE_ACCEPTANCE_MAX_BUDGET_USD
+
+
+def test_default_output_cap_within_coordinator_provider_result_cap() -> None:
+    assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+    assert COORDINATOR_PROVIDER_RESULT_CAP_BYTES == 524_288
+    assert AGENTIC_MAX_EVENT_LINE_BYTES == 512 * 1024
+    assert CURSOR_MAX_EVENT_LINE_BYTES == AGENTIC_MAX_EVENT_LINE_BYTES
+    assert AGENTIC_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
+    assert max_event_line_bytes("cursor", EXECUTION_PROFILE_ACCEPTANCE) == MAX_LINE_BYTES
+    assert max_event_line_bytes("claude", EXECUTION_PROFILE_ACCEPTANCE) == MAX_LINE_BYTES
+    assert max_event_line_bytes("codex", EXECUTION_PROFILE_CODEX_ADMIN) == MAX_LINE_BYTES
+    assert (
+        max_event_line_bytes("cursor", EXECUTION_PROFILE_CURSOR_IMPLEMENTATION)
+        == AGENTIC_MAX_EVENT_LINE_BYTES
+    )
+    assert (
+        max_event_line_bytes("claude", EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE)
+        == AGENTIC_MAX_EVENT_LINE_BYTES
+    )
+
+
+@pytest.mark.parametrize(
+    "subtype",
+    [
+        CLAUDE_RESULT_SUBTYPE_SUCCESS,
+        *sorted(CLAUDE_RESULT_SUBTYPES_ERROR),
+    ],
+)
+def test_claude_result_subtype_validation_accepts_registered(subtype: str) -> None:
+    validate_provider_event(
+        "claude",
+        {
+            "type": "result",
+            "subtype": subtype,
+            "provider_call_id": "call-registered",
+        },
+    )
+
+
+@pytest.mark.parametrize("subtype", ["error", "success_with_extra", ""])
+def test_claude_result_subtype_validation_rejects_unknown(subtype: str) -> None:
+    with pytest.raises(ValueError, match="subtype invalid"):
+        validate_provider_event(
+            "claude",
+            {"type": "result", "subtype": subtype, "provider_call_id": "call-bad"},
+        )
+
+
+def test_cursor_thinking_event_type_is_accepted() -> None:
+    validate_provider_event(
+        "cursor",
+        {"type": "thinking", "session_id": "sess-thinking"},
+    )
+
+
+@pytest.mark.parametrize(
+    "subtype",
+    sorted(CLAUDE_RESULT_SUBTYPES_ERROR),
+)
+def test_claude_error_terminal_subtype_requires_reconciliation(
+    tmp_path: Path, subtype: str
+) -> None:
+    binding = _binding(tmp_path, "claude")
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('claude 2.1.212'); raise SystemExit(0)\n"
+        f"print('{{\"type\":\"result\",\"subtype\":\"{subtype}\",\"provider_call_id\":\"call-err\"}}')\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id=f"inv-{subtype}",
+            attempt_id=f"att-{subtype}",
+            task_packet={"objective": "terminal error"},
+        )
+    )
+    assert result["reconciliation_required"] is True
+    assert result["outcome"] != "complete"
+    assert result["provider_call_id"] == "call-err"
+
+
+def test_claude_success_terminal_subtype_can_complete(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "claude")
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-success",
+            attempt_id="att-success",
+            task_packet={"objective": "terminal success"},
+        )
+    )
+    assert result["reconciliation_required"] is False
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-1"
 
 
 def test_write_set_dot_allows_any_in_workspace_path(tmp_path: Path) -> None:
@@ -566,3 +723,475 @@ def test_write_set_violation_fails_without_deleting_evidence(tmp_path: Path) -> 
     assert "undeclared.py" in result["undeclared_paths"]
     assert result["outcome"] == "failed"
     assert result["redacted_output"]
+
+
+def _cursor_stream_script(body: str) -> str:
+    return (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv:\n"
+        "    print('cursor 2026.08.04-aaa8809')\n"
+        "    raise SystemExit(0)\n"
+        + body
+    )
+
+
+def test_cursor_event_contract_matches_observed_types() -> None:
+    assert CURSOR_EVENT_TYPES == frozenset({
+        "system", "user", "assistant", "tool_call", "result", "error", "thinking",
+    })
+
+
+def test_cursor_large_nonterminal_stream_completes(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "import json\n"
+            "for i in range(300):\n"
+            "    print(json.dumps({'type':'assistant','session_id':'s','text':'x'*900}))\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-big'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-big-stream",
+            attempt_id="att-big-stream",
+            task_packet={"objective": "large stream"},
+        )
+    )
+    assert result["provider_call_id"] == "call-big"
+    assert result["outcome"] == "complete"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def _init_git_worktree(path: Path) -> None:
+    import subprocess as sp
+
+    sp.run(["git", "init"], cwd=path, capture_output=True, check=True)
+    sp.run(
+        [
+            "git",
+            "-c",
+            "user.email=test@test",
+            "-c",
+            "user.name=test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+        cwd=path,
+        check=True,
+    )
+
+
+def _cursor_implementation_binding(tmp_path: Path) -> ProviderBinding:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    _init_git_worktree(worktree)
+    return ProviderBinding(
+        provider="cursor",
+        executable=_fake_cli(tmp_path, "cursor"),
+        model="cursor-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "cursor.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2026.08.04-aaa8809",
+        allowed_models=("cursor-test-model",),
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+
+
+def _claude_review_binding(tmp_path: Path) -> ProviderBinding:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    _init_git_worktree(worktree)
+    return ProviderBinding(
+        provider="claude",
+        executable=_fake_cli(tmp_path, "claude"),
+        model="claude-test-model",
+        workspace_root=worktree,
+        socket_path=tmp_path / "claude.sock",
+        auth_token="test-only-host-token",
+        cli_version_pin="2.1.212",
+        allowed_models=("claude-test-model",),
+        execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    )
+
+
+def _event_line_at_byte_cap(
+    provider: str,
+    cap: int,
+    *,
+    event_type: str = "tool_call",
+) -> str:
+    if provider == "cursor":
+        prefix = f'{{"type":"{event_type}","session_id":"s","text":"'
+        suffix = '"}'
+    elif provider == "claude":
+        prefix = '{"type":"assistant","provider_call_id":"c","content":"'
+        suffix = '"}'
+    else:
+        prefix = '{"type":"result","provider_call_id":"c","text":"'
+        suffix = '"}'
+    padding = cap - len((prefix + suffix).encode())
+    assert padding >= 0
+    return prefix + ("x" * padding) + suffix
+
+
+def _cursor_event_line_at_byte_cap(
+    event_type: str = "tool_call",
+    *,
+    cap: int = AGENTIC_MAX_EVENT_LINE_BYTES,
+) -> str:
+    return _event_line_at_byte_cap("cursor", cap, event_type=event_type)
+
+
+def test_cursor_implementation_accepts_tool_result_at_512kib_boundary(tmp_path: Path) -> None:
+    big_line = _cursor_event_line_at_byte_cap("tool_call")
+    assert len(big_line.encode()) == AGENTIC_MAX_EVENT_LINE_BYTES
+    binding = _cursor_implementation_binding(tmp_path)
+    binding.executable.write_text(
+        _cursor_stream_script(
+            f"print({big_line!r})\n"
+            "import json\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-512k'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-512k",
+            attempt_id="att-512k",
+            task_packet={"objective": "512k tool result", "write_set": ["."]},
+        )
+    )
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-512k"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def test_claude_review_accepts_assistant_event_at_512kib_boundary(tmp_path: Path) -> None:
+    big_line = _event_line_at_byte_cap("claude", AGENTIC_MAX_EVENT_LINE_BYTES)
+    assert len(big_line.encode()) == AGENTIC_MAX_EVENT_LINE_BYTES
+    binding = _claude_review_binding(tmp_path)
+    binding.executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--version' in sys.argv: print('claude 2.1.212'); raise SystemExit(0)\n"
+        f"print({big_line!r})\n"
+        "import json\n"
+        "print(json.dumps({'type':'result','subtype':'success','provider_call_id':'call-512k'}))\n",
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-claude-512k",
+            attempt_id="att-claude-512k",
+            task_packet={"objective": "512k review tool result"},
+        )
+    )
+    assert result["outcome"] == "complete"
+    assert result["provider_call_id"] == "call-512k"
+    assert result["truncated"] is True
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def _assert_stream_parse_failure_is_durable(
+    tmp_path: Path,
+    *,
+    provider: str,
+    script_body: str,
+    invocation_id: str,
+    detail_match: str,
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE,
+    task_packet: dict[str, object] | None = None,
+) -> None:
+    if execution_profile == EXECUTION_PROFILE_CURSOR_IMPLEMENTATION:
+        binding = _cursor_implementation_binding(tmp_path)
+        task_packet = task_packet or {"objective": "parse failure", "write_set": ["."]}
+    elif execution_profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE:
+        binding = _claude_review_binding(tmp_path)
+        task_packet = task_packet or {"objective": "parse failure"}
+    else:
+        binding = _binding(tmp_path, provider, execution_profile=execution_profile)
+        task_packet = task_packet or {"objective": "parse failure"}
+    if provider == "cursor":
+        binding.executable.write_text(_cursor_stream_script(script_body), encoding="utf-8")
+    else:
+        binding.executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import sys\n"
+            f"if '--version' in sys.argv: print('{provider} "
+            + ("0.146.0" if provider == "codex" else "2.1.212")
+            + "'); raise SystemExit(0)\n"
+            + script_body,
+            encoding="utf-8",
+        )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id=invocation_id,
+        attempt_id=f"att-{invocation_id}",
+        task_packet=task_packet,
+    )
+    result = runner.invoke(packet)
+    assert result["outcome"] == "outcome_unknown"
+    assert result["reconciliation_required"] is True
+    assert result["anomalies"][0]["code"] == "A3"
+    assert detail_match in result["anomalies"][0]["detail"]
+    assert runner.reconcile(invocation_id) == result
+    restarted = HostRunner(binding)
+    assert restarted.reconcile(invocation_id) == result
+    replay = runner.invoke(packet)
+    assert replay == result
+
+
+def test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _cursor_event_line_at_byte_cap("tool_call") + "x"
+    assert len(over_line.encode()) > AGENTIC_MAX_EVENT_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-over-512k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    )
+
+
+def test_claude_review_rejects_event_over_512kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("claude", AGENTIC_MAX_EVENT_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > AGENTIC_MAX_EVENT_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="claude",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-claude-over-512k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    )
+
+
+def test_cursor_acceptance_rejects_event_over_64kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("cursor", MAX_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > MAX_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-cursor-over-64k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_ACCEPTANCE,
+    )
+
+
+def test_claude_acceptance_rejects_event_over_64kib_with_durable_outcome_unknown(
+    tmp_path: Path,
+) -> None:
+    over_line = _event_line_at_byte_cap("claude", MAX_LINE_BYTES) + "x"
+    assert len(over_line.encode()) > MAX_LINE_BYTES
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="claude",
+        script_body=f"print({over_line!r})\n",
+        invocation_id="inv-claude-over-64k",
+        detail_match="exceeds cap",
+        execution_profile=EXECUTION_PROFILE_ACCEPTANCE,
+    )
+
+
+def test_codex_rejects_oversized_event_with_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="codex",
+        script_body=(
+            "print('{' + '\"type\":\"result\",\"provider_call_id\":\"c\",\"text\":\"' "
+            "+ 'y' * 70000 + '\"}')\n"
+        ),
+        invocation_id="inv-codex-huge",
+        detail_match="exceeds cap",
+    )
+
+
+def test_stream_json_decode_failure_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body="print('{not-json')\n",
+        invocation_id="inv-json-fail",
+        detail_match="json decode failure",
+    )
+
+
+def test_unknown_cursor_event_type_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=(
+            "import json\n"
+            "print(json.dumps({'type':'progress','session_id':'s'}))\n"
+        ),
+        invocation_id="inv-unknown",
+        detail_match="unsupported provider event type",
+    )
+
+
+def test_event_count_overflow_is_durable_outcome_unknown(tmp_path: Path) -> None:
+    _assert_stream_parse_failure_is_durable(
+        tmp_path,
+        provider="cursor",
+        script_body=(
+            "import json\n"
+            f"for i in range({MAX_EVENTS + 1}):\n"
+            "    print(json.dumps({'type':'thinking','session_id':'s'}))\n"
+        ),
+        invocation_id="inv-count",
+        detail_match="event count exceeds cap",
+    )
+
+
+def test_parser_failure_socket_invoke_returns_without_escape(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock
+
+    base_binding = _binding(tmp_path, "cursor")
+    base_binding.executable.write_text(
+        _cursor_stream_script("print('{not-json')\n"),
+        encoding="utf-8",
+    )
+    base_binding.executable.chmod(0o700)
+    binding = ProviderBinding(
+        provider=base_binding.provider,
+        executable=base_binding.executable,
+        model=base_binding.model,
+        workspace_root=base_binding.workspace_root,
+        socket_path=base_binding.socket_path,
+        auth_token=base_binding.auth_token,
+        cli_version_pin=base_binding.cli_version_pin,
+        allowed_models=base_binding.allowed_models,
+        execution_profile=base_binding.execution_profile,
+        expected_peer_uid=None,
+    )
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    packet = _invoke_packet(
+        runner,
+        handshake,
+        invocation_id="inv-socket-parse",
+        attempt_id="att-socket-parse",
+        task_packet={"objective": "socket parse failure"},
+    )
+    now = int(time.time())
+    unsigned = {
+        "payload": {"operation": "invoke", **packet},
+        "nonce": "s" * 32,
+        "issued_at": now,
+        "expires_at": now + 30,
+    }
+    envelope = {
+        **unsigned,
+        "signature": hmac.new(
+            binding.auth_token.encode(),
+            canonical_json(unsigned).encode(),
+            hashlib.sha256,
+        ).hexdigest(),
+    }
+    sent = bytearray()
+    conn = MagicMock()
+    conn.recv.side_effect = [canonical_json(envelope).encode() + b"\n"]
+    conn.sendall.side_effect = lambda data: sent.extend(data)
+
+    HostRunnerServer(runner)._handle(conn)
+
+    response = json.loads(bytes(sent).split(b"\n", 1)[0])
+    assert response["outcome"] == "outcome_unknown"
+    assert response["anomalies"][0]["code"] == "A3"
+    assert runner.reconcile("inv-socket-parse")["outcome"] == "outcome_unknown"
+
+
+def test_invoke_rejects_oversized_single_event_line(tmp_path: Path) -> None:
+    """Legacy name: cursor events above 512 KiB fail closed with durable outcome_unknown."""
+    test_cursor_implementation_rejects_event_over_512kib_with_durable_outcome_unknown(tmp_path)
+
+
+def test_truncated_evidence_preserves_terminal_event(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    binding.executable.write_text(
+        _cursor_stream_script(
+            "import json\n"
+            "for i in range(400):\n"
+            "    print(json.dumps({'type':'thinking','session_id':'s','text':'z'*800}))\n"
+            "print(json.dumps({'type':'result','provider_call_id':'call-terminal'}))\n"
+        ),
+        encoding="utf-8",
+    )
+    binding.executable.chmod(0o700)
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-terminal",
+            attempt_id="att-terminal",
+            task_packet={"objective": "terminal preservation"},
+        )
+    )
+    assert result["truncated"] is True
+    assert result["provider_call_id"] == "call-terminal"
+    assert "call-terminal" in result["redacted_output"]
+    assert len(result["redacted_output"].encode()) <= binding.output_cap
+
+
+def test_host_runner_recv_rejects_oversized_socket_frame() -> None:
+    from unittest.mock import MagicMock
+
+    conn = MagicMock()
+    conn.recv.return_value = b"x" * (MAX_FRAME_BYTES + 1)
+    with pytest.raises(ValueError, match="frame exceeds cap"):
+        HostRunnerServer._recv(conn)
+
+
+def test_invoke_result_socket_response_stays_within_frame_cap(tmp_path: Path) -> None:
+    binding = _binding(tmp_path, "cursor")
+    runner = HostRunner(binding)
+    handshake = runner.handshake()
+    result = runner.invoke(
+        _invoke_packet(
+            runner,
+            handshake,
+            invocation_id="inv-frame",
+            attempt_id="att-frame",
+            task_packet={"objective": "frame bound"},
+        )
+    )
+    response = canonical_json(result).encode() + b"\n"
+    assert len(response) <= MAX_FRAME_BYTES
+    assert len(result["redacted_output"].encode()) <= DEFAULT_OUTPUT_CAP

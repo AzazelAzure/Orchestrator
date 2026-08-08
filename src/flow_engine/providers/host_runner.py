@@ -18,15 +18,23 @@ import tempfile
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from flow_engine.providers.cli_registry import (
     CLAUDE_ACCEPTANCE_DISALLOWED,
+    CLAUDE_ACCEPTANCE_MAX_BUDGET_USD,
+    CLAUDE_ACCEPTANCE_MAX_TURNS,
     CLAUDE_REVIEW_DISALLOWED,
+    CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD,
+    CLAUDE_REVIEW_MERGE_MAX_TURNS,
+    CLAUDE_REVIEW_MERGE_PERMISSION_MODE,
     EXECUTION_PROFILE_ACCEPTANCE,
     EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+    EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    claude_result_subtype_is_success,
+    claude_result_subtype_is_terminal,
     probe_matches_pinned_version,
     validate_cli_version_pin,
     validate_execution_profile,
@@ -47,17 +55,29 @@ from flow_engine.providers.protocol import (
 )
 
 MAX_FRAME_BYTES = 1_048_576
+COORDINATOR_PROVIDER_RESULT_CAP_BYTES = 524_288
 DEFAULT_OUTPUT_CAP = 262_144
+DEFAULT_STDERR_CAP = 262_144
+assert DEFAULT_OUTPUT_CAP <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_LINE_BYTES = 65_536
+AGENTIC_MAX_EVENT_LINE_BYTES = 512 * 1024
+CURSOR_MAX_EVENT_LINE_BYTES = AGENTIC_MAX_EVENT_LINE_BYTES
+AGENTIC_EXECUTION_PROFILES = frozenset({
+    EXECUTION_PROFILE_CURSOR_IMPLEMENTATION,
+    EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE,
+})
+assert AGENTIC_MAX_EVENT_LINE_BYTES <= COORDINATOR_PROVIDER_RESULT_CAP_BYTES
 MAX_EVENTS = 2_000
+# Observed Cursor stream-json event types for cursor-events-v1 (CLI 2026.08.04-aaa8809).
+CURSOR_EVENT_TYPES = frozenset({
+    "system", "user", "assistant", "tool_call", "result", "error", "thinking",
+})
 EVENT_TYPES = {
     "codex": frozenset({
         "thread.started", "turn.started", "item.started", "item.updated",
         "item.completed", "turn.completed", "error", "result",
     }),
-    "cursor": frozenset({
-        "system", "user", "assistant", "tool_call", "result", "error", "thinking",
-    }),
+    "cursor": CURSOR_EVENT_TYPES,
     "claude": frozenset({"system", "user", "assistant", "result", "rate_limit_event"}),
 }
 # HOME is required by installed provider CLI wrappers (auth/session paths).
@@ -71,6 +91,8 @@ def provider_env_allowlist(provider: str) -> tuple[str, ...]:
     if provider == "cursor":
         return SAFE_ENV + (CURSOR_API_KEY_VAR,)
     return SAFE_ENV
+
+
 SECRET_PATTERN = re.compile(
     r"(?im)(authorization|proxy-authorization|cookie|set-cookie|x-api-key)"
     r"\s*:\s*[^\r\n]+|bearer\s+[a-z0-9._~+/=-]+|"
@@ -93,6 +115,47 @@ def digest_json(value: Any) -> str:
 
 def redact(value: str) -> str:
     return PRIVATE_KEY_PATTERN.sub("[REDACTED-PRIVATE-KEY]", SECRET_PATTERN.sub("[REDACTED]", value))
+
+
+class StreamParseFailure(Exception):
+    """Post-dispatch stdout JSONL parse failure; becomes durable outcome_unknown."""
+
+
+def max_event_line_bytes(provider: str, execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE) -> int:
+    del provider  # cap is binding/profile-driven; provider kept for call-site clarity
+    if execution_profile in AGENTIC_EXECUTION_PROFILES:
+        return AGENTIC_MAX_EVENT_LINE_BYTES
+    return MAX_LINE_BYTES
+
+
+def _terminate_dispatched_process(proc: subprocess.Popen[Any]) -> None:
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(2)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait(2)
+
+
+def _stream_parse_failure_result(
+    *,
+    invocation_id: str,
+    provider: str,
+    execution_profile: str,
+    binding_digest: str,
+    detail: str,
+) -> dict[str, Any]:
+    return {
+        "invocation_id": invocation_id,
+        "provider": provider,
+        "execution_profile": execution_profile,
+        "outcome": "outcome_unknown",
+        "reconciliation_required": True,
+        "binding_digest": binding_digest,
+        "anomalies": [{"code": "A3", "detail": redact(detail)}],
+    }
 
 
 def canonical_invocation_packet(payload: dict[str, Any]) -> dict[str, Any]:
@@ -217,10 +280,14 @@ def provider_argv(
     executable = str(binding.executable)
     prompt_args: tuple[str, ...] = () if prompt_via_stdin else (prompt,)
     if binding.provider == "codex":
-        return (
+        argv = [
             executable, "exec", "--json", "--ephemeral",
-            "--sandbox", "read-only", "--model", binding.model, *prompt_args,
-        )
+            "--sandbox", "read-only", "--model", binding.model,
+        ]
+        if profile == EXECUTION_PROFILE_ACCEPTANCE:
+            argv.insert(argv.index("--sandbox"), "--skip-git-repo-check")
+        argv.extend(prompt_args)
+        return tuple(argv)
     if binding.provider == "cursor":
         if profile == EXECUTION_PROFILE_ACCEPTANCE:
             argv: list[str] = [
@@ -240,13 +307,25 @@ def provider_argv(
         if profile == EXECUTION_PROFILE_ACCEPTANCE
         else CLAUDE_REVIEW_DISALLOWED
     )
-    return (
-        executable, "--print", "--verbose", "--output-format", "stream-json",
-        "--model", binding.model, "--max-turns", "8",
-        "--max-budget-usd", "1.00", "--no-session-persistence",
-        "--disallowedTools", disallowed,
-        *prompt_args,
+    max_turns = (
+        CLAUDE_REVIEW_MERGE_MAX_TURNS
+        if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
+        else CLAUDE_ACCEPTANCE_MAX_TURNS
     )
+    max_budget_usd = (
+        CLAUDE_REVIEW_MERGE_MAX_BUDGET_USD
+        if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE
+        else CLAUDE_ACCEPTANCE_MAX_BUDGET_USD
+    )
+    argv: list[str] = [
+        executable, "--print", "--verbose", "--output-format", "stream-json",
+        "--model", binding.model, "--max-turns", max_turns,
+        "--max-budget-usd", max_budget_usd, "--no-session-persistence",
+    ]
+    if profile == EXECUTION_PROFILE_CLAUDE_REVIEW_MERGE:
+        argv.extend(["--permission-mode", CLAUDE_REVIEW_MERGE_PERMISSION_MODE])
+    argv.extend(["--disallowedTools", disallowed, *prompt_args])
+    return tuple(argv)
 
 
 def provider_uses_stdin_prompt(binding: ProviderBinding) -> bool:
@@ -263,8 +342,36 @@ def authorize_provider_packet(packet: dict[str, Any], provider: str) -> None:
         raise PermissionError("provider is not authorized for task packet")
 
 
-def validate_provider_event(provider: str, event: dict[str, Any]) -> None:
-    if len(canonical_json(event).encode()) > MAX_LINE_BYTES:
+def is_terminal_provider_event(provider: str, event: dict[str, Any]) -> bool:
+    """Return whether a validated stream event is terminal for outcome resolution."""
+    event_type = event.get("type")
+    if event_type in {"turn.completed", "error"}:
+        return True
+    if event_type == "result":
+        if provider == "claude":
+            return claude_result_subtype_is_terminal(event.get("subtype"))
+        return True
+    return False
+
+
+@dataclass
+class _StreamParseState:
+    event_count: int = 0
+    terminal_event: dict[str, Any] | None = None
+    evidence_parts: list[str] = field(default_factory=list)
+    evidence_bytes: int = 0
+    evidence_truncated: bool = False
+
+
+def validate_provider_event(
+    provider: str,
+    event: dict[str, Any],
+    *,
+    execution_profile: str = EXECUTION_PROFILE_ACCEPTANCE,
+) -> None:
+    if len(canonical_json(event).encode()) > max_event_line_bytes(
+        provider, execution_profile
+    ):
         raise ValueError("provider event exceeds cap")
     event_type = event.get("type")
     if not isinstance(event_type, str) or event_type not in EVENT_TYPES[provider]:
@@ -279,7 +386,7 @@ def validate_provider_event(provider: str, event: dict[str, Any]) -> None:
         if not isinstance(event.get("usage"), dict):
             raise ValueError("Codex terminal event missing usage")
     if provider == "claude" and event_type == "result":
-        if event.get("subtype") not in {"success", "error"}:
+        if not claude_result_subtype_is_terminal(event.get("subtype")):
             raise ValueError("Claude terminal result subtype invalid")
 
 
@@ -443,30 +550,11 @@ class HostRunner:
             raise
         self._processes[invocation_id] = proc
         try:
-            stdout_raw, stderr_raw, truncated = self._stream_process(proc)
-            stdout = stdout_raw.decode("utf-8", "replace")
+            parse_state, stderr_raw, stderr_truncated = self._stream_process(proc)
             stderr = stderr_raw.decode("utf-8", "replace")
-            events = []
-            for line in stdout.splitlines():
-                if not line.strip():
-                    continue
-                if len(line.encode()) > MAX_LINE_BYTES:
-                    raise ValueError("provider event line exceeds cap")
-                event = json.loads(line)
-                if not isinstance(event, dict):
-                    raise ValueError("provider event must be an object")
-                validate_provider_event(self.binding.provider, event)
-                events.append(event)
-                if len(events) > MAX_EVENTS:
-                    raise ValueError("provider event count exceeds cap")
-            terminal = next(
-                (
-                    event for event in reversed(events)
-                    if event.get("type") in {"result", "turn.completed", "error"}
-                    or event.get("subtype") in {"success", "error"}
-                ),
-                None,
-            )
+            stdout, evidence_truncated = self._finalize_redacted_output(parse_state, False)
+            truncated = evidence_truncated or stderr_truncated
+            terminal = parse_state.terminal_event
             terminal_identity = None
             if terminal is not None:
                 terminal_identity = (
@@ -475,7 +563,13 @@ class HostRunner:
                     or terminal.get("thread_id")
                     or terminal.get("request_id")
                 )
-            ambiguous = truncated or proc.returncode != 0 or not terminal_identity
+            ambiguous = stderr_truncated or proc.returncode != 0 or not terminal_identity
+            if (
+                terminal is not None
+                and self.binding.provider == "claude"
+                and not claude_result_subtype_is_success(terminal.get("subtype"))
+            ):
+                ambiguous = True
             write_evidence: dict[str, Any] = {}
             if git_baseline is not None:
                 git_diff = diff_against_git_baseline(git_baseline, cwd)
@@ -512,17 +606,24 @@ class HostRunner:
                 "write_set": list(write_set) if write_set else [],
                 **write_evidence,
             }
+        except StreamParseFailure as exc:
+            _terminate_dispatched_process(proc)
+            result = _stream_parse_failure_result(
+                invocation_id=invocation_id,
+                provider=self.binding.provider,
+                execution_profile=self.binding.execution_profile,
+                binding_digest=str(packet["binding_digest"]),
+                detail=str(exc),
+            )
         except (subprocess.TimeoutExpired, TimeoutError):
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                proc.wait(2)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
+            _terminate_dispatched_process(proc)
             result = {
                 "invocation_id": invocation_id,
                 "provider": self.binding.provider,
+                "execution_profile": self.binding.execution_profile,
                 "outcome": "outcome_unknown",
                 "reconciliation_required": True,
+                "binding_digest": packet["binding_digest"],
                 "anomalies": [{"code": "A1", "detail": "provider timeout after dispatch"}],
             }
         finally:
@@ -557,16 +658,84 @@ class HostRunner:
             raise PermissionError("signed invocation binding digest mismatch")
         return binding
 
+    def _consume_stdout_line(self, line: str, state: _StreamParseState) -> None:
+        if not line.strip():
+            return
+        line_cap = max_event_line_bytes(
+            self.binding.provider, self.binding.execution_profile
+        )
+        if len(line.encode()) > line_cap:
+            raise StreamParseFailure("provider event line exceeds cap")
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise StreamParseFailure("provider stream json decode failure") from exc
+        if not isinstance(event, dict):
+            raise StreamParseFailure("provider event must be an object")
+        try:
+            validate_provider_event(
+                self.binding.provider,
+                event,
+                execution_profile=self.binding.execution_profile,
+            )
+        except ValueError as exc:
+            raise StreamParseFailure(str(exc)) from exc
+        state.event_count += 1
+        if state.event_count > MAX_EVENTS:
+            raise StreamParseFailure("provider event count exceeds cap")
+        if is_terminal_provider_event(self.binding.provider, event):
+            state.terminal_event = event
+        redacted_line = redact(line)
+        part = redacted_line + "\n"
+        part_bytes = len(part.encode())
+        if state.evidence_bytes + part_bytes > self.binding.output_cap:
+            state.evidence_truncated = True
+            return
+        state.evidence_parts.append(part)
+        state.evidence_bytes += part_bytes
+
+    def _finalize_redacted_output(
+        self, state: _StreamParseState, truncated: bool
+    ) -> tuple[str, bool]:
+        truncated = truncated or state.evidence_truncated
+        terminal_line = ""
+        terminal_suffix = ""
+        if state.terminal_event is not None:
+            terminal_line = redact(canonical_json(state.terminal_event))
+            terminal_suffix = terminal_line + "\n"
+        cap = self.binding.output_cap
+        base = "".join(state.evidence_parts)
+        if terminal_suffix and terminal_line not in base:
+            terminal_bytes = len(terminal_suffix.encode())
+            available = max(0, cap - terminal_bytes)
+            base_bytes = base.encode()
+            if len(base_bytes) > available:
+                truncated = True
+                base = base_bytes[:available].decode("utf-8", "replace")
+            output = base + terminal_suffix
+        else:
+            output = base
+            if len(output.encode()) > cap:
+                truncated = True
+                output = output.encode()[:cap].decode("utf-8", "replace")
+        return output, truncated
+
     def _stream_process(
         self, proc: subprocess.Popen[bytes]
-    ) -> tuple[bytes, bytes, bool]:
+    ) -> tuple[_StreamParseState, bytes, bool]:
         assert proc.stdout is not None and proc.stderr is not None
         selector = selectors.DefaultSelector()
         selector.register(proc.stdout, selectors.EVENT_READ, "stdout")
         selector.register(proc.stderr, selectors.EVENT_READ, "stderr")
-        buffers = {"stdout": bytearray(), "stderr": bytearray()}
-        deadline = time.monotonic() + self.binding.timeout_sec
+        stdout_buf = bytearray()
+        stderr_buf = bytearray()
+        state = _StreamParseState()
+        stderr_cap = DEFAULT_STDERR_CAP
+        line_cap = max_event_line_bytes(
+            self.binding.provider, self.binding.execution_profile
+        )
         truncated = False
+        deadline = time.monotonic() + self.binding.timeout_sec
         while selector.get_map():
             if time.monotonic() >= deadline:
                 raise TimeoutError
@@ -575,19 +744,28 @@ class HostRunner:
                 if not chunk:
                     selector.unregister(key.fileobj)
                     continue
-                target = buffers[key.data]
-                if len(target) + len(chunk) > self.binding.output_cap:
-                    remaining = self.binding.output_cap - len(target)
-                    if remaining > 0:
-                        target.extend(chunk[:remaining])
-                    truncated = True
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    proc.wait(2)
-                    selector.close()
-                    return bytes(buffers["stdout"]), bytes(buffers["stderr"]), truncated
-                target.extend(chunk)
+                if key.data == "stdout":
+                    stdout_buf.extend(chunk)
+                    while b"\n" in stdout_buf:
+                        line_bytes, stdout_buf = stdout_buf.split(b"\n", 1)
+                        self._consume_stdout_line(
+                            line_bytes.decode("utf-8", "replace"), state
+                        )
+                    if len(stdout_buf) > line_cap:
+                        raise StreamParseFailure("provider event line exceeds cap")
+                else:
+                    if len(stderr_buf) + len(chunk) > stderr_cap:
+                        remaining = stderr_cap - len(stderr_buf)
+                        if remaining > 0:
+                            stderr_buf.extend(chunk[:remaining])
+                        truncated = True
+                    else:
+                        stderr_buf.extend(chunk)
         proc.wait()
-        return bytes(buffers["stdout"]), bytes(buffers["stderr"]), truncated
+        if stdout_buf:
+            self._consume_stdout_line(stdout_buf.decode("utf-8", "replace"), state)
+        selector.close()
+        return state, bytes(stderr_buf), truncated
 
     def heartbeat(self, invocation_id: str) -> dict[str, Any]:
         proc = self._processes.get(invocation_id)
@@ -690,22 +868,40 @@ class HostRunnerServer:
 
     def _handle(self, conn: socket.socket) -> None:
         with conn:
-            self._check_peer(conn)
-            request = self._recv(conn)
-            self._verify_envelope(request)
-            request = request["payload"]
-            operation = str(request.pop("operation", ""))
-            handlers = {
-                "handshake": lambda: self.runner.handshake(),
-                "invoke": lambda: self.runner.invoke(request),
-                "validate_packet": lambda: self.runner.validate_packet(request),
-                "heartbeat": lambda: self.runner.heartbeat(str(request["invocation_id"])),
-                "cancel": lambda: self.runner.cancel(str(request["invocation_id"])),
-                "reconcile": lambda: self.runner.reconcile(str(request["invocation_id"])),
-            }
-            if operation not in handlers:
-                raise ValueError("unsupported operation")
-            conn.sendall(canonical_json(handlers[operation]()).encode() + b"\n")
+            operation = ""
+            payload: dict[str, Any] = {}
+            try:
+                self._check_peer(conn)
+                request = self._recv(conn)
+                self._verify_envelope(request)
+                payload = request["payload"]
+                operation = str(payload.pop("operation", ""))
+                handlers = {
+                    "handshake": lambda: self.runner.handshake(),
+                    "invoke": lambda: self.runner.invoke(payload),
+                    "validate_packet": lambda: self.runner.validate_packet(payload),
+                    "heartbeat": lambda: self.runner.heartbeat(str(payload["invocation_id"])),
+                    "cancel": lambda: self.runner.cancel(str(payload["invocation_id"])),
+                    "reconcile": lambda: self.runner.reconcile(str(payload["invocation_id"])),
+                }
+                if operation not in handlers:
+                    raise ValueError("unsupported operation")
+                response: dict[str, Any] = handlers[operation]()
+            except Exception as exc:
+                if operation != "invoke":
+                    raise
+                invocation_id = str(payload.get("invocation_id", ""))
+                response = {
+                    "invocation_id": invocation_id,
+                    "provider": self.runner.binding.provider,
+                    "outcome": "outcome_unknown",
+                    "reconciliation_required": True,
+                    "anomalies": [{"code": "A3", "detail": redact(str(exc))}],
+                }
+                if invocation_id:
+                    self.runner._results[invocation_id] = response
+                    self.runner._persist_result(invocation_id, response)
+            conn.sendall(canonical_json(response).encode() + b"\n")
 
     def _verify_envelope(self, envelope: dict[str, Any]) -> None:
         if set(envelope) != {"payload", "nonce", "issued_at", "expires_at", "signature"}:
